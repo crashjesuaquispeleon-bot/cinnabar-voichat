@@ -669,6 +669,165 @@ mod tests {
     }
 
     #[test]
+    fn persistent_worker_can_reselect_after_disconnect_without_default_fallback() {
+        use std::collections::VecDeque;
+        use std::sync::{
+            atomic::{AtomicBool, AtomicU64, Ordering},
+            Arc, Mutex,
+        };
+
+        #[derive(Clone)]
+        struct Shared {
+            running: Arc<AtomicBool>,
+            opens: Arc<AtomicU64>,
+            selections: Arc<Mutex<Vec<super::super::voice_capture::MicrophoneSelection>>>,
+            events: Arc<Mutex<VecDeque<super::super::voice_capture::MicrophoneWorkerEvent>>>,
+        }
+
+        struct WorkerBackedStream(Shared);
+
+        impl VoiceCaptureStream for WorkerBackedStream {
+            fn stop(&mut self) {
+                self.0.running.store(false, Ordering::Release);
+            }
+
+            fn is_running(&self) -> bool {
+                self.0.running.load(Ordering::Acquire)
+            }
+
+            fn has_persistent_device_worker(&self) -> bool {
+                true
+            }
+
+            fn refresh_input_devices(&mut self) -> Result<(), String> {
+                self.0.events.lock().unwrap().push_back(
+                    super::super::voice_capture::MicrophoneWorkerEvent::Devices(vec![
+                        super::super::voice_capture::MicrophoneDevice {
+                            id: "fresh-device-token".to_owned(),
+                            name: "USB microphone".to_owned(),
+                            is_default: false,
+                        },
+                    ]),
+                );
+                Ok(())
+            }
+
+            fn select_input_device(
+                &mut self,
+                selection: super::super::voice_capture::MicrophoneSelection,
+            ) -> Result<(), String> {
+                self.0.selections.lock().unwrap().push(selection.clone());
+                self.0.running.store(true, Ordering::Release);
+                let device_id = match selection {
+                    super::super::voice_capture::MicrophoneSelection::Device(id) => id,
+                    super::super::voice_capture::MicrophoneSelection::SystemDefault => {
+                        "system-default".to_owned()
+                    }
+                };
+                self.0.events.lock().unwrap().push_back(
+                    super::super::voice_capture::MicrophoneWorkerEvent::Selected { device_id },
+                );
+                Ok(())
+            }
+
+            fn try_recv_input_event(
+                &mut self,
+            ) -> Option<super::super::voice_capture::MicrophoneWorkerEvent> {
+                self.0.events.lock().unwrap().pop_front()
+            }
+        }
+
+        struct WorkerBackedOpener(Shared);
+
+        impl VoiceCaptureOpener for WorkerBackedOpener {
+            fn open_default(
+                &self,
+                _queues: VoiceCaptureQueues,
+            ) -> Result<Box<dyn VoiceCaptureStream>, VoiceCaptureError> {
+                self.0.opens.fetch_add(1, Ordering::Relaxed);
+                self.0.running.store(true, Ordering::Release);
+                Ok(Box::new(WorkerBackedStream(self.0.clone())))
+            }
+        }
+
+        let shared = Shared {
+            running: Arc::new(AtomicBool::new(false)),
+            opens: Arc::new(AtomicU64::new(0)),
+            selections: Arc::new(Mutex::new(Vec::new())),
+            events: Arc::new(Mutex::new(VecDeque::new())),
+        };
+        let mut controller =
+            VoiceCaptureController::with_opener(Box::new(WorkerBackedOpener(shared.clone())));
+        let mut policy = permitted_policy();
+
+        controller.sync_with_policy(&mut policy);
+        assert!(controller.is_running());
+        assert_eq!(shared.opens.load(Ordering::Relaxed), 1);
+
+        shared.running.store(false, Ordering::Release);
+        shared.events.lock().unwrap().push_back(
+            super::super::voice_capture::MicrophoneWorkerEvent::DeviceUnavailable {
+                device_id: Some("old-device-token".to_owned()),
+            },
+        );
+        controller.sync_with_policy(&mut policy);
+
+        // A worker-backed device loss pauses capture but retains the owner worker.
+        assert!(!controller.is_running());
+        assert_eq!(shared.opens.load(Ordering::Relaxed), 1);
+        assert_eq!(
+            controller.poll_microphone_events(),
+            vec![
+                super::super::voice_capture::MicrophoneWorkerEvent::DeviceUnavailable {
+                    device_id: Some("old-device-token".to_owned())
+                }
+            ]
+        );
+
+        controller.refresh_microphone_devices().unwrap();
+        assert_eq!(
+            controller.poll_microphone_events(),
+            vec![
+                super::super::voice_capture::MicrophoneWorkerEvent::Devices(vec![
+                    super::super::voice_capture::MicrophoneDevice {
+                        id: "fresh-device-token".to_owned(),
+                        name: "USB microphone".to_owned(),
+                        is_default: false,
+                    }
+                ])
+            ]
+        );
+
+        controller
+            .select_microphone_device(
+                super::super::voice_capture::MicrophoneSelection::Device(
+                    "fresh-device-token".to_owned(),
+                ),
+            )
+            .unwrap();
+        controller.sync_with_policy(&mut policy);
+
+        assert!(controller.is_running());
+        assert_eq!(shared.opens.load(Ordering::Relaxed), 1);
+        assert_eq!(
+            *shared.selections.lock().unwrap(),
+            vec![
+                super::super::voice_capture::MicrophoneSelection::Device(
+                    "fresh-device-token".to_owned()
+                )
+            ]
+        );
+        assert_eq!(
+            controller.poll_microphone_events(),
+            vec![
+                super::super::voice_capture::MicrophoneWorkerEvent::Selected {
+                    device_id: "fresh-device-token".to_owned()
+                }
+            ]
+        );
+    }
+
+    #[test]
     fn open_error_is_recorded() {
         struct FailingOpener;
         impl VoiceCaptureOpener for FailingOpener {

@@ -75,6 +75,14 @@ impl VoiceCaptureController {
         }
     }
 
+    /// Updates capture gain for both the future network queue and local monitor.
+    /// The percentage is bounded to 0..=200; 100 leaves microphone samples unchanged.
+    pub fn set_input_sensitivity_percent(&self, percent: u8) {
+        let gain = f32::from(percent.min(200)) / 100.0;
+        self.queue.set_input_gain(gain);
+        self.monitor_queue.set_input_gain(gain);
+    }
+
     #[must_use]
     pub fn queue(&self) -> SharedPcmQueue {
         Arc::clone(&self.queue)

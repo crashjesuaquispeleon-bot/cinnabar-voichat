@@ -147,7 +147,7 @@ impl VoiceCaptureController {
         if !self.is_running()
             && self
                 .next_open_attempt
-                .is_none_or(|deadline| now >= deadline)
+                .map_or(true, |deadline| now >= deadline)
         {
             self.try_open(policy, now);
         }
@@ -165,6 +165,12 @@ impl VoiceCaptureController {
             return;
         }
         self.stream = None;
+        // Retire any samples left by a stream that stopped asynchronously before
+        // attempting to reopen. The queues stay closed until the policy is re-applied.
+        self.queue.set_accepting(false);
+        self.monitor_queue.set_accepting(false);
+        self.queue.clear();
+        self.monitor_queue.clear();
         self.open_attempts = self.open_attempts.saturating_add(1);
         match self.opener.open_default(VoiceCaptureQueues {
             transmit: Arc::clone(&self.queue),
@@ -429,6 +435,14 @@ mod tests {
         assert_eq!(attempts.load(Ordering::Relaxed), 2);
         controller.sync_with_policy_at(&mut policy, start + Duration::from_millis(1_500));
         assert_eq!(attempts.load(Ordering::Relaxed), 3);
+
+        // Repeated failures grow the delay but never exceed the eight-second cap.
+        let mut now = start + Duration::from_secs(2);
+        for _ in 0..8 {
+            now += controller.open_retry_delay;
+            controller.sync_with_policy_at(&mut policy, now);
+        }
+        assert_eq!(controller.open_retry_delay, MAX_OPEN_RETRY_DELAY);
 
         // A policy/session stop resets the retry window for the next deliberate start.
         policy.set_session_active(false);

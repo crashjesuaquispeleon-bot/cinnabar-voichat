@@ -45,8 +45,10 @@ impl Default for VoiceCaptureController {
 impl VoiceCaptureController {
     #[must_use]
     pub fn with_opener(opener: Box<dyn VoiceCaptureOpener>) -> Self {
+        let queue = Arc::new(BoundedPcmQueue::with_default_capacity());
+        queue.set_accepting(false);
         Self {
-            queue: Arc::new(BoundedPcmQueue::with_default_capacity()),
+            queue,
             opener,
             stream: None,
             last_capture_permitted: false,
@@ -114,6 +116,9 @@ impl VoiceCaptureController {
         } else {
             self.force_stop();
         }
+        // Only retain samples while the current activation mode permits transmission.
+        // PTT keeps the device open but the callback queue is closed until the key is held.
+        self.queue.set_accepting(policy.transmission_permitted());
         self.last_capture_permitted = should_open && self.is_running();
     }
 
@@ -148,6 +153,7 @@ impl VoiceCaptureController {
     }
 
     fn force_stop(&mut self) {
+        self.queue.set_accepting(false);
         if let Some(mut stream) = self.stream.take() {
             stream.stop();
             self.stop_count = self.stop_count.saturating_add(1);

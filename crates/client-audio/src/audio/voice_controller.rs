@@ -672,8 +672,8 @@ mod tests {
     fn persistent_worker_can_reselect_after_disconnect_without_default_fallback() {
         use std::collections::VecDeque;
         use std::sync::{
-            atomic::{AtomicBool, AtomicU64, Ordering},
             Arc, Mutex,
+            atomic::{AtomicBool, AtomicU64, Ordering},
         };
 
         #[derive(Clone)]

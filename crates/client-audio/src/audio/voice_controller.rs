@@ -5,8 +5,8 @@
 //! capture owner thread; this module only issues start/stop decisions on the frame schedule.
 
 use super::voice_input::{MicrophonePermission, VoiceInputPolicy};
-use super::voice_permission::{outcome_from_error, outcome_from_success, permission_after_outcome};
 use super::voice_pcm::BoundedPcmQueue;
+use super::voice_permission::{outcome_from_error, outcome_from_success, permission_after_outcome};
 use super::voice_stream::{
     MockVoiceCaptureOpener, SharedPcmQueue, VoiceCaptureError, VoiceCaptureOpener,
     VoiceCaptureQueues, VoiceCaptureStream,
@@ -220,7 +220,9 @@ impl VoiceCaptureController {
         self.queue.set_accepting(false);
         self.monitor_queue.set_accepting(false);
         if let Some(stream) = self.stream.take() {
-            let mut stream = stream.into_inner().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let mut stream = stream
+                .into_inner()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             stream.stop();
             self.stop_count = self.stop_count.saturating_add(1);
         }
@@ -333,7 +335,9 @@ mod tests {
         let mut controller = test_controller();
         let mut policy = permitted_policy();
         controller.sync_with_policy(&mut policy);
-        controller.queue().push(crate::audio::voice_pcm::PcmFrame::silence());
+        controller
+            .queue()
+            .push(crate::audio::voice_pcm::PcmFrame::silence());
         assert!(controller.is_running());
         assert_eq!(controller.queue().len(), 1);
 
@@ -415,10 +419,9 @@ mod tests {
         }
 
         let attempts = Arc::new(AtomicU64::new(0));
-        let mut controller =
-            VoiceCaptureController::with_opener(Box::new(CountingFailingOpener(
-                Arc::clone(&attempts),
-            )));
+        let mut controller = VoiceCaptureController::with_opener(Box::new(CountingFailingOpener(
+            Arc::clone(&attempts),
+        )));
         let mut policy = permitted_policy();
         let start = std::time::Instant::now();
 

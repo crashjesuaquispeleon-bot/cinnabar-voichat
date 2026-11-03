@@ -12,7 +12,13 @@ use super::voice_stream::{
     VoiceCaptureQueues, VoiceCaptureStream,
 };
 use bevy::prelude::{ResMut, Resource};
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
+
+const INITIAL_OPEN_RETRY_DELAY: Duration = Duration::from_millis(500);
+const MAX_OPEN_RETRY_DELAY: Duration = Duration::from_secs(8);
 
 /// Owns the shared PCM queue and the optional running capture stream.
 ///
@@ -28,6 +34,8 @@ pub struct VoiceCaptureController {
     last_error: Option<String>,
     open_attempts: u64,
     stop_count: u64,
+    next_open_attempt: Option<Instant>,
+    open_retry_delay: Duration,
 }
 
 impl Default for VoiceCaptureController {
@@ -59,6 +67,8 @@ impl VoiceCaptureController {
             last_error: None,
             open_attempts: 0,
             stop_count: 0,
+            next_open_attempt: None,
+            open_retry_delay: INITIAL_OPEN_RETRY_DELAY,
         }
     }
 
@@ -109,34 +119,48 @@ impl VoiceCaptureController {
 
     /// Applies the current policy: open when capture may run, stop when not.
     ///
-    /// Updates [`VoiceInputPolicy`] permission from the open outcome (probe-on-first-open).
+    /// Failed transient opens use an exponential retry delay (500 ms to 8 s) so a
+    /// missing/hot-plugged device cannot trigger an open attempt every Bevy frame.
+    /// The clock-aware helper keeps retry behavior deterministic in tests.
     pub fn sync_with_policy(&mut self, policy: &mut VoiceInputPolicy) {
+        self.sync_with_policy_at(policy, Instant::now());
+    }
+
+    fn sync_with_policy_at(&mut self, policy: &mut VoiceInputPolicy, now: Instant) {
         let should_open = Self::should_open(policy);
-        if should_open == self.last_capture_permitted && self.is_running() == should_open {
-            if should_open && !self.is_running() {
-                self.try_open(policy);
+
+        if !should_open {
+            if self.stream.is_some() || self.last_capture_permitted {
+                self.force_stop();
+            } else {
+                self.queue.set_accepting(false);
+                self.monitor_queue.set_accepting(false);
+                self.queue.clear();
+                self.monitor_queue.clear();
             }
-            let accepting = policy.transmission_permitted();
-            self.queue.set_accepting(accepting);
-            self.monitor_queue.set_accepting(accepting);
-            self.last_capture_permitted = should_open && self.is_running();
+            self.next_open_attempt = None;
+            self.open_retry_delay = INITIAL_OPEN_RETRY_DELAY;
+            self.last_capture_permitted = false;
             return;
         }
 
-        if should_open {
-            self.try_open(policy);
-        } else {
-            self.force_stop();
+        if !self.is_running()
+            && self
+                .next_open_attempt
+                .is_none_or(|deadline| now >= deadline)
+        {
+            self.try_open(policy, now);
         }
+
         // Keep both destinations in lockstep. The monitor has its own queue so its
         // playback consumer cannot steal frames from the future network sender.
         let accepting = policy.transmission_permitted();
         self.queue.set_accepting(accepting);
         self.monitor_queue.set_accepting(accepting);
-        self.last_capture_permitted = should_open && self.is_running();
+        self.last_capture_permitted = self.is_running();
     }
 
-    fn try_open(&mut self, policy: &mut VoiceInputPolicy) {
+    fn try_open(&mut self, policy: &mut VoiceInputPolicy, now: Instant) {
         if self.is_running() {
             return;
         }
@@ -149,6 +173,8 @@ impl VoiceCaptureController {
             Ok(stream) => {
                 self.last_error = None;
                 self.stream = Some(Mutex::new(stream));
+                self.next_open_attempt = None;
+                self.open_retry_delay = INITIAL_OPEN_RETRY_DELAY;
                 policy.set_permission(permission_after_outcome(
                     policy.permission(),
                     outcome_from_success(),
@@ -159,6 +185,19 @@ impl VoiceCaptureController {
                 self.stream = None;
                 let outcome = outcome_from_error(&error);
                 policy.set_permission(permission_after_outcome(policy.permission(), outcome));
+
+                // Permission denial is terminal until the user/OS changes permission.
+                // Other failures (no device, unsupported format, transient host errors)
+                // are retried with bounded exponential backoff.
+                if policy.permission() != MicrophonePermission::Denied {
+                    self.next_open_attempt = Some(now + self.open_retry_delay);
+                    self.open_retry_delay = self
+                        .open_retry_delay
+                        .saturating_mul(2)
+                        .min(MAX_OPEN_RETRY_DELAY);
+                } else {
+                    self.next_open_attempt = None;
+                }
             }
         }
     }
@@ -167,6 +206,8 @@ impl VoiceCaptureController {
     pub fn reset_for_session_change(&mut self) {
         self.force_stop();
         self.last_capture_permitted = false;
+        self.next_open_attempt = None;
+        self.open_retry_delay = INITIAL_OPEN_RETRY_DELAY;
     }
 
     fn force_stop(&mut self) {
@@ -351,6 +392,50 @@ mod tests {
         assert!(controller.is_running());
         assert!(!controller.queue().is_accepting());
         assert!(!controller.monitor_queue().is_accepting());
+    }
+
+    #[test]
+    fn transient_open_failures_are_rate_limited_with_bounded_backoff() {
+        use std::sync::atomic::{AtomicU64, Ordering};
+
+        struct CountingFailingOpener(Arc<AtomicU64>);
+        impl VoiceCaptureOpener for CountingFailingOpener {
+            fn open_default(
+                &self,
+                _queues: VoiceCaptureQueues,
+            ) -> Result<Box<dyn VoiceCaptureStream>, VoiceCaptureError> {
+                self.0.fetch_add(1, Ordering::Relaxed);
+                Err(VoiceCaptureError::NoDevice)
+            }
+        }
+
+        let attempts = Arc::new(AtomicU64::new(0));
+        let mut controller =
+            VoiceCaptureController::with_opener(Box::new(CountingFailingOpener(Arc::clone(&attempts))));
+        let mut policy = permitted_policy();
+        let start = std::time::Instant::now();
+
+        controller.sync_with_policy_at(&mut policy, start);
+        assert_eq!(attempts.load(Ordering::Relaxed), 1);
+
+        controller.sync_with_policy_at(&mut policy, start + Duration::from_millis(499));
+        assert_eq!(attempts.load(Ordering::Relaxed), 1);
+
+        controller.sync_with_policy_at(&mut policy, start + Duration::from_millis(500));
+        assert_eq!(attempts.load(Ordering::Relaxed), 2);
+
+        // The second failure doubles the delay to one second.
+        controller.sync_with_policy_at(&mut policy, start + Duration::from_millis(1_499));
+        assert_eq!(attempts.load(Ordering::Relaxed), 2);
+        controller.sync_with_policy_at(&mut policy, start + Duration::from_millis(1_500));
+        assert_eq!(attempts.load(Ordering::Relaxed), 3);
+
+        // A policy/session stop resets the retry window for the next deliberate start.
+        policy.set_session_active(false);
+        controller.sync_with_policy_at(&mut policy, start + Duration::from_secs(2));
+        policy.set_session_active(true);
+        controller.sync_with_policy_at(&mut policy, start + Duration::from_secs(2));
+        assert_eq!(attempts.load(Ordering::Relaxed), 4);
     }
 
     #[test]

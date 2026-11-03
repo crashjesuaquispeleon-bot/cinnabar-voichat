@@ -11,16 +11,35 @@ use std::sync::Arc;
 pub type SharedPcmQueue = Arc<BoundedPcmQueue>;
 
 /// Errors from opening or running a local capture stream.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum VoiceCaptureError {
-    #[error("microphone capture is not permitted by policy")]
+    /// Policy refused to open the device.
     NotPermitted,
-    #[error("no input device available")]
+    /// Host reported no input device.
     NoDevice,
-    #[error("unsupported input format")]
+    /// Negotiated format cannot be converted to the internal mono layout.
     UnsupportedFormat,
-    #[error(transparent)]
-    Other(#[from] anyhow::Error),
+    /// Other platform failure.
+    Other(String),
+}
+
+impl std::fmt::Display for VoiceCaptureError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NotPermitted => write!(f, "microphone capture is not permitted by policy"),
+            Self::NoDevice => write!(f, "no input device available"),
+            Self::UnsupportedFormat => write!(f, "unsupported input format"),
+            Self::Other(message) => write!(f, "{message}"),
+        }
+    }
+}
+
+impl std::error::Error for VoiceCaptureError {}
+
+impl From<anyhow::Error> for VoiceCaptureError {
+    fn from(value: anyhow::Error) -> Self {
+        Self::Other(value.to_string())
+    }
 }
 
 /// Lifecycle control for a running (or mock) capture stream.
@@ -41,13 +60,15 @@ pub trait VoiceCaptureStream: Send {
 /// [`super::voice_input::VoiceInputPolicy::capture_permitted`]. The stream must stop when
 /// the handle is dropped.
 pub trait VoiceCaptureOpener: Send + Sync {
-    fn open_default(&self, queue: SharedPcmQueue) -> Result<Box<dyn VoiceCaptureStream>, VoiceCaptureError>;
+    fn open_default(
+        &self,
+        queue: SharedPcmQueue,
+    ) -> Result<Box<dyn VoiceCaptureStream>, VoiceCaptureError>;
 }
 
-/// Accumulates interleaved or planar samples into mono [`PcmFrame`]s and pushes them.
+/// Accumulates mono samples into [`PcmFrame`]s and pushes them.
 ///
-/// Intended for the real-time callback: no heap allocation after construction of the
-/// scratch frame on the stack inside [`push_mono_samples`].
+/// Intended for the real-time callback path after format conversion.
 #[derive(Debug, Default)]
 pub struct MonoFrameBuilder {
     partial: [f32; VOICE_FRAME_SAMPLES],
@@ -107,7 +128,7 @@ pub fn interleaved_to_mono_f32(src: &[f32], channels: u16, dst: &mut Vec<f32>) -
     frames
 }
 
-/// Converts integer PCM (`i16`) samples to `f32` in place-style output buffer.
+/// Converts integer PCM (`i16`) samples to `f32`.
 pub fn i16_slice_to_f32(src: &[i16], dst: &mut Vec<f32>) {
     dst.clear();
     dst.reserve(src.len());
@@ -204,14 +225,12 @@ mod tests {
     }
 
     #[test]
-    fn mock_stream_stops_and_clears_queue() {
+    fn mock_stream_stops_on_drop() {
         let queue = Arc::new(BoundedPcmQueue::new(4));
         let opener = MockVoiceCaptureOpener;
-        let mut stream = opener.open_default(Arc::clone(&queue)).unwrap();
+        let stream = opener.open_default(Arc::clone(&queue)).unwrap();
         assert!(stream.is_running());
-        // inject via concrete type
         drop(stream);
-        // After drop, a new mock can still open.
         let mut stream = opener.open_default(Arc::clone(&queue)).unwrap();
         stream.stop();
         assert!(!stream.is_running());

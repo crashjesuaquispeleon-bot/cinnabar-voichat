@@ -787,23 +787,19 @@ mod tests {
         controller.refresh_microphone_devices().unwrap();
         assert_eq!(
             controller.poll_microphone_events(),
-            vec![
-                super::super::voice_capture::MicrophoneWorkerEvent::Devices(vec![
-                    super::super::voice_capture::MicrophoneDevice {
-                        id: "fresh-device-token".to_owned(),
-                        name: "USB microphone".to_owned(),
-                        is_default: false,
-                    }
-                ])
-            ]
+            vec![super::super::voice_capture::MicrophoneWorkerEvent::Devices(
+                vec![super::super::voice_capture::MicrophoneDevice {
+                    id: "fresh-device-token".to_owned(),
+                    name: "USB microphone".to_owned(),
+                    is_default: false,
+                }]
+            )]
         );
 
         controller
-            .select_microphone_device(
-                super::super::voice_capture::MicrophoneSelection::Device(
-                    "fresh-device-token".to_owned(),
-                ),
-            )
+            .select_microphone_device(super::super::voice_capture::MicrophoneSelection::Device(
+                "fresh-device-token".to_owned(),
+            ))
             .unwrap();
         controller.sync_with_policy(&mut policy);
 
@@ -811,11 +807,9 @@ mod tests {
         assert_eq!(shared.opens.load(Ordering::Relaxed), 1);
         assert_eq!(
             *shared.selections.lock().unwrap(),
-            vec![
-                super::super::voice_capture::MicrophoneSelection::Device(
-                    "fresh-device-token".to_owned()
-                )
-            ]
+            vec![super::super::voice_capture::MicrophoneSelection::Device(
+                "fresh-device-token".to_owned()
+            )]
         );
         assert_eq!(
             controller.poll_microphone_events(),

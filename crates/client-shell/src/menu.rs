@@ -224,6 +224,7 @@ pub struct MenuRuntime {
     selected_microphone_id: Option<String>,
     microphone_message: Option<String>,
     microphone_permission_status: launcher::menu::view::MicrophonePermissionStatus,
+    microphone_permission_retry_requested: bool,
     microphone_refresh_requested: bool,
     microphone_selection_requested:
         Option<launcher::menu::view::MicrophoneSelectionRequest>,
@@ -366,6 +367,11 @@ impl MenuRuntime {
     /// Whether any device rows currently belong to the visible microphone snapshot.
     pub fn has_microphone_devices(&self) -> bool {
         !self.microphone_devices.is_empty()
+    }
+
+    /// Consumes one request to retry the operating-system microphone permission probe.
+    pub fn take_microphone_permission_retry_request(&mut self) -> bool {
+        std::mem::take(&mut self.microphone_permission_retry_requested)
     }
 
     /// Consumes one UI request to enumerate native microphone inputs.

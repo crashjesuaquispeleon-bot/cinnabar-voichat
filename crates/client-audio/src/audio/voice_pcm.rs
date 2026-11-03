@@ -5,7 +5,7 @@
 //! This queue is safe to share between the capture callback and a consumer thread.
 
 use crossbeam_queue::ArrayQueue;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 /// Internal capture format used between the microphone backend and later encode/playback.
 pub const VOICE_SAMPLE_RATE: u32 = 48_000;
@@ -75,6 +75,7 @@ pub struct BoundedPcmQueue {
     suppressed: AtomicU64,
     accepting: std::sync::atomic::AtomicBool,
     generation: AtomicU64,
+    input_gain: AtomicU32,
 }
 
 impl BoundedPcmQueue {
@@ -88,6 +89,7 @@ impl BoundedPcmQueue {
             suppressed: AtomicU64::new(0),
             accepting: std::sync::atomic::AtomicBool::new(false),
             generation: AtomicU64::new(0),
+            input_gain: AtomicU32::new(1.0_f32.to_bits()),
         }
     }
 
@@ -115,6 +117,19 @@ impl BoundedPcmQueue {
     #[must_use]
     pub fn is_accepting(&self) -> bool {
         self.accepting.load(Ordering::Acquire)
+    }
+
+    /// Sets local microphone gain for every subsequently queued frame.
+    ///
+    /// Non-finite values reset to unity; values are bounded to 0..=2x. This is an
+    /// atomic store so the audio callback never locks or allocates while applying it.
+    pub fn set_input_gain(&self, gain: f32) {
+        let gain = if gain.is_finite() {
+            gain.clamp(0.0, 2.0)
+        } else {
+            1.0
+        };
+        self.input_gain.store(gain.to_bits(), Ordering::Release);
     }
 
     /// Changes the capture gate and advances an epoch so in-flight callbacks from an
@@ -160,6 +175,15 @@ impl BoundedPcmQueue {
             self.suppressed.fetch_add(1, Ordering::Relaxed);
             return;
         }
+        let gain = f32::from_bits(self.input_gain.load(Ordering::Acquire));
+        for sample in &mut frame.samples {
+            let scaled = *sample * gain;
+            *sample = if scaled.is_finite() {
+                scaled.clamp(-1.0, 1.0)
+            } else {
+                0.0
+            };
+        }
         frame.generation = generation;
         if self.slots.push(frame).is_ok() {
             self.pushed.fetch_add(1, Ordering::Relaxed);
@@ -201,6 +225,26 @@ impl BoundedPcmQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn input_gain_scales_and_clips_captured_frames_without_changing_queue_policy() {
+        let q = BoundedPcmQueue::new(2);
+        q.set_accepting(true);
+        q.set_input_gain(2.0);
+        q.push_samples(&[0.25; VOICE_FRAME_SAMPLES]);
+        let frame = q.pop().expect("gain-adjusted frame should be queued");
+        assert!((frame.samples()[0] - 0.5).abs() < 1e-6);
+
+        q.set_input_gain(2.0);
+        q.push_samples(&[0.75; VOICE_FRAME_SAMPLES]);
+        let clipped = q.pop().expect("boosted frame should be queued");
+        assert_eq!(clipped.samples()[0], 1.0);
+
+        q.set_input_gain(f32::NAN);
+        q.push_samples(&[0.25; VOICE_FRAME_SAMPLES]);
+        let reset = q.pop().expect("non-finite gain should recover to unity");
+        assert!((reset.samples()[0] - 0.25).abs() < 1e-6);
+    }
 
     #[test]
     fn frame_constants_match_twenty_millisecond_mono_48k() {

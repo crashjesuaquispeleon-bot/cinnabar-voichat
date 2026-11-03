@@ -173,6 +173,15 @@ mod tests {
     }
 
     #[test]
+    fn monitor_source_ends_when_capture_lifecycle_stops() {
+        let queue = Arc::new(BoundedPcmQueue::new(2));
+        queue.set_accepting(true);
+        let mut source = VoiceLoopbackSource::new(queue);
+        source.stop_flag().store(true, Ordering::Release);
+        assert_eq!(source.next(), None);
+    }
+
+    #[test]
     fn empty_queue_yields_silence_stereo_pairs() {
         let queue = Arc::new(BoundedPcmQueue::new(4));
         queue.set_accepting(true);

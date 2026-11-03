@@ -89,7 +89,9 @@ fn drive_microphone_settings(
                 "Permission check restarted. Enable Voice Chat in an active multiplayer session to prompt the OS again.",
             );
         } else {
-            menu.set_microphone_message("Microphone permission state is unavailable on this client.");
+            menu.set_microphone_message(
+                "Microphone permission state is unavailable on this client.",
+            );
         }
     }
 

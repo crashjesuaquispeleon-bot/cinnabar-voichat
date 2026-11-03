@@ -107,7 +107,8 @@ impl VoiceCaptureController {
             if should_open && !self.is_running() {
                 self.try_open(policy);
             }
-            self.last_capture_permitted = should_open;
+            self.queue.set_accepting(policy.transmission_permitted());
+            self.last_capture_permitted = should_open && self.is_running();
             return;
         }
 
@@ -307,6 +308,27 @@ mod tests {
         controller.sync_with_policy(&mut policy);
         assert_eq!(controller.open_attempts(), 1);
         assert!(controller.is_running());
+    }
+
+
+    #[test]
+    fn push_to_talk_controls_pcm_queue_acceptance_without_closing_device() {
+        let mut controller = test_controller();
+        let mut policy = enabled_session();
+        policy.set_mode(MicrophoneMode::PushToTalk);
+        controller.sync_with_policy(&mut policy);
+        assert!(controller.is_running());
+        assert!(!controller.queue().is_accepting());
+
+        policy.set_push_to_talk_held(true);
+        controller.sync_with_policy(&mut policy);
+        assert!(controller.is_running());
+        assert!(controller.queue().is_accepting());
+
+        policy.set_push_to_talk_held(false);
+        controller.sync_with_policy(&mut policy);
+        assert!(controller.is_running());
+        assert!(!controller.queue().is_accepting());
     }
 
     #[test]

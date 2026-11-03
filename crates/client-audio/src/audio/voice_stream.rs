@@ -322,7 +322,7 @@ struct CpalVoiceCaptureHandle {
     stop: Option<std::sync::mpsc::Sender<()>>,
     owner: Option<std::thread::JoinHandle<()>>,
     running: std::sync::Arc<std::sync::atomic::AtomicBool>,
-    queue: SharedPcmQueue,
+    queues: VoiceCaptureQueues,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -337,7 +337,8 @@ impl VoiceCaptureStream for CpalVoiceCaptureHandle {
         self.running
             .store(false, std::sync::atomic::Ordering::Release);
         // The owner thread has dropped the CPAL stream, so the callback cannot repopulate it.
-        self.queue.clear();
+        self.queues.transmit.clear();
+        self.queues.monitor.clear();
     }
 
     fn is_running(&self) -> bool {
@@ -430,7 +431,8 @@ impl VoiceCaptureOpener for CpalVoiceCaptureOpener {
                         )
                     }
                     rodio::cpal::SampleFormat::I16 => {
-                        let callback_queue = Arc::clone(&thread_queue);
+                        let callback_transmit = Arc::clone(&thread_queues.transmit);
+                        let callback_monitor = Arc::clone(&thread_queues.monitor);
                         let mut builder = MonoFrameBuilder::new();
                         let callback_running = std::sync::Arc::clone(&thread_running);
                         device.build_input_stream(

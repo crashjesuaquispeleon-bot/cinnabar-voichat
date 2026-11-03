@@ -115,6 +115,16 @@ impl VoiceCaptureController {
         self.stop_count
     }
 
+    /// Clears a denied permission result's retry deadline after the player changes OS privacy settings.
+    ///
+    /// The normal policy still decides whether an open attempt is allowed: voice must be
+    /// enabled, the session active and the mode selected. This method does not open capture.
+    pub fn retry_permission_probe(&mut self) {
+        self.next_open_attempt = None;
+        self.open_retry_delay = INITIAL_OPEN_RETRY_DELAY;
+        self.last_error = None;
+    }
+
     /// Requests a fresh local input-device snapshot from the active native worker.
     /// The returned descriptors arrive asynchronously through poll_microphone_events.
     pub fn refresh_microphone_devices(&mut self) -> Result<(), String> {
@@ -838,6 +848,22 @@ mod tests {
                 }
             ]
         );
+    }
+
+    #[test]
+    fn permission_retry_clears_previous_backoff_without_opening_capture() {
+        let mut controller =
+            VoiceCaptureController::with_opener(Box::new(MockVoiceCaptureOpener));
+        controller.next_open_attempt = Some(Instant::now() + Duration::from_secs(8));
+        controller.open_retry_delay = MAX_OPEN_RETRY_DELAY;
+        controller.last_error = Some("permission denied".to_owned());
+
+        controller.retry_permission_probe();
+
+        assert!(controller.next_open_attempt.is_none());
+        assert_eq!(controller.open_retry_delay, INITIAL_OPEN_RETRY_DELAY);
+        assert_eq!(controller.last_error(), None);
+        assert!(!controller.is_running());
     }
 
     #[test]

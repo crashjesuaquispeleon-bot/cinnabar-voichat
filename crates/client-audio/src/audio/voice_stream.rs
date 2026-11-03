@@ -202,7 +202,7 @@ impl MonoFrameBuilder {
 /// Returns `None` when `channels` is zero, the input is not channel-aligned, or `dst`
 /// is too small. This is the preferred helper for an audio callback.
 pub fn interleaved_to_mono_f32_into(src: &[f32], channels: u16, dst: &mut [f32]) -> Option<usize> {
-    if channels == 0 || src.len() % channels as usize != 0 {
+    if channels == 0 || !src.len().is_multiple_of(channels as usize) {
         return None;
     }
     let frames = src.len() / channels as usize;

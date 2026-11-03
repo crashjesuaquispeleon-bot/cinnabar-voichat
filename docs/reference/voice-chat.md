@@ -132,7 +132,7 @@ References:
 - `VoiceCaptureController` opens only while voice is enabled and a multiplayer session is active. Unknown permission is probed once the controller attempts to open; Denied does not spin-reopen.
 - The capture callback writes fixed 20 ms mono frames into a bounded, preallocated queue. It does not allocate, log, encode or block.
 - The queue has a policy gate and generation tag. It accepts samples only while `transmission_permitted()` is true; PTT keeps the device open but does not retain microphone PCM until the held action is active. Mute, release, mode change, disconnect and session replacement close the gate, advance its epoch and retire stale in-flight frames.
-- macOS packaging includes `NSMicrophoneUsageDescription`. Native settings/deep-link UX, denial recovery, device selection, local loopback playback and network transport are still pending.
+- macOS packaging includes `NSMicrophoneUsageDescription`. Native settings/deep-link UX, denial recovery, device selection, runtime loopback validation and network transport are still pending. A pull-driven loopback source and optional existing-mixer attachment are implemented in source but are not build- or device-verified.
 
 The permission probe may open the microphone device while voice is enabled in a live session even if PTT is not held. The queue gate prevents samples from being retained or forwarded during that interval.
 
@@ -169,7 +169,7 @@ The semantic input domain now includes `Action::PushToTalk` as a persistent held
 
 The app session-audio adapter reads only the finalized `SemanticInputSnapshot` phase for `Action::PushToTalk` and forwards its `held` value to `VoiceInputPolicy::set_push_to_talk_held()`. It runs after `ClientFrameSet::SemanticFinalize` and before `sync_voice_capture_with_policy`, so the controller observes the same frame's policy. Missing or cleared snapshots are neutral/released. The audio crate never reads Bevy keyboard state.
 
-Router and launcher tests cover PTT press/hold/release and remapping. OS permission settings UI, mute/settings UI, local loopback and network transport remain separate follow-up work.
+Router and launcher tests cover PTT press/hold/release and remapping. OS permission settings UI, mute/settings UI, runtime loopback validation and network transport remain separate follow-up work.
 
 ## PTT-aware PCM privacy gate
 

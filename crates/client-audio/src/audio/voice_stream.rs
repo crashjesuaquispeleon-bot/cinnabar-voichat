@@ -92,12 +92,60 @@ impl MonoFrameBuilder {
             self.filled += take;
             offset += take;
             if self.filled == VOICE_FRAME_SAMPLES {
-                let mut frame = PcmFrame::silence();
-                frame.copy_from_slice(&self.partial);
-                queue.push(frame);
-                self.filled = 0;
+                self.emit_frame(queue);
             }
         }
+    }
+
+    /// Downmixes interleaved `f32` callback samples directly into fixed PCM frames.
+    /// No temporary vector or heap allocation is used. Incomplete trailing channel data
+    /// is ignored because it cannot form a complete interleaved sample frame.
+    pub fn push_interleaved_f32(
+        &mut self,
+        samples: &[f32],
+        channels: u16,
+        queue: &BoundedPcmQueue,
+    ) {
+        let channels = channels as usize;
+        if channels == 0 {
+            return;
+        }
+        for input_frame in samples.chunks_exact(channels) {
+            let mono = input_frame.iter().copied().sum::<f32>() / channels as f32;
+            self.push_one(mono, queue);
+        }
+    }
+
+    /// Converts and downmixes interleaved `i16` callback samples without allocating.
+    pub fn push_interleaved_i16(
+        &mut self,
+        samples: &[i16],
+        channels: u16,
+        queue: &BoundedPcmQueue,
+    ) {
+        let channels = channels as usize;
+        if channels == 0 {
+            return;
+        }
+        for input_frame in samples.chunks_exact(channels) {
+            let sum = input_frame.iter().map(|&sample| f32::from(sample)).sum::<f32>();
+            self.push_one(sum / channels as f32 / 32768.0, queue);
+        }
+    }
+
+    fn push_one(&mut self, sample: f32, queue: &BoundedPcmQueue) {
+        self.partial[self.filled] = sample;
+        self.filled += 1;
+        if self.filled == VOICE_FRAME_SAMPLES {
+            self.emit_frame(queue);
+        }
+    }
+
+    fn emit_frame(&mut self, queue: &BoundedPcmQueue) {
+        let mut frame = PcmFrame::silence();
+        frame.copy_from_slice(&self.partial);
+        queue.push(frame);
+        self.filled = 0;
     }
 
     /// Drops any incomplete frame (device stop / session end).
@@ -230,6 +278,196 @@ impl VoiceCaptureOpener for MockVoiceCaptureOpener {
     }
 }
 
+
+/// Opens the default CPAL microphone and owns its stream on a dedicated thread.
+/// The device must expose an exact 48 kHz `f32` or `i16` input configuration;
+/// unsupported rates are rejected rather than mislabeled as 48 kHz.
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CpalVoiceCaptureOpener;
+
+#[cfg(not(target_arch = "wasm32"))]
+struct CpalVoiceCaptureHandle {
+    stop: Option<std::sync::mpsc::Sender<()>>,
+    owner: Option<std::thread::JoinHandle<()>>,
+    running: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    queue: SharedPcmQueue,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl VoiceCaptureStream for CpalVoiceCaptureHandle {
+    fn stop(&mut self) {
+        if let Some(stop) = self.stop.take() {
+            let _ = stop.send(());
+        }
+        if let Some(owner) = self.owner.take() {
+            let _ = owner.join();
+        }
+        self.running
+            .store(false, std::sync::atomic::Ordering::Release);
+        // The owner thread has dropped the CPAL stream, so the callback cannot repopulate it.
+        self.queue.clear();
+    }
+
+    fn is_running(&self) -> bool {
+        self.running.load(std::sync::atomic::Ordering::Acquire)
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl Drop for CpalVoiceCaptureHandle {
+    fn drop(&mut self) {
+        self.stop();
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl VoiceCaptureOpener for CpalVoiceCaptureOpener {
+    fn open_default(
+        &self,
+        queue: SharedPcmQueue,
+    ) -> Result<Box<dyn VoiceCaptureStream>, VoiceCaptureError> {
+        use rodio::cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+        use std::sync::{
+            atomic::{AtomicBool, Ordering},
+            mpsc,
+        };
+
+        let (ready_tx, ready_rx) = mpsc::sync_channel::<Result<(), VoiceCaptureError>>(1);
+        let (stop_tx, stop_rx) = mpsc::channel::<()>();
+        let running = std::sync::Arc::new(AtomicBool::new(false));
+        let thread_running = std::sync::Arc::clone(&running);
+        let thread_queue = Arc::clone(&queue);
+
+        let owner = std::thread::Builder::new()
+            .name("voice-capture".to_owned())
+            .spawn(move || {
+                let host = rodio::cpal::default_host();
+                let Some(device) = host.default_input_device() else {
+                    let _ = ready_tx.send(Err(VoiceCaptureError::NoDevice));
+                    return;
+                };
+
+                let supported = match device.supported_input_configs() {
+                    Ok(configs) => configs
+                        .filter(|config| {
+                            config.min_sample_rate().0 <= VOICE_SAMPLE_RATE
+                                && config.max_sample_rate().0 >= VOICE_SAMPLE_RATE
+                                && matches!(
+                                    config.sample_format(),
+                                    rodio::cpal::SampleFormat::F32
+                                        | rodio::cpal::SampleFormat::I16
+                                )
+                        })
+                        .max_by_key(|config| config.channels()),
+                    Err(error) => {
+                        let _ = ready_tx.send(Err(VoiceCaptureError::Other(error.to_string())));
+                        return;
+                    }
+                };
+
+                let Some(supported) = supported else {
+                    let _ = ready_tx.send(Err(VoiceCaptureError::UnsupportedFormat));
+                    return;
+                };
+                let sample_format = supported.sample_format();
+                let config = supported
+                    .with_sample_rate(rodio::cpal::SampleRate(VOICE_SAMPLE_RATE))
+                    .config();
+                let channels = config.channels;
+
+                let callback_running = std::sync::Arc::clone(&thread_running);
+                let error_callback = move |_error| {
+                    // Do not log or allocate in CPAL's real-time error callback.
+                    callback_running.store(false, Ordering::Release);
+                };
+
+                let stream_result = match sample_format {
+                    rodio::cpal::SampleFormat::F32 => {
+                        let callback_queue = Arc::clone(&thread_queue);
+                        let mut builder = MonoFrameBuilder::new();
+                        device.build_input_stream(
+                            &config,
+                            move |data: &[f32], _| {
+                                builder.push_interleaved_f32(data, channels, &callback_queue);
+                            },
+                            error_callback,
+                            None,
+                        )
+                    }
+                    rodio::cpal::SampleFormat::I16 => {
+                        let callback_queue = Arc::clone(&thread_queue);
+                        let mut builder = MonoFrameBuilder::new();
+                        let callback_running = std::sync::Arc::clone(&thread_running);
+                        device.build_input_stream(
+                            &config,
+                            move |data: &[i16], _| {
+                                builder.push_interleaved_i16(data, channels, &callback_queue);
+                            },
+                            move |_error| {
+                                callback_running.store(false, Ordering::Release);
+                            },
+                            None,
+                        )
+                    }
+                    _ => unreachable!("sample format was filtered above"),
+                };
+
+                let stream = match stream_result {
+                    Ok(stream) => stream,
+                    Err(error) => {
+                        let _ = ready_tx.send(Err(VoiceCaptureError::Other(error.to_string())));
+                        return;
+                    }
+                };
+                if let Err(error) = stream.play() {
+                    let _ = ready_tx.send(Err(VoiceCaptureError::Other(error.to_string())));
+                    return;
+                }
+
+                thread_running.store(true, Ordering::Release);
+                if ready_tx.send(Ok(())).is_err() {
+                    thread_running.store(false, Ordering::Release);
+                    drop(stream);
+                    return;
+                }
+
+                loop {
+                    match stop_rx.recv_timeout(std::time::Duration::from_millis(50)) {
+                        Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                        Err(mpsc::RecvTimeoutError::Timeout) => {
+                            if !thread_running.load(Ordering::Acquire) {
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Stream is dropped here, on the same owner thread that created it.
+                drop(stream);
+                thread_running.store(false, Ordering::Release);
+            })
+            .map_err(|error| VoiceCaptureError::Other(error.to_string()))?;
+
+        match ready_rx.recv() {
+            Ok(Ok(())) => Ok(Box::new(CpalVoiceCaptureHandle {
+                stop: Some(stop_tx),
+                owner: Some(owner),
+                running,
+                queue,
+            })),
+            Ok(Err(error)) => {
+                let _ = owner.join();
+                Err(error)
+            }
+            Err(error) => {
+                let _ = owner.join();
+                Err(VoiceCaptureError::Other(error.to_string()))
+            }
+        }
+    }
+}
+
 /// Target capture rate for documentation and backend negotiation.
 #[must_use]
 pub fn target_sample_rate() -> u32 {
@@ -252,6 +490,24 @@ mod tests {
         assert!(queue.pop().is_some());
         assert!(queue.pop().is_some());
         assert!(queue.pop().is_none());
+    }
+
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn interleaved_builder_downmixes_without_temporary_vectors() {
+        let queue = Arc::new(BoundedPcmQueue::new(2));
+        let mut builder = MonoFrameBuilder::new();
+        let stereo = [0.2_f32, 0.4, 0.6, 0.8];
+        builder.push_interleaved_f32(&stereo, 2, &queue);
+        assert_eq!(builder.filled, 2);
+        assert!(queue.is_empty());
+
+        let silence = vec![0.0_f32; VOICE_FRAME_SAMPLES - 2];
+        builder.push_mono_samples(&silence, &queue);
+        let frame = queue.pop().unwrap();
+        assert!((frame.samples()[0] - 0.3).abs() < 1e-6);
+        assert!((frame.samples()[1] - 0.7).abs() < 1e-6);
     }
 
     #[test]

@@ -102,6 +102,7 @@ References:
 - [x] Add deterministic tests for permission gating, open-mic, PTT press/release, mute, disconnect, permission revocation, disable and mode changes.
 - [x] Implement native CPAL input-device enumeration behind `MicrophoneBackend`; it is a synchronous discovery adapter and must be called off the Bevy frame schedule.
 - [x] Implement a dedicated owner-thread CPAL opener with a synchronous ready/error handshake and exact 48 kHz `f32` / `i16` negotiation.
+- [x] Rate-limit transient microphone reopen attempts with bounded exponential backoff and clear stale PCM before reopening.
 - [x] Wire capture policy to the active `WorldStream` lifecycle; stop and clear on disconnect, transfer or stream-generation change.
 - [ ] Add OS permission UX/denial recovery, device selection and error presentation; the opener currently uses the OS default input only.
 - [x] Define mockable `VoiceCaptureOpener` / `VoiceCaptureStream` traits, fixed-frame accumulation, allocation-free conversion helpers, mock lifecycle tests, and the first native CPAL stream owner.
@@ -128,7 +129,7 @@ References:
 
 - `VoiceInputPolicy` remains closed by default: permission unknown, voice disabled, no active multiplayer session and no activation mode selected.
 - Native capture uses CPAL 0.15.3 through the existing `rodio::cpal` re-export. The default input device is opened on a dedicated owner thread; the current first slice accepts exact 48 kHz F32/I16 input only.
-- The first open attempt is the Stage-1 permission probe. A successful stream open marks permission Granted; explicit permission/access-denied-like errors mark Denied; missing devices and unsupported formats remain retryable. Error-string classification is best-effort, not a portable OS permission API or native permission dialog.
+- The first open attempt is the Stage-1 permission probe. A successful stream open marks permission Granted; explicit permission/access-denied-like errors mark Denied; missing devices and unsupported formats remain retryable. Transient open failures use an exponential retry delay beginning at 500 ms and capped at 8 seconds, rather than retrying on every Bevy frame. A successful open or a deliberate session stop resets the delay. The controller closes and clears both PCM queues before a reopen attempt so frames from a failed/stopped stream cannot leak into a later capture. Error-string classification is best-effort, not a portable OS permission API or native permission dialog.
 - `VoiceCaptureController` opens only while voice is enabled and a multiplayer session is active. Unknown permission is probed once the controller attempts to open; Denied does not spin-reopen.
 - The capture callback writes fixed 20 ms mono frames into a bounded, preallocated queue. It does not allocate, log, encode or block.
 - The queue has a policy gate and generation tag. It accepts samples only while `transmission_permitted()` is true; PTT keeps the device open but does not retain microphone PCM until the held action is active. Mute, release, mode change, disconnect and session replacement close the gate, advance its epoch and retire stale in-flight frames.

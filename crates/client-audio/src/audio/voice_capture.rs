@@ -383,8 +383,6 @@ where
                         }
                     }
                     Ok(MicrophoneWorkerCommand::Select(selection)) => {
-                        backend.stop();
-                        active_id = None;
                         let resolved_id = match &selection {
                             MicrophoneSelection::Device(id) => Some(id.clone()),
                             MicrophoneSelection::SystemDefault => catalog
@@ -393,31 +391,36 @@ where
                                 .find(|device| device.is_default)
                                 .map(|device| device.id),
                         };
-                        let result = catalog.resolve_selection(&selection);
-                        match result {
-                            Ok(device) => match backend.start(device) {
-                                Ok(()) => {
-                                    active_id = resolved_id.clone();
-                                    if event_tx
-                                        .send(MicrophoneWorkerEvent::Selected {
-                                            device_id: resolved_id.unwrap_or_default(),
-                                        })
-                                        .is_err()
-                                    {
+                        // Resolve first: a stale/invalid UI token must not interrupt the
+                        // currently working microphone or silently replace it.
+                        match catalog.resolve_selection(&selection) {
+                            Ok(device) => {
+                                backend.stop();
+                                active_id = None;
+                                match backend.start(device) {
+                                    Ok(()) => {
+                                        active_id = resolved_id.clone();
+                                        if event_tx
+                                            .send(MicrophoneWorkerEvent::Selected {
+                                                device_id: resolved_id.unwrap_or_default(),
+                                            })
+                                            .is_err()
+                                        {
+                                            backend.stop();
+                                            break;
+                                        }
+                                    }
+                                    Err(error) => {
                                         backend.stop();
-                                        break;
+                                        if event_tx
+                                            .send(MicrophoneWorkerEvent::BackendError(error))
+                                            .is_err()
+                                        {
+                                            break;
+                                        }
                                     }
                                 }
-                                Err(error) => {
-                                    backend.stop();
-                                    if event_tx
-                                        .send(MicrophoneWorkerEvent::BackendError(error))
-                                        .is_err()
-                                    {
-                                        break;
-                                    }
-                                }
-                            },
+                            }
                             Err(error) => {
                                 if event_tx
                                     .send(MicrophoneWorkerEvent::SelectionRejected(error))

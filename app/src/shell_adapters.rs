@@ -4,6 +4,7 @@ use bevy::prelude::*;
 use client_audio::audio::{
     voice_capture::{MicrophoneSelection, MicrophoneWorkerEvent},
     voice_controller::VoiceCaptureController,
+    voice_input::{MicrophonePermission, VoiceInputPolicy},
 };
 use client_runtime::{blob_cache::ClientBlobCacheOwner, network::NetworkHandle};
 use client_shell::{
@@ -11,7 +12,9 @@ use client_shell::{
     player_skin::LocalPlayerSkin,
     ui_resources::UiRuntimeResource,
 };
-use launcher::menu::view::MicrophoneSelectionRequest;
+use launcher::menu::view::{
+    MicrophonePermissionStatus, MicrophoneSelectionRequest,
+};
 /// Drives the launcher's own services: catalog, saves, settings, the account core and local worlds.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn drive_menu_services(
@@ -26,6 +29,7 @@ pub(crate) fn drive_menu_services(
     mut local_worlds: Option<ResMut<client_shell::local_worlds::LocalWorlds>>,
     audio_settings: Option<ResMut<client_audio::audio::AudioSettings>>,
     mut voice_controller: Option<ResMut<VoiceCaptureController>>,
+    voice_policy: Option<Res<VoiceInputPolicy>>,
     settings: Option<ResMut<client_state::RuntimeSettings>>,
     antialiasing: Option<Res<client_presentation::camera::antialiasing::CameraAntiAliasingSupport>>,
     mut local_skin: Option<ResMut<LocalPlayerSkin>>,
@@ -52,7 +56,7 @@ pub(crate) fn drive_menu_services(
         menu.sync_anti_aliasing_support(support.0);
     }
     menu.sync_user_settings(settings);
-    drive_microphone_settings(&mut menu, voice_controller);
+    drive_microphone_settings(&mut menu, voice_controller, voice_policy);
     menu.sync_language(&mut runtime);
     if let Some(account) = launcher_account.as_deref() {
         client_shell::menu::sync_cinnabar_players(account, &mut runtime.0);
@@ -74,7 +78,17 @@ pub(crate) fn drive_menu_services(
 fn drive_microphone_settings(
     menu: &mut MenuRuntime,
     controller: Option<ResMut<VoiceCaptureController>>,
+    voice_policy: Option<Res<VoiceInputPolicy>>,
 ) {
+    let permission = voice_policy.map_or(MicrophonePermission::Unknown, |policy| {
+        policy.permission()
+    });
+    menu.set_microphone_permission_status(match permission {
+        MicrophonePermission::Unknown => MicrophonePermissionStatus::Unknown,
+        MicrophonePermission::Granted => MicrophonePermissionStatus::Granted,
+        MicrophonePermission::Denied => MicrophonePermissionStatus::Denied,
+    });
+
     let Some(mut controller) = controller else {
         if menu.take_microphone_refresh_request() {
             menu.set_microphone_message("Microphone control is unavailable on this client.");

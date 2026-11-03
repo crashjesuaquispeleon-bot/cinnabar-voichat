@@ -226,8 +226,7 @@ pub struct MenuRuntime {
     microphone_permission_status: launcher::menu::view::MicrophonePermissionStatus,
     microphone_permission_retry_requested: bool,
     microphone_refresh_requested: bool,
-    microphone_selection_requested:
-        Option<launcher::menu::view::MicrophoneSelectionRequest>,
+    microphone_selection_requested: Option<launcher::menu::view::MicrophoneSelectionRequest>,
     storage: std::sync::Arc<launcher::menu::settings_storage::StorageView>,
     settings_dirty: bool,
     settings_writer: Option<launcher::menu::settings_options::persistence::writer::Writer>,
@@ -409,7 +408,11 @@ impl MenuRuntime {
 
     /// Marks the exact token returned by a successful worker selection event.
     pub fn mark_microphone_selected(&mut self, device_id: String) {
-        if self.microphone_devices.iter().any(|device| device.id == device_id) {
+        if self
+            .microphone_devices
+            .iter()
+            .any(|device| device.id == device_id)
+        {
             self.selected_microphone_id = Some(device_id);
             self.microphone_message = Some("Microphone input changed successfully.".to_owned());
         } else {

@@ -153,7 +153,10 @@ impl VoiceCaptureController {
         // A live stream can fail asynchronously (for example, a device unplug or host
         // audio error). Detect that transition once and apply the same bounded backoff as
         // an open failure; otherwise the frame schedule could reopen it every frame.
-        if self.last_capture_permitted && !self.is_running() {
+        if self.stream.is_some() && !self.is_running() {
+            // A stream can fail before the frame loop first observes it as running.
+            // Retire the dead handle immediately so this path is detected exactly once.
+            self.stream = None;
             self.last_error = Some("microphone capture stream stopped unexpectedly".to_owned());
             self.next_open_attempt = Some(now + self.open_retry_delay);
             self.open_retry_delay = self
@@ -553,6 +556,48 @@ mod tests {
         assert_eq!(attempts.load(Ordering::Relaxed), 1);
         controller.sync_with_policy_at(&mut policy, start + Duration::from_millis(501));
         assert!(controller.is_running());
+        assert_eq!(attempts.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn stream_that_stops_before_first_observation_uses_retry_backoff() {
+        use std::sync::atomic::{AtomicU64, Ordering};
+
+        struct AlreadyStoppedStream;
+        impl VoiceCaptureStream for AlreadyStoppedStream {
+            fn stop(&mut self) {}
+            fn is_running(&self) -> bool { false }
+        }
+
+        struct AlreadyStoppedOpener(Arc<AtomicU64>);
+        impl VoiceCaptureOpener for AlreadyStoppedOpener {
+            fn open_default(
+                &self,
+                _queues: VoiceCaptureQueues,
+            ) -> Result<Box<dyn VoiceCaptureStream>, VoiceCaptureError> {
+                self.0.fetch_add(1, Ordering::Relaxed);
+                Ok(Box::new(AlreadyStoppedStream))
+            }
+        }
+
+        let attempts = Arc::new(AtomicU64::new(0));
+        let opener = AlreadyStoppedOpener(Arc::clone(&attempts));
+        let mut controller = VoiceCaptureController::with_opener(Box::new(opener));
+        let mut policy = permitted_policy();
+        let start = Instant::now();
+
+        // The opener returns a handle that has already failed before the first
+        // post-open is_running observation can mark it as permitted.
+        controller.sync_with_policy_at(&mut policy, start);
+        assert_eq!(attempts.load(Ordering::Relaxed), 1);
+        assert_eq!(
+            controller.last_error(),
+            Some("microphone capture stream stopped unexpectedly")
+        );
+
+        controller.sync_with_policy_at(&mut policy, start + Duration::from_millis(499));
+        assert_eq!(attempts.load(Ordering::Relaxed), 1);
+        controller.sync_with_policy_at(&mut policy, start + Duration::from_millis(500));
         assert_eq!(attempts.load(Ordering::Relaxed), 2);
     }
 

@@ -16,6 +16,9 @@
   <key>LSSupportsGameMode</key><true/>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSSupportsAutomaticGraphicsSwitching</key><true/>
+  <!-- Required before any microphone capture stream is opened. -->
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Cinnabar uses the microphone for in-game voice chat with other players in your multiplayer session.</string>
   <!-- Finder launches log to client.log; keep ANSI colour codes out of it. -->
   <key>LSEnvironment</key><dict><key>NO_COLOR</key><string>1</string></dict>
 </dict>

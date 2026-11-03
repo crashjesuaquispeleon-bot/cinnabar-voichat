@@ -109,7 +109,7 @@ References:
 - [x] Connect the remappable semantic PTT input and saved enablement/activation-mode settings to the policy.
 - [x] Add a bounded, thread-safe PCM frame queue with fixed internal format and explicit overflow accounting (no live capture producer yet).
 - [ ] Implement a bounded capture-to-playback loopback test and verify device shutdown on mute, disconnect and application exit.
-- [x] Add saved enablement, local mute and activation-mode controls to the existing Sound settings panel without changing game sound sliders.\n- [ ] Add the dynamic microphone-device selector, input sensitivity, permission status and error presentation.
+- [x] Add saved enablement, local mute and activation-mode controls to the existing Sound settings panel without changing game sound sliders.\n- [ ] Add the dynamic microphone-device selector, permission status and error presentation.
 
 ### Stage 2 — Authenticated global rooms
 
@@ -124,6 +124,10 @@ References:
 - [ ] Qualify Windows, macOS and Linux capture/playback and device switching.
 - [ ] Measure CPU, memory, bandwidth, end-to-end latency and queue drops at representative room sizes.
 - [ ] Document server deployment, configuration, privacy behavior and troubleshooting.
+
+## Voice input sensitivity
+
+The Sound settings panel includes a persisted **Voice Input Sensitivity** slider from 0% to 200%, defaulting to 100%. The app applies the saved value to both the transmit and local-monitor PCM queues. Gain is applied as each fixed frame enters the bounded queue, using an atomic scalar so the CPAL callback does not lock or allocate. Values above unity are clipped to the normalized PCM range; non-finite internal gain values recover to unity. This control changes capture level only: it does not grant microphone permission, bypass mute/PTT, open a microphone, or authorize network transmission.
 
 ## Local capture and permission probe implemented
 

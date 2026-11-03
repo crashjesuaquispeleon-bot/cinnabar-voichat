@@ -111,7 +111,10 @@ impl VoiceCaptureController {
     ///
     /// `Unknown` permission is allowed once as an OS probe when voice is enabled in a session.
     fn should_open(policy: &VoiceInputPolicy) -> bool {
-        if !policy.enabled() || !policy.session_active() {
+        if !policy.enabled()
+            || !policy.session_active()
+            || policy.mode() == super::voice_input::MicrophoneMode::Unselected
+        {
             return false;
         }
         match policy.permission() {
@@ -288,6 +291,22 @@ mod tests {
         controller.sync_with_policy(&mut policy);
         assert!(controller.is_running());
         assert_eq!(policy.permission(), MicrophonePermission::Granted);
+    }
+
+    #[test]
+    fn unselected_mode_does_not_open_the_microphone() {
+        let mut controller = test_controller();
+        let mut policy = VoiceInputPolicy::default();
+        policy.set_enabled(true);
+        policy.set_session_active(true);
+        policy.set_permission(MicrophonePermission::Granted);
+
+        controller.sync_with_policy(&mut policy);
+
+        assert!(!controller.is_running());
+        assert_eq!(controller.open_attempts(), 0);
+        assert!(!controller.queue().is_accepting());
+        assert!(!controller.monitor_queue().is_accepting());
     }
 
     #[test]

@@ -616,19 +616,27 @@ mod tests {
     }
 
     #[test]
-    fn mock_stream_preserves_partial_frames_between_callbacks() {
-        let queue = Arc::new(BoundedPcmQueue::new(2));
-        queue.set_accepting(true);
-        let mut stream = MockVoiceCaptureStream::new(Arc::clone(&queue));
+    fn mock_stream_preserves_partial_frames_between_callbacks_for_both_destinations() {
+        let transmit = Arc::new(BoundedPcmQueue::new(2));
+        let monitor = Arc::new(BoundedPcmQueue::new(2));
+        transmit.set_accepting(true);
+        monitor.set_accepting(true);
+        let mut stream = MockVoiceCaptureStream::new(VoiceCaptureQueues {
+            transmit: Arc::clone(&transmit),
+            monitor: Arc::clone(&monitor),
+        });
         let first = vec![0.2_f32; VOICE_FRAME_SAMPLES / 2];
         let second = vec![0.4_f32; VOICE_FRAME_SAMPLES / 2];
         stream.inject_mono(&first);
-        assert!(queue.is_empty());
+        assert!(transmit.is_empty());
+        assert!(monitor.is_empty());
         stream.inject_mono(&second);
-        assert_eq!(queue.len(), 1);
-        let frame = queue.pop().unwrap();
-        assert!((frame.samples()[0] - 0.2).abs() < 1e-6);
-        assert!((frame.samples()[VOICE_FRAME_SAMPLES / 2] - 0.4).abs() < 1e-6);
+        for queue in [&transmit, &monitor] {
+            assert_eq!(queue.len(), 1);
+            let frame = queue.pop().unwrap();
+            assert!((frame.samples()[0] - 0.2).abs() < 1e-6);
+            assert!((frame.samples()[VOICE_FRAME_SAMPLES / 2] - 0.4).abs() < 1e-6);
+        }
     }
 
     #[test]

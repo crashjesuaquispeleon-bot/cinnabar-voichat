@@ -427,7 +427,7 @@ impl super::voice_capture::MicrophoneWorkerBackend for CpalMicrophoneWorkerBacke
         self.queues.transmit.set_accepting(false);
         self.queues.monitor.set_accepting(false);
         // Drop the stream on the same thread that created it.
-        self.stream.take();
+        drop(self.stream.take());
         self.queues.transmit.clear();
         self.queues.monitor.clear();
     }

@@ -31,7 +31,10 @@ pub struct MicrophoneCatalog<T> {
 
 impl<T> Default for MicrophoneCatalog<T> {
     fn default() -> Self {
-        Self { generation: 0, entries: Vec::new() }
+        Self {
+            generation: 0,
+            entries: Vec::new(),
+        }
     }
 }
 
@@ -43,31 +46,44 @@ impl<T> MicrophoneCatalog<T> {
         devices: impl IntoIterator<Item = (String, bool, T)>,
     ) -> Vec<MicrophoneDevice> {
         self.generation = self.generation.wrapping_add(1);
-        self.entries = devices.into_iter().enumerate().map(|(index, (name, is_default, handle))| {
-            let descriptor = MicrophoneDevice {
-                id: format!("mic-{}-{index}", self.generation),
-                name,
-                is_default,
-            };
-            (descriptor, handle)
-        }).collect();
+        self.entries = devices
+            .into_iter()
+            .enumerate()
+            .map(|(index, (name, is_default, handle))| {
+                let descriptor = MicrophoneDevice {
+                    id: format!("mic-{}-{index}", self.generation),
+                    name,
+                    is_default,
+                };
+                (descriptor, handle)
+            })
+            .collect();
         self.descriptors()
     }
 
     /// Returns current presentation-only descriptors.
     #[must_use]
     pub fn descriptors(&self) -> Vec<MicrophoneDevice> {
-        self.entries.iter().map(|(descriptor, _)| descriptor.clone()).collect()
+        self.entries
+            .iter()
+            .map(|(descriptor, _)| descriptor.clone())
+            .collect()
     }
 
     /// Resolves an ID only in the current snapshot; the handle stays backend-owned.
     pub fn resolve(&self, id: &str) -> Option<&T> {
-        self.entries.iter().find(|(descriptor, _)| descriptor.id == id).map(|(_, handle)| handle)
+        self.entries
+            .iter()
+            .find(|(descriptor, _)| descriptor.id == id)
+            .map(|(_, handle)| handle)
     }
 
     #[must_use]
-    pub fn generation(&self) -> u64 { self.generation }
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
 }
+
 /// Boundary for enumerating local microphone devices.
 ///
 /// Implementations must perform operating-system enumeration outside Bevy's frame
@@ -158,6 +174,7 @@ mod tests {
         assert!(catalog.refresh(std::iter::empty()).is_empty());
         assert!(catalog.resolve(&old[0].id).is_none());
     }
+
     #[test]
     fn mock_backend_exposes_only_local_device_descriptors() {
         let backend = MockMicrophoneBackend {

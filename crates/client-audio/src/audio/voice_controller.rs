@@ -831,6 +831,22 @@ mod tests {
     }
 
     #[test]
+    fn input_sensitivity_updates_transmit_and_monitor_queues_together() {
+        let controller =
+            VoiceCaptureController::with_opener(Box::new(MockVoiceCaptureOpener));
+        controller.set_input_sensitivity_percent(150);
+        let queues = [controller.queue(), controller.monitor_queue()];
+        let samples = [0.4_f32; 960];
+
+        for queue in &queues {
+            queue.set_accepting(true);
+            queue.push_samples(&samples);
+            let frame = queue.pop().expect("both queues should receive the frame");
+            assert!((frame.samples()[0] - 0.6).abs() < 1e-6);
+        }
+    }
+
+    #[test]
     fn open_error_is_recorded() {
         struct FailingOpener;
         impl VoiceCaptureOpener for FailingOpener {

@@ -8,7 +8,7 @@ The first release is a Cinnabar-client-only voice feature.
 - **Room scope (confirmed by the user):** players can communicate only when they are in the same active Minecraft multiplayer session/partida. The voice room is bound to that exact joined session; players in different servers or different partidas cannot hear each other. "Global" means everyone in that one session can hear everyone else, regardless of in-game distance.
 - **Client compatibility:** Cinnabar only. Vanilla Bedrock and Java clients are out of scope.
 - **Microphone modes:** open microphone and Push to Talk (PTT), selectable in Sound settings. Voice Chat is disabled by default; PTT is the default activation mode and the semantic PTT action defaults to V (remappable).
-- **User controls:** Sound settings now expose enable/disable and activation mode. Local mute, permission/status, microphone/output device selection, input sensitivity and per-player receive volume still need their in-game UI.
+- **User controls:** Sound settings now expose enable/disable, activation mode and a separate local microphone mute. An in-game quick-mute control, permission/status, microphone/output device selection, input sensitivity and per-player receive volume still need their UI.
 
 ## Repository facts confirmed during initial inspection
 
@@ -170,7 +170,7 @@ The semantic input domain now includes `Action::PushToTalk` as a persistent held
 
 The app session-audio adapter reads only the finalized `SemanticInputSnapshot` phase for `Action::PushToTalk` and forwards its `held` value to `VoiceInputPolicy::set_push_to_talk_held()`. It runs after `ClientFrameSet::SemanticFinalize` and before `sync_voice_capture_with_policy`, so the controller observes the same frame's policy. Missing or cleared snapshots are neutral/released. The audio crate never reads Bevy keyboard state.
 
-Router and launcher tests cover PTT press/hold/release and remapping. Enablement, local mute and activation mode now appear in Sound settings and are propagated to the policy. OS permission UX, mute/device selection UI, runtime loopback validation and network transport remain separate follow-up work.
+Router and launcher tests cover PTT press/hold/release and remapping. Enablement, local mute and activation mode now appear in Sound settings and are propagated to the policy. OS permission UX, an in-game quick-mute control, device-selection UI, runtime loopback validation and network transport remain separate follow-up work.
 
 ## PTT-aware PCM privacy gate
 

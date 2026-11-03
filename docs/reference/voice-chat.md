@@ -64,6 +64,12 @@ A server-routed SFU is the leading option to evaluate for global rooms. A full-m
 7. Do not record, persist or upload raw microphone audio. Diagnostics must not include voice payloads, credentials or private room tokens.
 8. Preserve Cinnabar's license and third-party notices. Any new codec or capture library requires license, platform and packaging review before adoption.
 
+## Microphone discovery boundary
+
+`audio::voice_capture` defines a platform-independent `MicrophoneBackend` interface and a `MicrophoneDevice` descriptor. The descriptor exposes a display name, a default-device flag and an opaque backend-local ID that is valid only for the enumeration snapshot that produced it. The interface is deliberately limited to discovery: it does not open a device, capture PCM, or own a worker. This keeps CPAL types out of the audio policy and allows deterministic mock implementations in unit tests.
+
+The production CPAL adapter, device-handle lifetime, permission integration and asynchronous enumeration remain unimplemented. Enumeration must run outside Bevy's frame schedule. A device ID must not be persisted as a stable hardware identity or sent to a server.
+
 ## Capture review notes (provisional)
 
 A review posted to PR #1 under the heading "Grok review — platform / capture / PCM queue" agrees with the CPAL reuse direction and recommends a dedicated stream owner, mockable capture boundary, fixed-format PCM and a local loopback acceptance test. Treat these as review proposals pending implementation and CI, not as tested behavior.

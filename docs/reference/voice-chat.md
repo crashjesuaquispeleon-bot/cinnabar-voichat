@@ -8,7 +8,7 @@ The first release is a Cinnabar-client-only voice feature.
 - **Room scope (confirmed by the user):** players can communicate only when they are in the same active Minecraft multiplayer session/partida. The voice room is bound to that exact joined session; players in different servers or different partidas cannot hear each other. "Global" means everyone in that one session can hear everyone else, regardless of in-game distance.
 - **Client compatibility:** Cinnabar only. Vanilla Bedrock and Java clients are out of scope.
 - **Microphone modes:** open microphone and Push to Talk (PTT), selectable in Sound settings. Voice Chat is disabled by default; PTT is the default activation mode and the semantic PTT action defaults to V (remappable).
-- **User controls:** Sound settings now expose enable/disable, activation mode and a separate local microphone mute. An in-game quick-mute control, permission/status, microphone/output device selection, input sensitivity and per-player receive volume still need their UI.
+- **User controls:** Sound settings expose enable/disable, activation mode and a persisted microphone-mute preference. A separate in-game **Toggle Voice Mute** action is available in remappable Controls, defaulting to **M**; it toggles effective local mute without changing the saved preference. Microphone permission/status, the visible device selector, input sensitivity and per-player receive volume still need their in-game UI.
 
 ## Repository facts confirmed during initial inspection
 

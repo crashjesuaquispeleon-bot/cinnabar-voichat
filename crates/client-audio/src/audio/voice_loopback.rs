@@ -236,7 +236,7 @@ mod tests {
         queue.set_accepting(true);
         queue.push(PcmFrame::silence());
         queue.set_accepting(false);
-        let mut source = VoiceLoopbackSource::new(queue);
+        let source = VoiceLoopbackSource::new(queue);
         let samples: Vec<f32> = source.take(4).collect();
         assert!(samples.iter().all(|s| *s == 0.0));
     }

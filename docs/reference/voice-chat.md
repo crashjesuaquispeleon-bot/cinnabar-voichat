@@ -64,6 +64,20 @@ A server-routed SFU is the leading option to evaluate for global rooms. A full-m
 7. Do not record, persist or upload raw microphone audio. Diagnostics must not include voice payloads, credentials or private room tokens.
 8. Preserve Cinnabar's license and third-party notices. Any new codec or capture library requires license, platform and packaging review before adoption.
 
+## Capture review notes (provisional)
+
+A review posted to PR #1 under the heading "Grok review — platform / capture / PCM queue" agrees with the CPAL reuse direction and recommends a dedicated stream owner, mockable capture boundary, fixed-format PCM and a local loopback acceptance test. Treat these as review proposals pending implementation and CI, not as tested behavior.
+
+Version-specific platform correction: the repository locks CPAL **0.15.3**. Its upstream v0.15.3 README lists Linux support through **ALSA or optional JACK**, Windows through WASAPI by default, and macOS through CoreAudio. Do not describe PipeWire or PulseAudio as native CPAL 0.15.3 backends; newer CPAL documentation lists those optional backends, but that is not evidence they exist in the locked version. Linux first-release behavior must be qualified against the actual ALSA device routing and build environment.
+
+The macOS purpose string is a real prerequisite: Apple's `NSMicrophoneUsageDescription` property is required for apps that access the microphone. Confirm signing/sandbox entitlements in the packaging path as well before shipping capture. Do not add the key alone and claim permission handling is complete.
+
+For the callback queue, preallocate fixed-capacity storage and fixed-size frame slots before starting the stream. Avoid a per-frame `Box<[f32]>` allocation. Prefer a bounded non-blocking producer operation with an explicit overflow counter; dropping the newest frame is the simplest safe initial policy unless the selected queue explicitly supports producer-side overwrite without blocking or races. A 10–20 ms frame and 48 kHz mono are review suggestions, not yet product constants.
+
+References:
+- CPAL 0.15.3 platform support: https://github.com/RustAudio/cpal/blob/v0.15.3/README.md
+- Apple microphone purpose-string requirement: https://developer.apple.com/documentation/BundleResources/Information-Property-List/NSMicrophoneUsageDescription
+
 ## Work plan and acceptance gates
 
 ### Stage 0 — Architecture and service discovery (current)

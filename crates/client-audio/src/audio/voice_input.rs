@@ -18,8 +18,10 @@ pub enum MicrophonePermission {
 /// Which local microphone activation policy is selected.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum MicrophoneMode {
-    /// Transmit whenever voice is enabled and the player is in a multiplayer session.
+    /// No activation mode has been selected; transmission stays closed.
     #[default]
+    Unselected,
+    /// Transmit whenever voice is enabled and the player is in a multiplayer session.
     OpenMicrophone,
     /// Transmit only while the configured push-to-talk key is held.
     PushToTalk,
@@ -115,6 +117,7 @@ impl VoiceInputPolicy {
         self.capture_permitted()
             && !self.muted
             && match self.mode {
+                MicrophoneMode::Unselected => false,
                 MicrophoneMode::OpenMicrophone => true,
                 MicrophoneMode::PushToTalk => self.push_to_talk_held,
             }
@@ -144,6 +147,14 @@ mod tests {
     }
 
     #[test]
+    fn unselected_mode_never_transmits() {
+        let policy = ready();
+        assert_eq!(policy.mode(), MicrophoneMode::Unselected);
+        assert!(policy.capture_permitted());
+        assert!(!policy.transmission_permitted());
+    }
+
+    #[test]
     fn capture_stays_closed_until_permission_voice_and_session_are_ready() {
         let mut policy = VoiceInputPolicy::default();
         assert!(!policy.capture_permitted());
@@ -157,6 +168,7 @@ mod tests {
     #[test]
     fn open_microphone_transmits_only_while_enabled_in_a_session() {
         let mut policy = ready();
+        policy.set_mode(MicrophoneMode::OpenMicrophone);
         assert!(policy.transmission_permitted());
         policy.set_enabled(false);
         assert!(!policy.capture_permitted());

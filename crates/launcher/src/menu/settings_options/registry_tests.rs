@@ -73,12 +73,15 @@ fn section_rows_keep_order_and_shared_controls_from_the_registry() {
         .collect();
     assert!(video.contains(&SettingId::CameraShake));
     assert!(accessibility.contains(&SettingId::CameraShake));
+    let audio_rows = SettingPanel::Audio
+        .options()
+        .map(|row| row.id)
+        .collect::<Vec<_>>();
+    let volume_rows = volume_settings().map(|row| row.id).collect::<Vec<_>>();
+    assert_eq!(&audio_rows[..volume_rows.len()], volume_rows.as_slice());
     assert_eq!(
-        SettingPanel::Audio
-            .options()
-            .map(|row| row.id)
-            .collect::<Vec<_>>(),
-        volume_settings().map(|row| row.id).collect::<Vec<_>>()
+        &audio_rows[volume_rows.len()..],
+        &[SettingId::VoiceChatEnabled, SettingId::VoiceActivationMode]
     );
 }
 

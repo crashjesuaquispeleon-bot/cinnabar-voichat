@@ -223,6 +223,7 @@ pub struct MenuRuntime {
     microphone_devices_revision: u64,
     selected_microphone_id: Option<String>,
     microphone_message: Option<String>,
+    microphone_permission_status: launcher::menu::view::MicrophonePermissionStatus,
     microphone_refresh_requested: bool,
     microphone_selection_requested:
         Option<launcher::menu::view::MicrophoneSelectionRequest>,
@@ -424,6 +425,14 @@ impl MenuRuntime {
     /// Publishes a local-only status or error from the native microphone worker.
     pub fn set_microphone_message(&mut self, message: impl Into<String>) {
         self.microphone_message = Some(message.into());
+    }
+
+    /// Publishes the capture policy's best-effort local OS permission state.
+    pub fn set_microphone_permission_status(
+        &mut self,
+        status: launcher::menu::view::MicrophonePermissionStatus,
+    ) {
+        self.microphone_permission_status = status;
     }
 
     /// The queued join, once the saved account's check has settled (bounded) and any

@@ -103,6 +103,7 @@ impl MenuRuntime {
             microphone_devices_revision: self.microphone_devices_revision,
             selected_microphone_id: self.selected_microphone_id.clone(),
             microphone_message: self.microphone_message.clone(),
+            microphone_permission_status: self.microphone_permission_status,
             storage: std::sync::Arc::clone(&self.storage),
             language_choices: std::sync::Arc::clone(&self.language_choices),
             feeds: self.presented_feeds(),

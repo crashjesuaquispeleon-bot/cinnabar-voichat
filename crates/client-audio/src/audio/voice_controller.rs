@@ -150,6 +150,19 @@ impl VoiceCaptureController {
             return;
         }
 
+        // A live stream can fail asynchronously (for example, a device unplug or host
+        // audio error). Detect that transition once and apply the same bounded backoff as
+        // an open failure; otherwise the frame schedule could reopen it every frame.
+        if self.last_capture_permitted && !self.is_running() {
+            self.last_error = Some("microphone capture stream stopped unexpectedly".to_owned());
+            self.next_open_attempt = Some(now + self.open_retry_delay);
+            self.open_retry_delay = self
+                .open_retry_delay
+                .saturating_mul(2)
+                .min(MAX_OPEN_RETRY_DELAY);
+            self.last_capture_permitted = false;
+        }
+
         if !self.is_running()
             && self
                 .next_open_attempt
@@ -480,6 +493,67 @@ mod tests {
             attempts.load(Ordering::Relaxed),
             attempts_before_restart + 1
         );
+    }
+
+    #[test]
+    fn unexpected_stream_stop_uses_bounded_retry_backoff() {
+        use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+
+        struct FailingStream(Arc<AtomicBool>);
+        impl VoiceCaptureStream for FailingStream {
+            fn stop(&mut self) {
+                self.0.store(false, Ordering::Release);
+            }
+
+            fn is_running(&self) -> bool {
+                self.0.load(Ordering::Acquire)
+            }
+        }
+
+        struct RestartingOpener {
+            running: Arc<AtomicBool>,
+            attempts: Arc<AtomicU64>,
+        }
+        impl VoiceCaptureOpener for RestartingOpener {
+            fn open_default(
+                &self,
+                _queues: VoiceCaptureQueues,
+            ) -> Result<Box<dyn VoiceCaptureStream>, VoiceCaptureError> {
+                self.attempts.fetch_add(1, Ordering::Relaxed);
+                self.running.store(true, Ordering::Release);
+                Ok(Box::new(FailingStream(Arc::clone(&self.running))))
+            }
+        }
+
+        let running = Arc::new(AtomicBool::new(false));
+        let attempts = Arc::new(AtomicU64::new(0));
+        let opener = RestartingOpener {
+            running: Arc::clone(&running),
+            attempts: Arc::clone(&attempts),
+        };
+        let mut controller = VoiceCaptureController::with_opener(Box::new(opener));
+        let mut policy = permitted_policy();
+        let start = Instant::now();
+
+        controller.sync_with_policy_at(&mut policy, start);
+        assert!(controller.is_running());
+        assert_eq!(attempts.load(Ordering::Relaxed), 1);
+
+        // Simulate CPAL reporting an asynchronous device/host failure.
+        running.store(false, Ordering::Release);
+        controller.sync_with_policy_at(&mut policy, start + Duration::from_millis(1));
+        assert!(!controller.is_running());
+        assert_eq!(attempts.load(Ordering::Relaxed), 1);
+        assert_eq!(
+            controller.last_error(),
+            Some("microphone capture stream stopped unexpectedly")
+        );
+
+        controller.sync_with_policy_at(&mut policy, start + Duration::from_millis(500));
+        assert_eq!(attempts.load(Ordering::Relaxed), 1);
+        controller.sync_with_policy_at(&mut policy, start + Duration::from_millis(501));
+        assert!(controller.is_running());
+        assert_eq!(attempts.load(Ordering::Relaxed), 2);
     }
 
     #[test]

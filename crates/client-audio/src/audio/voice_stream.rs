@@ -157,7 +157,10 @@ impl MonoFrameBuilder {
             return;
         }
         for input_frame in samples.chunks_exact(channels) {
-            let sum = input_frame.iter().map(|&sample| f32::from(sample)).sum::<f32>();
+            let sum = input_frame
+                .iter()
+                .map(|&sample| f32::from(sample))
+                .sum::<f32>();
             self.push_one(sum / channels as f32 / 32768.0, queues);
         }
     }
@@ -189,11 +192,7 @@ impl MonoFrameBuilder {
 ///
 /// Returns `None` when `channels` is zero, the input is not channel-aligned, or `dst`
 /// is too small. This is the preferred helper for an audio callback.
-pub fn interleaved_to_mono_f32_into(
-    src: &[f32],
-    channels: u16,
-    dst: &mut [f32],
-) -> Option<usize> {
+pub fn interleaved_to_mono_f32_into(src: &[f32], channels: u16, dst: &mut [f32]) -> Option<usize> {
     if channels == 0 || src.len() % channels as usize != 0 {
         return None;
     }
@@ -263,7 +262,11 @@ pub struct MockVoiceCaptureStream {
 impl MockVoiceCaptureStream {
     #[must_use]
     pub fn new(queues: VoiceCaptureQueues) -> Self {
-        Self { running: true, queues, builder: MonoFrameBuilder::new() }
+        Self {
+            running: true,
+            queues,
+            builder: MonoFrameBuilder::new(),
+        }
     }
 
     /// Injects mono samples as if a device callback had fired.
@@ -308,7 +311,6 @@ impl VoiceCaptureOpener for MockVoiceCaptureOpener {
         Ok(Box::new(MockVoiceCaptureStream::new(queues)))
     }
 }
-
 
 /// Opens the default CPAL microphone and owns its stream on a dedicated thread.
 /// The device must expose an exact 48 kHz `f32` or `i16` input configuration;
@@ -387,8 +389,7 @@ impl VoiceCaptureOpener for CpalVoiceCaptureOpener {
                                 && config.max_sample_rate().0 >= VOICE_SAMPLE_RATE
                                 && matches!(
                                     config.sample_format(),
-                                    rodio::cpal::SampleFormat::F32
-                                        | rodio::cpal::SampleFormat::I16
+                                    rodio::cpal::SampleFormat::F32 | rodio::cpal::SampleFormat::I16
                                 )
                         })
                         .max_by_key(|config| config.channels()),
@@ -423,7 +424,9 @@ impl VoiceCaptureOpener for CpalVoiceCaptureOpener {
                             &config,
                             move |data: &[f32], _| {
                                 builder.push_interleaved_f32_to_queues(
-                                    data, channels, &[&callback_transmit, &callback_monitor],
+                                    data,
+                                    channels,
+                                    &[&callback_transmit, &callback_monitor],
                                 );
                             },
                             error_callback,
@@ -439,7 +442,9 @@ impl VoiceCaptureOpener for CpalVoiceCaptureOpener {
                             &config,
                             move |data: &[i16], _| {
                                 builder.push_interleaved_i16_to_queues(
-                                    data, channels, &[&callback_transmit, &callback_monitor],
+                                    data,
+                                    channels,
+                                    &[&callback_transmit, &callback_monitor],
                                 );
                             },
                             move |_error| {
@@ -534,7 +539,6 @@ mod tests {
         assert!(queue.pop().is_none());
     }
 
-
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn interleaved_builder_downmixes_without_temporary_vectors() {
@@ -568,11 +572,21 @@ mod tests {
         queue.set_accepting(true);
         let opener = MockVoiceCaptureOpener;
         let shared = Arc::clone(&queue);
-        let stream = opener.open_default(VoiceCaptureQueues { transmit: Arc::clone(&shared), monitor: shared }).unwrap();
+        let stream = opener
+            .open_default(VoiceCaptureQueues {
+                transmit: Arc::clone(&shared),
+                monitor: shared,
+            })
+            .unwrap();
         assert!(stream.is_running());
         drop(stream);
         let shared = Arc::clone(&queue);
-        let mut stream = opener.open_default(VoiceCaptureQueues { transmit: Arc::clone(&shared), monitor: shared }).unwrap();
+        let mut stream = opener
+            .open_default(VoiceCaptureQueues {
+                transmit: Arc::clone(&shared),
+                monitor: shared,
+            })
+            .unwrap();
         stream.stop();
         assert!(!stream.is_running());
     }
@@ -598,15 +612,20 @@ mod tests {
         assert!(monitor.is_empty());
     }
 
-
     #[test]
     fn fixed_buffer_converters_do_not_require_vec_storage() {
         let stereo = [1.0_f32, 3.0, 5.0, 7.0];
         let mut mono = [0.0_f32; 2];
         assert_eq!(interleaved_to_mono_f32_into(&stereo, 2, &mut mono), Some(2));
         assert_eq!(mono, [2.0, 6.0]);
-        assert_eq!(interleaved_to_mono_f32_into(&stereo, 2, &mut mono[..1]), None);
-        assert_eq!(interleaved_to_mono_f32_into(&stereo[..3], 2, &mut mono), None);
+        assert_eq!(
+            interleaved_to_mono_f32_into(&stereo, 2, &mut mono[..1]),
+            None
+        );
+        assert_eq!(
+            interleaved_to_mono_f32_into(&stereo[..3], 2, &mut mono),
+            None
+        );
 
         let integer = [0_i16, 16384, -16384];
         let mut float = [0.0_f32; 3];

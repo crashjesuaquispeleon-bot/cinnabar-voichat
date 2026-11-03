@@ -106,9 +106,46 @@ impl MonoFrameBuilder {
     }
 }
 
+/// Downmixes interleaved samples to mono into caller-owned storage without allocating.
+///
+/// Returns `None` when `channels` is zero, the input is not channel-aligned, or `dst`
+/// is too small. This is the preferred helper for an audio callback.
+pub fn interleaved_to_mono_f32_into(
+    src: &[f32],
+    channels: u16,
+    dst: &mut [f32],
+) -> Option<usize> {
+    if channels == 0 || src.len() % channels as usize != 0 {
+        return None;
+    }
+    let frames = src.len() / channels as usize;
+    if dst.len() < frames {
+        return None;
+    }
+    let ch = channels as usize;
+    for (frame, output) in src.chunks_exact(ch).zip(dst.iter_mut()) {
+        let sum: f32 = frame.iter().copied().sum();
+        *output = sum / ch as f32;
+    }
+    Some(frames)
+}
+
+/// Converts integer PCM into caller-owned `f32` storage without allocating.
+/// Returns `None` when the destination is too small.
+pub fn i16_slice_to_f32_into(src: &[i16], dst: &mut [f32]) -> Option<usize> {
+    if dst.len() < src.len() {
+        return None;
+    }
+    for (&sample, output) in src.iter().zip(dst.iter_mut()) {
+        *output = f32::from(sample) / 32768.0;
+    }
+    Some(src.len())
+}
+
 /// Downmixes interleaved samples to mono `f32` into `dst` (cleared first).
 ///
-/// `src` length must be a multiple of `channels`. Returns the number of mono samples written.
+/// Convenience helper for non-real-time callers; it may allocate when capacity is
+/// insufficient. `src` length must be a multiple of `channels`.
 pub fn interleaved_to_mono_f32(src: &[f32], channels: u16, dst: &mut Vec<f32>) -> usize {
     dst.clear();
     if channels == 0 {
@@ -128,7 +165,7 @@ pub fn interleaved_to_mono_f32(src: &[f32], channels: u16, dst: &mut Vec<f32>) -
     frames
 }
 
-/// Converts integer PCM (`i16`) samples to `f32`.
+/// Converts integer PCM (`i16`) samples to `f32` for non-real-time callers; may allocate.
 pub fn i16_slice_to_f32(src: &[i16], dst: &mut Vec<f32>) {
     dst.clear();
     dst.reserve(src.len());
@@ -141,6 +178,7 @@ pub fn i16_slice_to_f32(src: &[i16], dst: &mut Vec<f32>) {
 pub struct MockVoiceCaptureStream {
     running: bool,
     queue: SharedPcmQueue,
+    builder: MonoFrameBuilder,
 }
 
 impl MockVoiceCaptureStream {
@@ -149,14 +187,14 @@ impl MockVoiceCaptureStream {
         Self {
             running: true,
             queue,
+            builder: MonoFrameBuilder::new(),
         }
     }
 
     /// Injects mono samples as if a device callback had fired.
     pub fn inject_mono(&mut self, samples: &[f32]) {
         if self.running {
-            let mut builder = MonoFrameBuilder::new();
-            builder.push_mono_samples(samples, &self.queue);
+            self.builder.push_mono_samples(samples, &self.queue);
         }
     }
 }
@@ -164,6 +202,7 @@ impl MockVoiceCaptureStream {
 impl VoiceCaptureStream for MockVoiceCaptureStream {
     fn stop(&mut self) {
         self.running = false;
+        self.builder.reset();
         self.queue.clear();
     }
 
@@ -245,6 +284,38 @@ mod tests {
         assert_eq!(queue.len(), 1);
         stream.stop();
         assert!(queue.is_empty());
+    }
+
+
+    #[test]
+    fn fixed_buffer_converters_do_not_require_vec_storage() {
+        let stereo = [1.0_f32, 3.0, 5.0, 7.0];
+        let mut mono = [0.0_f32; 2];
+        assert_eq!(interleaved_to_mono_f32_into(&stereo, 2, &mut mono), Some(2));
+        assert_eq!(mono, [2.0, 6.0]);
+        assert_eq!(interleaved_to_mono_f32_into(&stereo, 2, &mut mono[..1]), None);
+        assert_eq!(interleaved_to_mono_f32_into(&stereo[..3], 2, &mut mono), None);
+
+        let integer = [0_i16, 16384, -16384];
+        let mut float = [0.0_f32; 3];
+        assert_eq!(i16_slice_to_f32_into(&integer, &mut float), Some(3));
+        assert!((float[1] - 0.5).abs() < 1e-4);
+        assert_eq!(i16_slice_to_f32_into(&integer, &mut float[..2]), None);
+    }
+
+    #[test]
+    fn mock_stream_preserves_partial_frames_between_callbacks() {
+        let queue = Arc::new(BoundedPcmQueue::new(2));
+        let mut stream = MockVoiceCaptureStream::new(Arc::clone(&queue));
+        let first = vec![0.2_f32; VOICE_FRAME_SAMPLES / 2];
+        let second = vec![0.4_f32; VOICE_FRAME_SAMPLES / 2];
+        stream.inject_mono(&first);
+        assert!(queue.is_empty());
+        stream.inject_mono(&second);
+        assert_eq!(queue.len(), 1);
+        let frame = queue.pop().unwrap();
+        assert!((frame.samples()[0] - 0.2).abs() < 1e-6);
+        assert!((frame.samples()[VOICE_FRAME_SAMPLES / 2] - 0.4).abs() < 1e-6);
     }
 
     #[test]

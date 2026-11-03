@@ -179,6 +179,8 @@ pub enum MenuAction {
     SettingsMicrophoneRefresh,
     /// Explicitly switches capture back to the operating-system default input.
     SettingsMicrophoneUseSystemDefault,
+    /// Retries the OS permission probe after the player changes system privacy settings.
+    SettingsMicrophoneRetryPermission,
     /// Selects a row from one exact presentation snapshot; stale revisions are rejected.
     SettingsMicrophoneSelect(u16, u64),
     SettingsOption(u16, i32),

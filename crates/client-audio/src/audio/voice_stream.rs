@@ -576,16 +576,24 @@ mod tests {
     }
 
     #[test]
-    fn mock_inject_fills_queue() {
-        let queue = Arc::new(BoundedPcmQueue::new(4));
-        queue.set_accepting(true);
-        let shared = Arc::clone(&queue);
-        let mut stream = MockVoiceCaptureStream::new(VoiceCaptureQueues { transmit: Arc::clone(&shared), monitor: shared });
+    fn mock_inject_fans_out_to_independent_queues() {
+        let transmit = Arc::new(BoundedPcmQueue::new(4));
+        let monitor = Arc::new(BoundedPcmQueue::new(4));
+        transmit.set_accepting(true);
+        monitor.set_accepting(true);
+        let mut stream = MockVoiceCaptureStream::new(VoiceCaptureQueues {
+            transmit: Arc::clone(&transmit),
+            monitor: Arc::clone(&monitor),
+        });
         let samples = vec![0.1_f32; VOICE_FRAME_SAMPLES];
         stream.inject_mono(&samples);
-        assert_eq!(queue.len(), 1);
+        assert_eq!(transmit.len(), 1);
+        assert_eq!(monitor.len(), 1);
+        assert!((transmit.pop().unwrap().samples()[0] - 0.1).abs() < 1e-6);
+        assert!((monitor.pop().unwrap().samples()[0] - 0.1).abs() < 1e-6);
         stream.stop();
-        assert!(queue.is_empty());
+        assert!(transmit.is_empty());
+        assert!(monitor.is_empty());
     }
 
 

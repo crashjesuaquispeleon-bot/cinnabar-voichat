@@ -1,11 +1,22 @@
 //! Borrows session identity for the presentation audio lane.
 use bevy::prelude::*;
 use client_audio::audio::{
-    voice_controller::VoiceCaptureController, voice_input::VoiceInputPolicy,
+    voice_controller::VoiceCaptureController,
+    voice_input::{MicrophoneMode, VoiceInputPolicy},
 };
 use client_audio::audio_ingress::SequencedAudioEvent;
 use client_audio::session_audio::{SessionAudio, SessionAudioCatalog};
 use semantic_input::Action;
+
+/// Copies saved, local voice preferences into the capture policy.
+fn apply_voice_chat_settings(policy: &mut VoiceInputPolicy, settings: &ui::VoiceChatSettings) {
+    policy.set_enabled(settings.enabled);
+    policy.set_mode(match settings.activation_mode {
+        ui::VoiceActivationMode::OpenMicrophone => MicrophoneMode::OpenMicrophone,
+        ui::VoiceActivationMode::PushToTalk => MicrophoneMode::PushToTalk,
+    });
+}
+
 
 /// Borrows current owner facts and forwards them at the existing system boundary.
 #[allow(clippy::too_many_arguments)]
@@ -20,6 +31,7 @@ pub(crate) fn drain_sequenced_audio_into_session(
     mut voice_policy: ResMut<VoiceInputPolicy>,
     mut voice_controller: ResMut<VoiceCaptureController>,
     input: Res<client_state::SemanticInputSnapshot>,
+    settings: Res<client_state::RuntimeSettings>,
     mut voice_session: Local<Option<(u64, u64)>>,
 ) {
     // Bind microphone lifetime to the exact local WorldStream lifetime and the
@@ -36,6 +48,12 @@ pub(crate) fn drain_sequenced_audio_into_session(
         voice_policy.set_session_active(current_voice_session.is_some());
         *voice_session = current_voice_session;
     }
+    // Saved Sound-panel preferences configure the local voice policy. Voice stays
+    // disabled by default; capture still requires OS permission and a live game session.
+    apply_voice_chat_settings(
+        &mut voice_policy,
+        &settings.user_settings_update().1.voice_chat,
+    );
     // PTT is sourced from the finalized semantic action, never raw keyboard polling.
     // Missing/stale snapshots report the neutral released phase.
     voice_policy.set_push_to_talk_held(input.phase(Action::PushToTalk).held);
@@ -70,3 +88,60 @@ pub(crate) fn drain_sequenced_audio_into_session(
 #[cfg(all(test, feature = "acceptance"))]
 #[path = "session_audio/wire_evidence_tests.rs"]
 mod wire_evidence_tests;
+
+#[cfg(test)]
+mod voice_settings_tests {
+    use super::*;
+
+    #[test]
+    fn voice_chat_settings_are_applied_with_closed_default_and_open_mic_choice() {
+        let mut policy = VoiceInputPolicy::default();
+        let defaults = ui::VoiceChatSettings::default();
+        apply_voice_chat_settings(&mut policy, &defaults);
+
+        assert!(!policy.enabled());
+        assert_eq!(policy.mode(), MicrophoneMode::PushToTalk);
+        assert!(!policy.capture_permitted());
+
+        let open_mic = ui::VoiceChatSettings {
+            enabled: true,
+            activation_mode: ui::VoiceActivationMode::OpenMicrophone,
+        };
+        apply_voice_chat_settings(&mut policy, &open_mic);
+        policy.set_permission(client_audio::audio::voice_input::MicrophonePermission::Granted);
+        policy.set_session_active(true);
+
+        assert!(policy.enabled());
+        assert_eq!(policy.mode(), MicrophoneMode::OpenMicrophone);
+        assert!(policy.transmission_permitted());
+    }
+
+    #[test]
+    fn disabling_voice_and_switching_to_ptt_releases_transmission() {
+        let mut policy = VoiceInputPolicy::default();
+        policy.set_permission(client_audio::audio::voice_input::MicrophonePermission::Granted);
+        policy.set_session_active(true);
+        apply_voice_chat_settings(
+            &mut policy,
+            &ui::VoiceChatSettings {
+                enabled: true,
+                activation_mode: ui::VoiceActivationMode::OpenMicrophone,
+            },
+        );
+        assert!(policy.transmission_permitted());
+
+        apply_voice_chat_settings(
+            &mut policy,
+            &ui::VoiceChatSettings {
+                enabled: true,
+                activation_mode: ui::VoiceActivationMode::PushToTalk,
+            },
+        );
+        assert!(!policy.transmission_permitted());
+        policy.set_push_to_talk_held(true);
+        assert!(policy.transmission_permitted());
+
+        apply_voice_chat_settings(&mut policy, &ui::VoiceChatSettings::default());
+        assert!(!policy.transmission_permitted());
+    }
+}

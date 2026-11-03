@@ -17,7 +17,6 @@ fn apply_voice_chat_settings(policy: &mut VoiceInputPolicy, settings: &ui::Voice
     });
 }
 
-
 /// Borrows current owner facts and forwards them at the existing system boundary.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn drain_sequenced_audio_into_session(

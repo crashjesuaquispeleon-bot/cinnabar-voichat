@@ -321,33 +321,198 @@ impl VoiceCaptureOpener for MockVoiceCaptureOpener {
     }
 }
 
-/// Opens the default CPAL microphone and owns its stream on a dedicated thread.
-/// The device must expose an exact 48 kHz `f32` or `i16` input configuration;
-/// unsupported rates are rejected rather than mislabeled as 48 kHz.
+/// Opens a CPAL microphone through the persistent owner-worker protocol.
+/// The worker constructs the CPAL host, owns every Device and Stream, and processes
+/// refresh/select/shutdown commands on that same thread.
 #[cfg(not(target_arch = "wasm32"))]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct CpalVoiceCaptureOpener;
 
 #[cfg(not(target_arch = "wasm32"))]
+struct CpalMicrophoneWorkerBackend {
+    host: rodio::cpal::Host,
+    queues: VoiceCaptureQueues,
+    running: Arc<std::sync::atomic::AtomicBool>,
+    stream: Option<rodio::cpal::Stream>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl CpalMicrophoneWorkerBackend {
+    /// Called only from the worker factory, so the host is born on its owner thread.
+    fn new(
+        queues: VoiceCaptureQueues,
+        running: Arc<std::sync::atomic::AtomicBool>,
+    ) -> Self {
+        Self {
+            host: rodio::cpal::default_host(),
+            queues,
+            running,
+            stream: None,
+        }
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl super::voice_capture::MicrophoneWorkerBackend for CpalMicrophoneWorkerBackend {
+    type Device = rodio::cpal::Device;
+
+    fn enumerate(&mut self) -> Result<Vec<(String, bool, Self::Device)>, String> {
+        use rodio::cpal::traits::{DeviceTrait, HostTrait};
+
+        let default_name = self
+            .host
+            .default_input_device()
+            .and_then(|device| device.name().ok());
+        let devices = self
+            .host
+            .input_devices()
+            .map_err(|error| error.to_string())?
+            .collect::<Vec<_>>();
+        let names = devices
+            .iter()
+            .map(|device| device.name().unwrap_or_default())
+            .collect::<Vec<_>>();
+
+        // CPAL has no portable persistent ID here. A name is accepted as the default
+        // only when it uniquely identifies one enumerated device.
+        let unique_default = default_name.filter(|candidate| {
+            !candidate.is_empty() && names.iter().filter(|name| *name == candidate).count() == 1
+        });
+
+        Ok(names
+            .into_iter()
+            .zip(devices)
+            .enumerate()
+            .map(|(index, (name, device))| {
+                let is_default = unique_default.as_deref() == Some(name.as_str());
+                let name = if name.is_empty() {
+                    format!("Input device {}", index + 1)
+                } else {
+                    name
+                };
+                (name, is_default, device)
+            })
+            .collect())
+    }
+
+    fn stop(&mut self) {
+        use std::sync::atomic::Ordering;
+
+        self.running.store(false, Ordering::Release);
+        self.queues.transmit.set_accepting(false);
+        self.queues.monitor.set_accepting(false);
+        // Drop the stream on the same thread that created it.
+        self.stream.take();
+        self.queues.transmit.clear();
+        self.queues.monitor.clear();
+    }
+
+    fn start(&mut self, device: &Self::Device) -> Result<(), String> {
+        use rodio::cpal::traits::{DeviceTrait, StreamTrait};
+        use std::sync::atomic::Ordering;
+
+        self.stop();
+        let supported = device
+            .supported_input_configs()
+            .map_err(|error| error.to_string())?
+            .filter(|config| {
+                config.min_sample_rate().0 <= VOICE_SAMPLE_RATE
+                    && config.max_sample_rate().0 >= VOICE_SAMPLE_RATE
+                    && matches!(
+                        config.sample_format(),
+                        rodio::cpal::SampleFormat::F32 | rodio::cpal::SampleFormat::I16
+                    )
+            })
+            .max_by_key(|config| config.channels())
+            .ok_or_else(|| "microphone does not support 48 kHz f32/i16 input".to_owned())?;
+
+        let sample_format = supported.sample_format();
+        let config = supported
+            .with_sample_rate(rodio::cpal::SampleRate(VOICE_SAMPLE_RATE))
+            .config();
+        let channels = config.channels;
+
+        let stream = match sample_format {
+            rodio::cpal::SampleFormat::F32 => {
+                let transmit = Arc::clone(&self.queues.transmit);
+                let monitor = Arc::clone(&self.queues.monitor);
+                let mut builder = MonoFrameBuilder::new();
+                let callback_running = Arc::clone(&self.running);
+                device
+                    .build_input_stream(
+                        &config,
+                        move |data: &[f32], _| {
+                            builder.push_interleaved_f32_to_queues(
+                                data,
+                                channels,
+                                &[&transmit, &monitor],
+                            );
+                        },
+                        move |_error| {
+                            callback_running.store(false, Ordering::Release);
+                        },
+                        None,
+                    )
+                    .map_err(|error| error.to_string())?
+            }
+            rodio::cpal::SampleFormat::I16 => {
+                let transmit = Arc::clone(&self.queues.transmit);
+                let monitor = Arc::clone(&self.queues.monitor);
+                let mut builder = MonoFrameBuilder::new();
+                let callback_running = Arc::clone(&self.running);
+                device
+                    .build_input_stream(
+                        &config,
+                        move |data: &[i16], _| {
+                            builder.push_interleaved_i16_to_queues(
+                                data,
+                                channels,
+                                &[&transmit, &monitor],
+                            );
+                        },
+                        move |_error| {
+                            callback_running.store(false, Ordering::Release);
+                        },
+                        None,
+                    )
+                    .map_err(|error| error.to_string())?
+            }
+            _ => return Err("unsupported microphone sample format".to_owned()),
+        };
+
+        self.running.store(true, Ordering::Release);
+        if let Err(error) = stream.play() {
+            self.running.store(false, Ordering::Release);
+            return Err(error.to_string());
+        }
+        self.stream = Some(stream);
+        Ok(())
+    }
+
+    fn is_running(&self) -> bool {
+        use std::sync::atomic::Ordering;
+
+        self.stream.is_some() && self.running.load(Ordering::Acquire)
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 struct CpalVoiceCaptureHandle {
-    stop: Option<std::sync::mpsc::Sender<()>>,
-    owner: Option<std::thread::JoinHandle<()>>,
-    running: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    worker: Option<super::voice_capture::MicrophoneWorker>,
+    running: Arc<std::sync::atomic::AtomicBool>,
     queues: VoiceCaptureQueues,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 impl VoiceCaptureStream for CpalVoiceCaptureHandle {
     fn stop(&mut self) {
-        if let Some(stop) = self.stop.take() {
-            let _ = stop.send(());
-        }
-        if let Some(owner) = self.owner.take() {
-            let _ = owner.join();
+        if let Some(worker) = self.worker.take() {
+            worker.shutdown();
         }
         self.running
             .store(false, std::sync::atomic::Ordering::Release);
-        // The owner thread has dropped the CPAL stream, so the callback cannot repopulate it.
+        self.queues.transmit.set_accepting(false);
+        self.queues.monitor.set_accepting(false);
         self.queues.transmit.clear();
         self.queues.monitor.clear();
     }
@@ -370,153 +535,85 @@ impl VoiceCaptureOpener for CpalVoiceCaptureOpener {
         &self,
         queues: VoiceCaptureQueues,
     ) -> Result<Box<dyn VoiceCaptureStream>, VoiceCaptureError> {
-        use rodio::cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-        use std::sync::{
-            atomic::{AtomicBool, Ordering},
-            mpsc,
+        use super::voice_capture::{
+            spawn_microphone_worker, MicrophoneSelection, MicrophoneSelectionError,
+            MicrophoneWorkerCommand, MicrophoneWorkerEvent,
         };
+        use std::sync::atomic::AtomicBool;
+        use std::time::Duration;
 
-        let (ready_tx, ready_rx) = mpsc::sync_channel::<Result<(), VoiceCaptureError>>(1);
-        let (stop_tx, stop_rx) = mpsc::channel::<()>();
-        let running = std::sync::Arc::new(AtomicBool::new(false));
-        let thread_running = std::sync::Arc::clone(&running);
-        let thread_queues = queues.clone();
+        let running = Arc::new(AtomicBool::new(false));
+        let worker_queues = queues.clone();
+        let worker_running = Arc::clone(&running);
+        let worker = spawn_microphone_worker(move || {
+            CpalMicrophoneWorkerBackend::new(worker_queues, worker_running)
+        })
+        .map_err(|error| VoiceCaptureError::Other(error.to_string()))?;
 
-        let owner = std::thread::Builder::new()
-            .name("voice-capture".to_owned())
-            .spawn(move || {
-                let host = rodio::cpal::default_host();
-                let Some(device) = host.default_input_device() else {
-                    let _ = ready_tx.send(Err(VoiceCaptureError::NoDevice));
-                    return;
-                };
-
-                let supported = match device.supported_input_configs() {
-                    Ok(configs) => configs
-                        .filter(|config| {
-                            config.min_sample_rate().0 <= VOICE_SAMPLE_RATE
-                                && config.max_sample_rate().0 >= VOICE_SAMPLE_RATE
-                                && matches!(
-                                    config.sample_format(),
-                                    rodio::cpal::SampleFormat::F32 | rodio::cpal::SampleFormat::I16
-                                )
-                        })
-                        .max_by_key(|config| config.channels()),
-                    Err(error) => {
-                        let _ = ready_tx.send(Err(VoiceCaptureError::Other(error.to_string())));
-                        return;
-                    }
-                };
-
-                let Some(supported) = supported else {
-                    let _ = ready_tx.send(Err(VoiceCaptureError::UnsupportedFormat));
-                    return;
-                };
-                let sample_format = supported.sample_format();
-                let config = supported
-                    .with_sample_rate(rodio::cpal::SampleRate(VOICE_SAMPLE_RATE))
-                    .config();
-                let channels = config.channels;
-
-                let callback_running = std::sync::Arc::clone(&thread_running);
-                let error_callback = move |_error| {
-                    // Do not log or allocate in CPAL's real-time error callback.
-                    callback_running.store(false, Ordering::Release);
-                };
-
-                let stream_result = match sample_format {
-                    rodio::cpal::SampleFormat::F32 => {
-                        let callback_transmit = Arc::clone(&thread_queues.transmit);
-                        let callback_monitor = Arc::clone(&thread_queues.monitor);
-                        let mut builder = MonoFrameBuilder::new();
-                        device.build_input_stream(
-                            &config,
-                            move |data: &[f32], _| {
-                                builder.push_interleaved_f32_to_queues(
-                                    data,
-                                    channels,
-                                    &[&callback_transmit, &callback_monitor],
-                                );
-                            },
-                            error_callback,
-                            None,
-                        )
-                    }
-                    rodio::cpal::SampleFormat::I16 => {
-                        let callback_transmit = Arc::clone(&thread_queues.transmit);
-                        let callback_monitor = Arc::clone(&thread_queues.monitor);
-                        let mut builder = MonoFrameBuilder::new();
-                        let callback_running = std::sync::Arc::clone(&thread_running);
-                        device.build_input_stream(
-                            &config,
-                            move |data: &[i16], _| {
-                                builder.push_interleaved_i16_to_queues(
-                                    data,
-                                    channels,
-                                    &[&callback_transmit, &callback_monitor],
-                                );
-                            },
-                            move |_error| {
-                                callback_running.store(false, Ordering::Release);
-                            },
-                            None,
-                        )
-                    }
-                    _ => unreachable!("sample format was filtered above"),
-                };
-
-                let stream = match stream_result {
-                    Ok(stream) => stream,
-                    Err(error) => {
-                        let _ = ready_tx.send(Err(VoiceCaptureError::Other(error.to_string())));
-                        return;
-                    }
-                };
-                thread_running.store(true, Ordering::Release);
-                if let Err(error) = stream.play() {
-                    thread_running.store(false, Ordering::Release);
-                    let _ = ready_tx.send(Err(VoiceCaptureError::Other(error.to_string())));
-                    return;
-                }
-
-                if ready_tx.send(Ok(())).is_err() {
-                    thread_running.store(false, Ordering::Release);
-                    drop(stream);
-                    return;
-                }
-
-                loop {
-                    match stop_rx.recv_timeout(std::time::Duration::from_millis(50)) {
-                        Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
-                        Err(mpsc::RecvTimeoutError::Timeout) => {
-                            if !thread_running.load(Ordering::Acquire) {
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                // Stream is dropped here, on the same owner thread that created it.
-                drop(stream);
-                thread_queues.transmit.clear();
-                thread_queues.monitor.clear();
-                thread_running.store(false, Ordering::Release);
-            })
+        worker
+            .send(MicrophoneWorkerCommand::Refresh)
             .map_err(|error| VoiceCaptureError::Other(error.to_string()))?;
 
-        match ready_rx.recv() {
-            Ok(Ok(())) => Ok(Box::new(CpalVoiceCaptureHandle {
-                stop: Some(stop_tx),
-                owner: Some(owner),
-                running,
-                queues,
-            })),
-            Ok(Err(error)) => {
-                let _ = owner.join();
-                Err(error)
+        match worker.recv_timeout(Duration::from_secs(5)) {
+            Ok(MicrophoneWorkerEvent::Devices(devices)) if !devices.is_empty() => {}
+            Ok(MicrophoneWorkerEvent::Devices(_)) => {
+                worker.shutdown();
+                return Err(VoiceCaptureError::NoDevice);
+            }
+            Ok(MicrophoneWorkerEvent::BackendError(error)) => {
+                worker.shutdown();
+                return Err(VoiceCaptureError::Other(error));
+            }
+            Ok(_) => {
+                worker.shutdown();
+                return Err(VoiceCaptureError::Other(
+                    "unexpected microphone discovery response".to_owned(),
+                ));
             }
             Err(error) => {
-                let _ = owner.join();
+                worker.shutdown();
+                return Err(VoiceCaptureError::Other(error.to_string()));
+            }
+        }
+
+        worker
+            .send(MicrophoneWorkerCommand::Select(MicrophoneSelection::SystemDefault))
+            .map_err(|error| VoiceCaptureError::Other(error.to_string()))?;
+
+        match worker.recv_timeout(Duration::from_secs(10)) {
+            Ok(MicrophoneWorkerEvent::Selected { .. })
+                if running.load(std::sync::atomic::Ordering::Acquire) =>
+            {
+                Ok(Box::new(CpalVoiceCaptureHandle {
+                    worker: Some(worker),
+                    running,
+                    queues,
+                }))
+            }
+            Ok(MicrophoneWorkerEvent::SelectionRejected(
+                MicrophoneSelectionError::NoDefaultDevice,
+            )) => {
+                worker.shutdown();
+                Err(VoiceCaptureError::NoDevice)
+            }
+            Ok(MicrophoneWorkerEvent::SelectionRejected(error)) => {
+                worker.shutdown();
+                Err(VoiceCaptureError::Other(format!(
+                    "microphone selection rejected: {error:?}"
+                )))
+            }
+            Ok(MicrophoneWorkerEvent::BackendError(error)) => {
+                worker.shutdown();
+                Err(VoiceCaptureError::Other(error))
+            }
+            Ok(_) => {
+                worker.shutdown();
+                Err(VoiceCaptureError::Other(
+                    "unexpected microphone open response".to_owned(),
+                ))
+            }
+            Err(error) => {
+                worker.shutdown();
                 Err(VoiceCaptureError::Other(error.to_string()))
             }
         }

@@ -204,6 +204,8 @@ pub enum MicrophoneWorkerEvent {
     SelectionRejected(MicrophoneSelectionError),
     /// The active stream stopped or its device disappeared.
     DeviceUnavailable { device_id: Option<String> },
+    /// A backend operation failed without substituting another device.
+    BackendError(String),
     /// Worker has stopped and invalidated all previously issued IDs.
     Stopped,
 }
@@ -247,6 +249,175 @@ impl<T> MicrophoneCatalog<T> {
             }
         }
     }
+}
+
+
+/// Operations that must run on the microphone worker's owner thread.
+///
+/// This trait intentionally has no `Send` or `Sync` supertrait: implementations may
+/// contain CPAL host/device/stream values that must never leave the thread that created
+/// them. Construct the backend inside the factory passed to
+/// [`spawn_microphone_worker`], not on the caller's thread.
+pub trait MicrophoneWorkerBackend: 'static {
+    /// Native device handle; it remains private to the worker thread.
+    type Device: 'static;
+
+    /// Enumerate current inputs, returning (display name, is system default, handle).
+    fn enumerate(&mut self) -> Result<Vec<(String, bool, Self::Device)>, String>;
+
+    /// Stop and release any active input stream.
+    fn stop(&mut self);
+
+    /// Open exactly the supplied handle. Must not silently select another device.
+    fn start(&mut self, device: &Self::Device) -> Result<(), String>;
+
+    /// Whether the active stream is still healthy.
+    fn is_running(&self) -> bool;
+}
+
+/// Sender/receiver/join handle for the persistent microphone owner worker.
+pub struct MicrophoneWorker {
+    commands: std::sync::mpsc::Sender<MicrophoneWorkerCommand>,
+    events: std::sync::mpsc::Receiver<MicrophoneWorkerEvent>,
+    owner: Option<std::thread::JoinHandle<()>>,
+}
+
+impl MicrophoneWorker {
+    /// Submit an owned command. Native device handles never cross this channel.
+    pub fn send(&self, command: MicrophoneWorkerCommand) -> Result<(), std::sync::mpsc::SendError<MicrophoneWorkerCommand>> {
+        self.commands.send(command)
+    }
+
+    /// Wait for the next worker event.
+    pub fn recv(&self) -> Result<MicrophoneWorkerEvent, std::sync::mpsc::RecvError> {
+        self.events.recv()
+    }
+
+    /// Wait for an event up to the supplied duration.
+    pub fn recv_timeout(&self, timeout: std::time::Duration) -> Result<MicrophoneWorkerEvent, std::sync::mpsc::RecvTimeoutError> {
+        self.events.recv_timeout(timeout)
+    }
+
+    /// Request orderly shutdown and join the owner thread.
+    pub fn shutdown(mut self) {
+        let _ = self.commands.send(MicrophoneWorkerCommand::Shutdown);
+        if let Some(owner) = self.owner.take() {
+            let _ = owner.join();
+        }
+    }
+}
+
+impl Drop for MicrophoneWorker {
+    fn drop(&mut self) {
+        let _ = self.commands.send(MicrophoneWorkerCommand::Shutdown);
+        if let Some(owner) = self.owner.take() {
+            let _ = owner.join();
+        }
+    }
+}
+
+/// Starts a persistent owner thread. The backend factory is Send, but the backend it
+/// creates is not required to be Send because construction and all use happen inside
+/// the spawned thread. A refresh invalidates old tokens; unplug/stream failure stops
+/// capture and invalidates the catalog. A missing selection never falls back to default.
+pub fn spawn_microphone_worker<B, F>(factory: F) -> std::io::Result<MicrophoneWorker>
+where
+    B: MicrophoneWorkerBackend,
+    F: FnOnce() -> B + Send + 'static,
+{
+    use std::sync::mpsc;
+    let (command_tx, command_rx) = mpsc::channel();
+    let (event_tx, event_rx) = mpsc::channel();
+    let owner = std::thread::Builder::new()
+        .name("microphone-device-owner".to_owned())
+        .spawn(move || {
+            let mut backend = factory();
+            let mut catalog = MicrophoneCatalog::<B::Device>::default();
+            let mut active_id: Option<String> = None;
+            loop {
+                if active_id.is_some() && !backend.is_running() {
+                    backend.stop();
+                    active_id = None;
+                    catalog.invalidate();
+                    if event_tx.send(MicrophoneWorkerEvent::DeviceUnavailable { device_id: None }).is_err() {
+                        break;
+                    }
+                }
+                match command_rx.recv_timeout(std::time::Duration::from_millis(50)) {
+                    Ok(MicrophoneWorkerCommand::Refresh) => {
+                        backend.stop();
+                        active_id = None;
+                        match backend.enumerate() {
+                            Ok(devices) => {
+                                let descriptors = catalog.refresh(devices);
+                                if event_tx.send(MicrophoneWorkerEvent::Devices(descriptors)).is_err() {
+                                    break;
+                                }
+                            }
+                            Err(error) => {
+                                catalog.invalidate();
+                                if event_tx.send(MicrophoneWorkerEvent::BackendError(error)).is_err() {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    Ok(MicrophoneWorkerCommand::Select(selection)) => {
+                        backend.stop();
+                        active_id = None;
+                        let resolved_id = match &selection {
+                            MicrophoneSelection::Device(id) => Some(id.clone()),
+                            MicrophoneSelection::SystemDefault => catalog
+                                .descriptors()
+                                .into_iter()
+                                .find(|device| device.is_default)
+                                .map(|device| device.id),
+                        };
+                        let result = catalog.resolve_selection(&selection);
+                        match result {
+                            Ok(device) => match backend.start(device) {
+                                Ok(()) => {
+                                    active_id = resolved_id.clone();
+                                    if event_tx.send(MicrophoneWorkerEvent::Selected {
+                                        device_id: resolved_id.unwrap_or_default(),
+                                    }).is_err() {
+                                        backend.stop();
+                                        break;
+                                    }
+                                }
+                                Err(error) => {
+                                    if event_tx.send(MicrophoneWorkerEvent::BackendError(error)).is_err() {
+                                        break;
+                                    }
+                                }
+                            },
+                            Err(error) => {
+                                if event_tx.send(MicrophoneWorkerEvent::SelectionRejected(error)).is_err() {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    Ok(MicrophoneWorkerCommand::Shutdown) => {
+                        backend.stop();
+                        catalog.invalidate();
+                        let _ = event_tx.send(MicrophoneWorkerEvent::Stopped);
+                        break;
+                    }
+                    Err(mpsc::RecvTimeoutError::Timeout) => {}
+                    Err(mpsc::RecvTimeoutError::Disconnected) => {
+                        backend.stop();
+                        catalog.invalidate();
+                        break;
+                    }
+                }
+            }
+        })?;
+    Ok(MicrophoneWorker {
+        commands: command_tx,
+        events: event_rx,
+        owner: Some(owner),
+    })
 }
 
 #[cfg(test)]

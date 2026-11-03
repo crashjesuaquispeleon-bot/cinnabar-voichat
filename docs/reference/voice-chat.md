@@ -107,7 +107,7 @@ References:
 - [ ] Add OS permission UX/denial recovery, error presentation and the dynamic microphone-device list. The in-game quick-mute action is now implemented and remappable. Sound settings persist enablement, local mute and activation mode; the controller exposes nonblocking refresh and exact selection APIs. Do not persist generation-scoped catalog tokens.
 - [x] Define mockable `VoiceCaptureOpener` / `VoiceCaptureStream` traits, fixed-frame accumulation, allocation-free conversion helpers, mock lifecycle tests, and the first native CPAL stream owner.
 - [x] Connect the remappable semantic PTT input and saved enablement/activation-mode settings to the policy.
-- [x] Add a bounded, thread-safe PCM frame queue with fixed internal format and explicit overflow accounting (no live capture producer yet).
+- [x] Add a bounded, thread-safe PCM frame queue with fixed internal format, explicit overflow accounting and a live policy-gated CPAL capture producer.
 - [ ] Implement a bounded capture-to-playback loopback test and verify device shutdown on mute, disconnect and application exit.
 - [x] Add saved enablement, local mute and activation-mode controls to the existing Sound settings panel without changing game sound sliders.\n- [ ] Add the dynamic microphone-device selector, permission status and error presentation.
 

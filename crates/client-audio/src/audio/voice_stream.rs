@@ -76,10 +76,19 @@ pub trait VoiceCaptureOpener: Send + Sync {
 /// Accumulates mono samples into [`PcmFrame`]s and pushes them.
 ///
 /// Intended for the real-time callback path after format conversion.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct MonoFrameBuilder {
     partial: [f32; VOICE_FRAME_SAMPLES],
     filled: usize,
+}
+
+impl Default for MonoFrameBuilder {
+    fn default() -> Self {
+        Self {
+            partial: [0.0; VOICE_FRAME_SAMPLES],
+            filled: 0,
+        }
+    }
 }
 
 impl MonoFrameBuilder {

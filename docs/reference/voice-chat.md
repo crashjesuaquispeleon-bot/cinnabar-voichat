@@ -104,12 +104,13 @@ References:
 - [x] Implement a dedicated owner-thread CPAL opener with a synchronous ready/error handshake and exact 48 kHz `f32` / `i16` negotiation.
 - [x] Rate-limit transient microphone open failures and unexpected runtime stream stops with bounded exponential backoff; clear stale PCM before reopening.
 - [x] Wire capture policy to the active `WorldStream` lifecycle; stop and clear on disconnect, transfer or stream-generation change.
-- [ ] Add OS permission UX/denial recovery, error presentation and the dynamic microphone-device list. The in-game quick-mute action is now implemented and remappable. Sound settings persist enablement, local mute and activation mode; the controller exposes nonblocking refresh and exact selection APIs. Do not persist generation-scoped catalog tokens.
+- [ ] Add OS permission UX/denial recovery, error presentation and the dynamic microphone-device list. The in-game quick-mute action is implemented and remappable. Sound settings persist enablement, local mute, activation mode and input sensitivity; the controller exposes nonblocking refresh and exact selection APIs. Do not persist generation-scoped catalog tokens.
 - [x] Define mockable `VoiceCaptureOpener` / `VoiceCaptureStream` traits, fixed-frame accumulation, allocation-free conversion helpers, mock lifecycle tests, and the first native CPAL stream owner.
 - [x] Connect the remappable semantic PTT input and saved enablement/activation-mode settings to the policy.
 - [x] Add a bounded, thread-safe PCM frame queue with fixed internal format, explicit overflow accounting and a live policy-gated CPAL capture producer.
-- [ ] Implement a bounded capture-to-playback loopback test and verify device shutdown on mute, disconnect and application exit.
-- [x] Add saved enablement, local mute and activation-mode controls to the existing Sound settings panel without changing game sound sliders.\n- [ ] Add the dynamic microphone-device selector, permission status and error presentation.
+- [x] Add a bounded mock capture-to-playback loopback test covering the existing mixer, independent transmit queue and disconnect cancellation; real-device shutdown still needs platform qualification.
+- [x] Add saved enablement, local mute, activation-mode and input-sensitivity controls to the existing Sound settings panel without changing game sound sliders.
+- [ ] Add the dynamic microphone-device selector, permission status and error presentation.
 
 ### Stage 2 — Authenticated global rooms
 

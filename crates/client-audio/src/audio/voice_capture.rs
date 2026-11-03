@@ -134,7 +134,6 @@ impl MicrophoneBackend for CpalMicrophoneBackend {
     }
 }
 
-
 /// User's local microphone preference. Device tokens are valid only in the
 /// catalog generation that issued them; `SystemDefault` is an explicit choice,
 /// never an implicit fallback for a missing selected device.
@@ -201,7 +200,6 @@ mod tests {
         }
     }
 
-
     #[test]
     fn explicit_selection_resolves_exact_device_even_with_duplicate_names() {
         let mut catalog = MicrophoneCatalog::default();
@@ -219,10 +217,11 @@ mod tests {
     #[test]
     fn explicit_missing_device_never_falls_back_to_system_default() {
         let mut catalog = MicrophoneCatalog::default();
-        catalog.refresh([("System microphone".to_owned(), true, 10_u32)]);
+        let old = catalog.refresh([("Old microphone".to_owned(), true, 10_u32)]);
+        catalog.refresh([("Replacement microphone".to_owned(), true, 20_u32)]);
 
         assert_eq!(
-            catalog.resolve_selection(&MicrophoneSelection::Device("stale-token".to_owned())),
+            catalog.resolve_selection(&MicrophoneSelection::Device(old[0].id.clone())),
             Err(MicrophoneSelectionError::DeviceUnavailable)
         );
     }

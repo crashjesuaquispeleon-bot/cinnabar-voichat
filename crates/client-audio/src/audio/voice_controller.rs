@@ -121,6 +121,15 @@ impl VoiceCaptureController {
         }
     }
 
+    /// Stops capture and retires queued PCM when the observed game session changes.
+    ///
+    /// The app-side lifecycle adapter calls this before publishing the next session as active,
+    /// so frames captured for the previous world cannot survive a transfer or reconnect.
+    pub fn reset_for_session_change(&mut self) {
+        self.force_stop();
+        self.last_capture_permitted = false;
+    }
+
     fn force_stop(&mut self) {
         if let Some(mut stream) = self.stream.take() {
             stream.stop();

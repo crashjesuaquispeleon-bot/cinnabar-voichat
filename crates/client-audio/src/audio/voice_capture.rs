@@ -805,9 +805,9 @@ mod tests {
 
         // A token from the previous snapshot is rejected without stopping the active mic.
         worker
-            .send(MicrophoneWorkerCommand::Select(MicrophoneSelection::Device(
-                devices[1].id.clone(),
-            )))
+            .send(MicrophoneWorkerCommand::Select(
+                MicrophoneSelection::Device(devices[1].id.clone()),
+            ))
             .unwrap();
         assert_eq!(
             worker

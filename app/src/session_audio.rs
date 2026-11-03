@@ -2,6 +2,7 @@
 use bevy::prelude::*;
 use client_audio::audio_ingress::SequencedAudioEvent;
 use client_audio::session_audio::{SessionAudio, SessionAudioCatalog};
+use semantic_input::Action;
 use client_audio::audio::{voice_controller::VoiceCaptureController, voice_input::VoiceInputPolicy};
 
 /// Borrows current owner facts and forwards them at the existing system boundary.
@@ -16,6 +17,7 @@ pub(crate) fn drain_sequenced_audio_into_session(
     session: ResMut<SessionAudio>,
     mut voice_policy: ResMut<VoiceInputPolicy>,
     mut voice_controller: ResMut<VoiceCaptureController>,
+    input: Res<client_state::SemanticInputSnapshot>,
     mut voice_session: Local<Option<(u64, u64)>>,
 ) {
     // Bind microphone lifetime to the exact local WorldStream lifetime and the
@@ -32,6 +34,9 @@ pub(crate) fn drain_sequenced_audio_into_session(
         voice_policy.set_session_active(current_voice_session.is_some());
         *voice_session = current_voice_session;
     }
+    // PTT is sourced from the finalized semantic action, never raw keyboard polling.
+    // Missing/stale snapshots report the neutral released phase.
+    voice_policy.set_push_to_talk_held(input.phase(Action::PushToTalk).held);
     #[cfg(feature = "acceptance")]
     if let Some(wire) = wire.as_mut() {
         let stream_id = client_world

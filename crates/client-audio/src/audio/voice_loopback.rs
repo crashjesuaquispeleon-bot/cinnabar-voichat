@@ -11,7 +11,8 @@ use super::voice::OUTPUT_RATE;
 use super::voice_pcm::{BoundedPcmQueue, VOICE_FRAME_SAMPLES, VOICE_SAMPLE_RATE};
 use super::voice_stream::SharedPcmQueue;
 use rodio::Source;
-use std::sync::Arc;
+use bevy::prelude::{NonSendMut, Res, ResMut, Resource};
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 use std::time::Duration;
 
 /// Pulls mono voice frames and emits interleaved stereo samples for the game mixer.
@@ -191,5 +192,57 @@ mod tests {
         source.mute_flag().store(true, std::sync::atomic::Ordering::Release);
         let silenced: Vec<f32> = source.by_ref().take(4).collect();
         assert!(silenced.iter().all(|s| *s == 0.0));
+    }
+}
+
+
+/// Tracks the one local monitor source attached to the shared named-audio mixer.
+///
+/// If the output device is absent or disabled, attachment simply remains pending; the
+/// client and microphone capture continue without a loopback output.
+#[derive(Resource, Default)]
+pub struct VoiceLoopbackAttachment {
+    attached: bool,
+    muted: Option<Arc<AtomicBool>>,
+}
+
+impl VoiceLoopbackAttachment {
+    /// Mutes only local monitoring; capture and future network transmission are unchanged.
+    pub fn set_muted(&mut self, muted: bool) {
+        if let Some(flag) = &self.muted {
+            flag.store(muted, Ordering::Release);
+        }
+    }
+
+    #[must_use]
+    pub fn is_attached(&self) -> bool {
+        self.attached
+    }
+}
+
+/// Attaches exactly one pull-driven monitor source to the existing named-audio output.
+///
+/// AudioDevice is non-send and is borrowed only on the Bevy main thread. No second
+/// output stream is opened. Missing/disabled devices are treated as a normal no-op.
+pub fn attach_voice_loopback_to_named_audio(
+    capture: Res<super::voice_controller::VoiceCaptureController>,
+    mut attachment: ResMut<VoiceLoopbackAttachment>,
+    mut device: Option<NonSendMut<crate::named_audio::AudioDevice>>,
+) {
+    if attachment.attached {
+        return;
+    }
+    let Some(device) = device.as_mut() else {
+        return;
+    };
+    if !device.available() {
+        return;
+    }
+
+    let source = VoiceLoopbackSource::new(capture.monitor_queue());
+    let muted = source.mute_flag();
+    if device.play_source(source) {
+        attachment.muted = Some(muted);
+        attachment.attached = true;
     }
 }

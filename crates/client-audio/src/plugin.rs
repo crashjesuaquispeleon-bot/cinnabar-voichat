@@ -10,6 +10,11 @@ impl bevy::prelude::Plugin for ClientAudioPlugin {
             .init_resource::<crate::audio::AudioEngine>()
             .init_resource::<AudioSettings>()
             .init_resource::<crate::audio::voice_input::VoiceInputPolicy>()
+            .init_resource::<crate::audio::voice_controller::VoiceCaptureController>()
+            .add_systems(
+                bevy::prelude::Update,
+                crate::audio::voice_controller::sync_voice_capture_with_policy,
+            )
             .add_message::<UiSoundCue>()
             .add_message::<LocalBlockCue>()
             .add_message::<crate::audio::predicted::LocalEatingCue>()

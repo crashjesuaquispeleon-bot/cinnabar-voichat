@@ -17,6 +17,16 @@ The first release is a Cinnabar-client-only voice feature.
 - `core/` is the Go integration process. The module already declares Pion WebRTC and the repository already has a browser relay contract in `crates/bridge` / `web/transport`. Their presence does **not** establish that a native voice room, SFU, signaling API or authorization path exists.
 - No existing microphone-capture implementation or end-to-end voice-chat feature was identified in the inspected client audio modules. `client-audio` currently depends on `rodio` for output; there is no capture dependency in its manifest.
 
+## Capture-backend findings (repository inspection)
+
+- The locked dependency graph already contains **CPAL 0.15.3** through `rodio 0.20.1`; the lockfile does not show a second CPAL version. Existing native output code imports `rodio::cpal` directly in `crates/client-audio/src/named_audio/backend/native.rs` and uses its `HostTrait` / `DeviceTrait` APIs.
+- This makes CPAL the lowest-friction capture candidate to prototype: it avoids introducing a second audio host stack or an immediate new direct dependency. The existing use proves the re-export is available in this crate, but it does **not** yet prove input-stream behavior, device switching, permission UX, or all-target builds.
+- Existing output ownership is deliberately kept on a dedicated `audio-output` thread in `named_audio/backend/native.rs`; voice capture must have similarly explicit stream ownership and teardown, but should not reuse the game-output mixer as a microphone transport. The existing `AudioDevice::start_capture` is a pull-driven capture of *game playback* for recording/mixing, not microphone input.
+- `packaging/macos/Info.plist.in` currently has no `NSMicrophoneUsageDescription`. Before shipping actual input capture, the macOS app bundle must include a clear microphone purpose string and the permission flow must handle denial/revocation. Windows and Linux permission/error behavior still needs a platform-specific review.
+- The crate declares `platform-specific = ["macos", "windows"]`, while its native output implementation is compiled for every non-wasm target. Confirm the actual release target matrix before deciding whether voice input is desktop-only or should include other native targets.
+
+The capture prototype should first use the already-locked CPAL version behind a mockable interface, with device enumeration and supported input-format negotiation isolated from Bevy. Keep the callback bounded and non-blocking: convert supported sample formats to a fixed internal PCM representation, write into a bounded queue, count/drop on overflow, and never allocate, log, encode, or wait in the real-time callback. A dedicated owner must stop and drop the stream on mute, permission loss, session end and application shutdown. Add a local loopback test only after capture and output are independently controllable.
+
 ## Proposed high-level media flow (not implemented)
 
 ```text

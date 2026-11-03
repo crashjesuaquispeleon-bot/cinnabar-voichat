@@ -112,6 +112,8 @@ bindings! {
         None, true, None;
     PlayerList => "key.playerList", Some(Action::PlayerList), Some(DeviceRow::Action(21)), None,
         None, false, Some("Player List");
+    PushToTalk => "key.pushToTalk", Some(Action::PushToTalk), Some(DeviceRow::Action(22)), None,
+        None, false, Some("Push to Talk");
     Inventory => "key.inventory", None, Some(DeviceRow::Extra(0, Some(PhysicalControl::KeyboardUsage(0x08)))), Some(DeviceRow::Extra(0, Some(PhysicalControl::GamepadButton(2)))),
         None, false, None;
     Chat => "key.chat", None, Some(DeviceRow::Extra(1, Some(PhysicalControl::KeyboardUsage(0x17)))), Some(DeviceRow::Extra(1, Some(PhysicalControl::GamepadButton(14)))),

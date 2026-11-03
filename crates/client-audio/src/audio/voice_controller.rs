@@ -9,7 +9,7 @@ use super::voice_permission::{outcome_from_error, outcome_from_success, permissi
 use super::voice_pcm::BoundedPcmQueue;
 use super::voice_stream::{
     MockVoiceCaptureOpener, SharedPcmQueue, VoiceCaptureError, VoiceCaptureOpener,
-    VoiceCaptureStream,
+    VoiceCaptureQueues, VoiceCaptureStream,
 };
 use bevy::prelude::{ResMut, Resource};
 use std::sync::Arc;
@@ -21,6 +21,7 @@ use std::sync::Arc;
 #[derive(Resource)]
 pub struct VoiceCaptureController {
     queue: SharedPcmQueue,
+    monitor_queue: SharedPcmQueue,
     opener: Box<dyn VoiceCaptureOpener>,
     stream: Option<Box<dyn VoiceCaptureStream>>,
     last_capture_permitted: bool,
@@ -46,9 +47,12 @@ impl VoiceCaptureController {
     #[must_use]
     pub fn with_opener(opener: Box<dyn VoiceCaptureOpener>) -> Self {
         let queue = Arc::new(BoundedPcmQueue::with_default_capacity());
+        let monitor_queue = Arc::new(BoundedPcmQueue::with_default_capacity());
         queue.set_accepting(false);
+        monitor_queue.set_accepting(false);
         Self {
             queue,
+            monitor_queue,
             opener,
             stream: None,
             last_capture_permitted: false,
@@ -61,6 +65,11 @@ impl VoiceCaptureController {
     #[must_use]
     pub fn queue(&self) -> SharedPcmQueue {
         Arc::clone(&self.queue)
+    }
+
+    #[must_use]
+    pub fn monitor_queue(&self) -> SharedPcmQueue {
+        Arc::clone(&self.monitor_queue)
     }
 
     #[must_use]
@@ -107,7 +116,9 @@ impl VoiceCaptureController {
             if should_open && !self.is_running() {
                 self.try_open(policy);
             }
-            self.queue.set_accepting(policy.transmission_permitted());
+            let accepting = policy.transmission_permitted();
+        self.queue.set_accepting(accepting);
+        self.monitor_queue.set_accepting(accepting);
             self.last_capture_permitted = should_open && self.is_running();
             return;
         }
@@ -129,7 +140,10 @@ impl VoiceCaptureController {
         }
         self.stream = None;
         self.open_attempts = self.open_attempts.saturating_add(1);
-        match self.opener.open_default(Arc::clone(&self.queue)) {
+        match self.opener.open_default(VoiceCaptureQueues {
+            transmit: Arc::clone(&self.queue),
+            monitor: Arc::clone(&self.monitor_queue),
+        }) {
             Ok(stream) => {
                 self.last_error = None;
                 self.stream = Some(stream);
@@ -160,6 +174,7 @@ impl VoiceCaptureController {
             self.stop_count = self.stop_count.saturating_add(1);
         }
         self.queue.clear();
+        self.monitor_queue.clear();
     }
 }
 
@@ -235,7 +250,7 @@ mod tests {
         impl VoiceCaptureOpener for DeniedOpener {
             fn open_default(
                 &self,
-                _queue: SharedPcmQueue,
+                _queues: VoiceCaptureQueues,
             ) -> Result<Box<dyn VoiceCaptureStream>, VoiceCaptureError> {
                 Err(VoiceCaptureError::Other("Access Denied".into()))
             }

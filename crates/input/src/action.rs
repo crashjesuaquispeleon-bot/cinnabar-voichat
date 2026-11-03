@@ -43,6 +43,8 @@ pub enum Action {
     /// Vanilla's "Open Notification": opens what the showing toast offers.
     InteractWithToast,
     PickItem,
+    /// Hold the configured microphone push-to-talk binding.
+    PushToTalk,
 }
 
 impl Action {
@@ -88,10 +90,11 @@ impl Action {
             Self::Freelook => "freelook",
             Self::InteractWithToast => "interact-with-toast",
             Self::PickItem => "pick-item",
+            Self::PushToTalk => "push-to-talk",
         }
     }
 
-    pub const COUNT: usize = 39;
+    pub const COUNT: usize = 40;
 
     pub(crate) const ALL: [Self; Self::COUNT] = [
         Self::MoveForward,
@@ -133,6 +136,7 @@ impl Action {
         Self::Freelook,
         Self::InteractWithToast,
         Self::PickItem,
+        Self::PushToTalk,
     ];
 
     pub(crate) const fn is_ui_preview(self) -> bool {

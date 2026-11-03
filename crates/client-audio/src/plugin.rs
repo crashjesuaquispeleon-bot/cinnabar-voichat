@@ -1,5 +1,5 @@
-use bevy::prelude::IntoScheduleConfigs;
 use crate::audio::{AudioSettings, LocalBlockCue, UiSoundCue};
+use bevy::prelude::IntoScheduleConfigs;
 
 /// Installs audio's settings and local cue queues without changing frame ordering.
 pub struct ClientAudioPlugin;

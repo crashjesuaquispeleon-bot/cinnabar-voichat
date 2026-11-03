@@ -40,8 +40,7 @@ impl MenuRuntime {
                             device.id.clone(),
                         ),
                     );
-                    self.microphone_message =
-                        Some(format!("Switching to {}…", device.name));
+                    self.microphone_message = Some(format!("Switching to {}…", device.name));
                 } else {
                     self.microphone_message = Some(
                         "That microphone is no longer available. Refresh the device list."
@@ -276,10 +275,7 @@ mod microphone_settings_tests {
             name: "New microphone".to_owned(),
             is_default: true,
         }]);
-        menu.activate_from_input(MenuAction::SettingsMicrophoneSelect(
-            0,
-            stale_revision,
-        ));
+        menu.activate_from_input(MenuAction::SettingsMicrophoneSelect(0, stale_revision));
 
         assert_eq!(menu.take_microphone_selection_request(), None);
         assert_eq!(

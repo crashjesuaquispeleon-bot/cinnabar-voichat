@@ -25,8 +25,7 @@ pub(crate) fn drive_menu_services(
     launcher_account: Option<ResMut<launcher_account::LauncherAccount>>,
     mut local_worlds: Option<ResMut<client_shell::local_worlds::LocalWorlds>>,
     audio_settings: Option<ResMut<client_audio::audio::AudioSettings>>,
-    mut voice_controller:
-        Option<ResMut<VoiceCaptureController>>,
+    mut voice_controller: Option<ResMut<VoiceCaptureController>>,
     settings: Option<ResMut<client_state::RuntimeSettings>>,
     antialiasing: Option<Res<client_presentation::camera::antialiasing::CameraAntiAliasingSupport>>,
     mut local_skin: Option<ResMut<LocalPlayerSkin>>,
@@ -116,9 +115,7 @@ fn drive_microphone_settings(
                     "The microphone selection was rejected: {error:?}. Refresh the list and try again."
                 ));
             }
-            MicrophoneWorkerEvent::DeviceUnavailable {
-                ..
-            } => {
+            MicrophoneWorkerEvent::DeviceUnavailable { .. } => {
                 menu.clear_microphone_devices(
                     "The active microphone disconnected. Refresh the list to choose another input.",
                 );
@@ -147,12 +144,8 @@ fn drive_microphone_settings(
 
     if let Some(request) = menu.take_microphone_selection_request() {
         let selection = match request {
-            MicrophoneSelectionRequest::SystemDefault => {
-                MicrophoneSelection::SystemDefault
-            }
-            MicrophoneSelectionRequest::Device(id) => {
-                MicrophoneSelection::Device(id)
-            }
+            MicrophoneSelectionRequest::SystemDefault => MicrophoneSelection::SystemDefault,
+            MicrophoneSelectionRequest::Device(id) => MicrophoneSelection::Device(id),
         };
         if let Err(error) = controller.select_microphone_device(selection) {
             menu.clear_microphone_devices(format!(

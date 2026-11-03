@@ -197,6 +197,22 @@ mod tests {
     }
 
     #[test]
+    fn session_reset_stops_stream_and_discards_queued_pcm() {
+        let mut controller = test_controller();
+        let policy = permitted_policy();
+        controller.sync_with_policy(&policy);
+        controller.queue().push(crate::audio::voice_pcm::PcmFrame::silence());
+        assert!(controller.is_running());
+        assert_eq!(controller.queue().len(), 1);
+
+        controller.reset_for_session_change();
+
+        assert!(!controller.is_running());
+        assert!(controller.queue().is_empty());
+        assert_eq!(controller.stop_count(), 1);
+    }
+
+    #[test]
     fn permission_loss_stops_capture() {
         let mut controller = test_controller();
         let mut policy = permitted_policy();

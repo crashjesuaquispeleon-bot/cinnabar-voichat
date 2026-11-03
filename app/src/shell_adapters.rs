@@ -20,6 +20,8 @@ pub(crate) fn drive_menu_services(
     launcher_account: Option<ResMut<launcher_account::LauncherAccount>>,
     mut local_worlds: Option<ResMut<client_shell::local_worlds::LocalWorlds>>,
     audio_settings: Option<ResMut<client_audio::audio::AudioSettings>>,
+    mut voice_controller:
+        Option<ResMut<client_audio::audio::voice_controller::VoiceCaptureController>>,
     settings: Option<ResMut<client_state::RuntimeSettings>>,
     antialiasing: Option<Res<client_presentation::camera::antialiasing::CameraAntiAliasingSupport>>,
     mut local_skin: Option<ResMut<LocalPlayerSkin>>,
@@ -46,6 +48,7 @@ pub(crate) fn drive_menu_services(
         menu.sync_anti_aliasing_support(support.0);
     }
     menu.sync_user_settings(settings);
+    drive_microphone_settings(&mut menu, voice_controller);
     menu.sync_language(&mut runtime);
     if let Some(account) = launcher_account.as_deref() {
         client_shell::menu::sync_cinnabar_players(account, &mut runtime.0);
@@ -61,6 +64,86 @@ pub(crate) fn drive_menu_services(
         launcher_account,
         local_worlds.as_deref_mut(),
     );
+}
+
+/// Routes presentation-only microphone actions and worker events without blocking the menu.
+fn drive_microphone_settings(
+    menu: &mut MenuRuntime,
+    controller: Option<ResMut<client_audio::audio::voice_controller::VoiceCaptureController>>,
+) {
+    let Some(mut controller) = controller else {
+        if menu.take_microphone_refresh_request() {
+            menu.set_microphone_message("Microphone control is unavailable on this client.");
+        }
+        if menu.take_microphone_selection_request().is_some() {
+            menu.set_microphone_message("Microphone control is unavailable on this client.");
+        }
+        return;
+    };
+
+    // Worker events carry only presentation tokens. A new snapshot invalidates the old list.
+    for event in controller.poll_microphone_events() {
+        match event {
+            client_audio::audio::voice_capture::MicrophoneWorkerEvent::Devices(devices) => {
+                menu.publish_microphone_devices(
+                    devices
+                        .into_iter()
+                        .map(|device| launcher::menu::view::MicrophoneDeviceView {
+                            id: device.id,
+                            name: device.name,
+                            is_default: device.is_default,
+                        })
+                        .collect(),
+                );
+            }
+            client_audio::audio::voice_capture::MicrophoneWorkerEvent::Selected { device_id } => {
+                menu.mark_microphone_selected(device_id);
+            }
+            client_audio::audio::voice_capture::MicrophoneWorkerEvent::SelectionRejected(error) => {
+                menu.set_microphone_message(format!(
+                    "The microphone selection was rejected: {error:?}. Refresh the list and try again."
+                ));
+            }
+            client_audio::audio::voice_capture::MicrophoneWorkerEvent::DeviceUnavailable {
+                ..
+            } => {
+                menu.clear_microphone_devices(
+                    "The active microphone disconnected. Refresh the list to choose another input.",
+                );
+            }
+            client_audio::audio::voice_capture::MicrophoneWorkerEvent::BackendError(error) => {
+                menu.set_microphone_message(format!("Microphone device error: {error}"));
+            }
+            client_audio::audio::voice_capture::MicrophoneWorkerEvent::Stopped => {
+                menu.clear_microphone_devices(
+                    "The microphone worker stopped. Enable Voice Chat in a multiplayer session to scan again.",
+                );
+            }
+        }
+    }
+
+    if menu.take_microphone_refresh_request() {
+        match controller.refresh_microphone_devices() {
+            Ok(()) => menu.set_microphone_message("Refreshing microphone input devices…"),
+            Err(error) => menu.set_microphone_message(format!(
+                "Could not refresh microphones: {error}. Enable Voice Chat in an active multiplayer session first."
+            )),
+        }
+    }
+
+    if let Some(request) = menu.take_microphone_selection_request() {
+        let selection = match request {
+            launcher::menu::view::MicrophoneSelectionRequest::SystemDefault => {
+                client_audio::audio::voice_capture::MicrophoneSelection::SystemDefault
+            }
+            launcher::menu::view::MicrophoneSelectionRequest::Device(id) => {
+                client_audio::audio::voice_capture::MicrophoneSelection::Device(id)
+            }
+        };
+        if let Err(error) = controller.select_microphone_device(selection) {
+            menu.set_microphone_message(format!("Could not switch microphone: {error}"));
+        }
+    }
 }
 
 use client_audio::audio::AudioSettings;

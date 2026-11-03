@@ -134,6 +134,11 @@ fn audio(content: &mut Content<'_, '_>) -> Result<(), PaintError> {
         Some(MenuAction::SettingsMicrophoneRefresh),
     )?;
 
+    let default_available = content
+        .view
+        .microphone_devices
+        .iter()
+        .any(|device| device.is_default);
     let default_selected = content.view.microphone_devices.iter().any(|device| {
         device.is_default
             && content.view.selected_microphone_id.as_deref() == Some(device.id.as_str())
@@ -142,8 +147,15 @@ fn audio(content: &mut Content<'_, '_>) -> Result<(), PaintError> {
         content,
         "System default input",
         "Let the operating system choose its current default microphone.",
-        if default_selected { "Selected" } else { "Use default" },
-        (!default_selected).then_some(MenuAction::SettingsMicrophoneUseSystemDefault),
+        if default_selected {
+            "Selected"
+        } else if default_available {
+            "Use default"
+        } else {
+            "Not available"
+        },
+        (default_available && !default_selected)
+            .then_some(MenuAction::SettingsMicrophoneUseSystemDefault),
     )?;
 
     for (index, device) in content.view.microphone_devices.iter().enumerate() {

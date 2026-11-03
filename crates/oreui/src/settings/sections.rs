@@ -138,6 +138,18 @@ fn audio(content: &mut Content<'_, '_>) -> Result<(), PaintError> {
         }
     };
     content.label_text("Microphone permission", permission_description)?;
+    if matches!(
+        content.view.microphone_permission_status,
+        launcher::menu::view::MicrophonePermissionStatus::Denied
+    ) {
+        super::services::action_row_text(
+            content,
+            "Retry microphone permission",
+            "After allowing microphone access in system privacy settings, retry the OS permission check.",
+            "Retry",
+            Some(MenuAction::SettingsMicrophoneRetryPermission),
+        )?;
+    }
     super::services::action_row_text(
         content,
         "Available microphones",

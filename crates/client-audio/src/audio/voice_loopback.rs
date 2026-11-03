@@ -166,6 +166,44 @@ mod tests {
     }
 
     #[test]
+    fn mock_capture_reaches_the_existing_mixer_without_draining_transmit_and_stops_cleanly() {
+        use crate::audio::voice_stream::{MockVoiceCaptureStream, VoiceCaptureQueues};
+
+        let transmit = Arc::new(BoundedPcmQueue::new(2));
+        let monitor = Arc::new(BoundedPcmQueue::new(2));
+        transmit.set_accepting(true);
+        monitor.set_accepting(true);
+
+        let mut capture = MockVoiceCaptureStream::new(VoiceCaptureQueues {
+            transmit: Arc::clone(&transmit),
+            monitor: Arc::clone(&monitor),
+        });
+        capture.inject_mono(&[0.25_f32; VOICE_FRAME_SAMPLES]);
+        assert_eq!(transmit.len(), 1);
+        assert_eq!(monitor.len(), 1);
+
+        let mut source = VoiceLoopbackSource::new(Arc::clone(&monitor));
+        let stopped = source.stop_flag();
+        let (mut device, mut mixer) = crate::named_audio::AudioDevice::memory_mixer();
+        assert!(device.play_source(source));
+        assert!((mixer.next().unwrap() - 0.25).abs() < 1e-6);
+        assert!((mixer.next().unwrap() - 0.25).abs() < 1e-6);
+
+        // The monitor consumes only its private copy; the network queue is untouched.
+        assert!(monitor.is_empty());
+        assert_eq!(transmit.len(), 1);
+
+        // Disconnect closes both gates, retires queued data, and cancels the mixer source.
+        transmit.set_accepting(false);
+        monitor.set_accepting(false);
+        capture.stop();
+        stopped.store(true, Ordering::Release);
+        assert!(transmit.is_empty());
+        assert!(monitor.is_empty());
+        assert_eq!(mixer.next(), None);
+    }
+
+    #[test]
     fn disabled_audio_device_rejects_loopback_without_panicking() {
         let queue = Arc::new(BoundedPcmQueue::new(2));
         let mut device = crate::named_audio::AudioDevice::disabled();

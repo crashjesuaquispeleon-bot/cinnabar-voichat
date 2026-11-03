@@ -162,7 +162,9 @@ fn audio(content: &mut Content<'_, '_>) -> Result<(), PaintError> {
         .view
         .microphone_devices
         .iter()
-        .any(|device| device.is_default);
+        .filter(|device| device.is_default)
+        .count()
+        == 1;
     let default_selected = content.view.microphone_devices.iter().any(|device| {
         device.is_default
             && content.view.selected_microphone_id.as_deref() == Some(device.id.as_str())

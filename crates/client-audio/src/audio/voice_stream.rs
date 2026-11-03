@@ -10,6 +10,13 @@ use std::sync::Arc;
 /// Shared capture queue fed by the owner thread and drained by encode/playback.
 pub type SharedPcmQueue = Arc<BoundedPcmQueue>;
 
+/// Independent destinations fed by one capture callback.
+#[derive(Clone)]
+pub struct VoiceCaptureQueues {
+    pub transmit: SharedPcmQueue,
+    pub monitor: SharedPcmQueue,
+}
+
 /// Errors from opening or running a local capture stream.
 #[derive(Debug)]
 pub enum VoiceCaptureError {
@@ -62,7 +69,7 @@ pub trait VoiceCaptureStream: Send {
 pub trait VoiceCaptureOpener: Send + Sync {
     fn open_default(
         &self,
-        queue: SharedPcmQueue,
+        queues: VoiceCaptureQueues,
     ) -> Result<Box<dyn VoiceCaptureStream>, VoiceCaptureError>;
 }
 
@@ -83,6 +90,10 @@ impl MonoFrameBuilder {
 
     /// Appends mono `f32` samples, emitting complete frames into `queue`.
     pub fn push_mono_samples(&mut self, samples: &[f32], queue: &BoundedPcmQueue) {
+        self.push_mono_samples_to_queues(samples, &[queue]);
+    }
+
+    pub fn push_mono_samples_to_queues(&mut self, samples: &[f32], queues: &[&BoundedPcmQueue]) {
         let mut offset = 0;
         while offset < samples.len() {
             let space = VOICE_FRAME_SAMPLES - self.filled;
@@ -92,7 +103,7 @@ impl MonoFrameBuilder {
             self.filled += take;
             offset += take;
             if self.filled == VOICE_FRAME_SAMPLES {
-                self.emit_frame(queue);
+                self.emit_frame(queues);
             }
         }
     }
@@ -106,13 +117,22 @@ impl MonoFrameBuilder {
         channels: u16,
         queue: &BoundedPcmQueue,
     ) {
+        self.push_interleaved_f32_to_queues(samples, channels, &[queue]);
+    }
+
+    pub fn push_interleaved_f32_to_queues(
+        &mut self,
+        samples: &[f32],
+        channels: u16,
+        queues: &[&BoundedPcmQueue],
+    ) {
         let channels = channels as usize;
         if channels == 0 {
             return;
         }
         for input_frame in samples.chunks_exact(channels) {
             let mono = input_frame.iter().copied().sum::<f32>() / channels as f32;
-            self.push_one(mono, queue);
+            self.push_one(mono, queues);
         }
     }
 
@@ -123,28 +143,39 @@ impl MonoFrameBuilder {
         channels: u16,
         queue: &BoundedPcmQueue,
     ) {
+        self.push_interleaved_i16_to_queues(samples, channels, &[queue]);
+    }
+
+    pub fn push_interleaved_i16_to_queues(
+        &mut self,
+        samples: &[i16],
+        channels: u16,
+        queues: &[&BoundedPcmQueue],
+    ) {
         let channels = channels as usize;
         if channels == 0 {
             return;
         }
         for input_frame in samples.chunks_exact(channels) {
             let sum = input_frame.iter().map(|&sample| f32::from(sample)).sum::<f32>();
-            self.push_one(sum / channels as f32 / 32768.0, queue);
+            self.push_one(sum / channels as f32 / 32768.0, queues);
         }
     }
 
-    fn push_one(&mut self, sample: f32, queue: &BoundedPcmQueue) {
+    fn push_one(&mut self, sample: f32, queues: &[&BoundedPcmQueue]) {
         self.partial[self.filled] = sample;
         self.filled += 1;
         if self.filled == VOICE_FRAME_SAMPLES {
-            self.emit_frame(queue);
+            self.emit_frame(queues);
         }
     }
 
-    fn emit_frame(&mut self, queue: &BoundedPcmQueue) {
+    fn emit_frame(&mut self, queues: &[&BoundedPcmQueue]) {
         let mut frame = PcmFrame::silence();
         frame.copy_from_slice(&self.partial);
-        queue.push(frame);
+        for queue in queues {
+            queue.push(frame);
+        }
         self.filled = 0;
     }
 
@@ -225,24 +256,23 @@ pub fn i16_slice_to_f32(src: &[i16], dst: &mut Vec<f32>) {
 /// Mock stream for tests: records start/stop without touching the OS.
 pub struct MockVoiceCaptureStream {
     running: bool,
-    queue: SharedPcmQueue,
+    queues: VoiceCaptureQueues,
     builder: MonoFrameBuilder,
 }
 
 impl MockVoiceCaptureStream {
     #[must_use]
-    pub fn new(queue: SharedPcmQueue) -> Self {
-        Self {
-            running: true,
-            queue,
-            builder: MonoFrameBuilder::new(),
-        }
+    pub fn new(queues: VoiceCaptureQueues) -> Self {
+        Self { running: true, queues, builder: MonoFrameBuilder::new() }
     }
 
     /// Injects mono samples as if a device callback had fired.
     pub fn inject_mono(&mut self, samples: &[f32]) {
         if self.running {
-            self.builder.push_mono_samples(samples, &self.queue);
+            self.builder.push_mono_samples_to_queues(
+                samples,
+                &[&self.queues.transmit, &self.queues.monitor],
+            );
         }
     }
 }
@@ -251,7 +281,8 @@ impl VoiceCaptureStream for MockVoiceCaptureStream {
     fn stop(&mut self) {
         self.running = false;
         self.builder.reset();
-        self.queue.clear();
+        self.queues.transmit.clear();
+        self.queues.monitor.clear();
     }
 
     fn is_running(&self) -> bool {
@@ -272,9 +303,9 @@ pub struct MockVoiceCaptureOpener;
 impl VoiceCaptureOpener for MockVoiceCaptureOpener {
     fn open_default(
         &self,
-        queue: SharedPcmQueue,
+        queues: VoiceCaptureQueues,
     ) -> Result<Box<dyn VoiceCaptureStream>, VoiceCaptureError> {
-        Ok(Box::new(MockVoiceCaptureStream::new(queue)))
+        Ok(Box::new(MockVoiceCaptureStream::new(queues)))
     }
 }
 
@@ -325,7 +356,7 @@ impl Drop for CpalVoiceCaptureHandle {
 impl VoiceCaptureOpener for CpalVoiceCaptureOpener {
     fn open_default(
         &self,
-        queue: SharedPcmQueue,
+        queues: VoiceCaptureQueues,
     ) -> Result<Box<dyn VoiceCaptureStream>, VoiceCaptureError> {
         use rodio::cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
         use std::sync::{
@@ -337,7 +368,7 @@ impl VoiceCaptureOpener for CpalVoiceCaptureOpener {
         let (stop_tx, stop_rx) = mpsc::channel::<()>();
         let running = std::sync::Arc::new(AtomicBool::new(false));
         let thread_running = std::sync::Arc::clone(&running);
-        let thread_queue = Arc::clone(&queue);
+        let thread_queues = queues.clone();
 
         let owner = std::thread::Builder::new()
             .name("voice-capture".to_owned())
@@ -384,12 +415,15 @@ impl VoiceCaptureOpener for CpalVoiceCaptureOpener {
 
                 let stream_result = match sample_format {
                     rodio::cpal::SampleFormat::F32 => {
-                        let callback_queue = Arc::clone(&thread_queue);
+                        let callback_transmit = Arc::clone(&thread_queues.transmit);
+                        let callback_monitor = Arc::clone(&thread_queues.monitor);
                         let mut builder = MonoFrameBuilder::new();
                         device.build_input_stream(
                             &config,
                             move |data: &[f32], _| {
-                                builder.push_interleaved_f32(data, channels, &callback_queue);
+                                builder.push_interleaved_f32_to_queues(
+                                    data, channels, &[&callback_transmit, &callback_monitor],
+                                );
                             },
                             error_callback,
                             None,
@@ -402,7 +436,9 @@ impl VoiceCaptureOpener for CpalVoiceCaptureOpener {
                         device.build_input_stream(
                             &config,
                             move |data: &[i16], _| {
-                                builder.push_interleaved_i16(data, channels, &callback_queue);
+                                builder.push_interleaved_i16_to_queues(
+                                    data, channels, &[&callback_transmit, &callback_monitor],
+                                );
                             },
                             move |_error| {
                                 callback_running.store(false, Ordering::Release);
@@ -446,7 +482,8 @@ impl VoiceCaptureOpener for CpalVoiceCaptureOpener {
 
                 // Stream is dropped here, on the same owner thread that created it.
                 drop(stream);
-                thread_queue.clear();
+                thread_queues.transmit.clear();
+                thread_queues.monitor.clear();
                 thread_running.store(false, Ordering::Release);
             })
             .map_err(|error| VoiceCaptureError::Other(error.to_string()))?;
@@ -456,7 +493,7 @@ impl VoiceCaptureOpener for CpalVoiceCaptureOpener {
                 stop: Some(stop_tx),
                 owner: Some(owner),
                 running,
-                queue,
+                queues,
             })),
             Ok(Err(error)) => {
                 let _ = owner.join();
@@ -528,10 +565,12 @@ mod tests {
         let queue = Arc::new(BoundedPcmQueue::new(4));
         queue.set_accepting(true);
         let opener = MockVoiceCaptureOpener;
-        let stream = opener.open_default(Arc::clone(&queue)).unwrap();
+        let shared = Arc::clone(&queue);
+        let stream = opener.open_default(VoiceCaptureQueues { transmit: Arc::clone(&shared), monitor: shared }).unwrap();
         assert!(stream.is_running());
         drop(stream);
-        let mut stream = opener.open_default(Arc::clone(&queue)).unwrap();
+        let shared = Arc::clone(&queue);
+        let mut stream = opener.open_default(VoiceCaptureQueues { transmit: Arc::clone(&shared), monitor: shared }).unwrap();
         stream.stop();
         assert!(!stream.is_running());
     }
@@ -540,7 +579,8 @@ mod tests {
     fn mock_inject_fills_queue() {
         let queue = Arc::new(BoundedPcmQueue::new(4));
         queue.set_accepting(true);
-        let mut stream = MockVoiceCaptureStream::new(Arc::clone(&queue));
+        let shared = Arc::clone(&queue);
+        let mut stream = MockVoiceCaptureStream::new(VoiceCaptureQueues { transmit: Arc::clone(&shared), monitor: shared });
         let samples = vec![0.1_f32; VOICE_FRAME_SAMPLES];
         stream.inject_mono(&samples);
         assert_eq!(queue.len(), 1);

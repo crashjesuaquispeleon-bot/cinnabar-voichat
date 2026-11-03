@@ -12,9 +12,7 @@ use client_shell::{
     player_skin::LocalPlayerSkin,
     ui_resources::UiRuntimeResource,
 };
-use launcher::menu::view::{
-    MicrophonePermissionStatus, MicrophoneSelectionRequest,
-};
+use launcher::menu::view::{MicrophonePermissionStatus, MicrophoneSelectionRequest};
 /// Drives the launcher's own services: catalog, saves, settings, the account core and local worlds.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn drive_menu_services(
@@ -92,10 +90,8 @@ fn drive_microphone_settings(
         }
     }
 
-    let permission = voice_policy.as_deref().map_or(
-        MicrophonePermission::Unknown,
-        |policy| policy.permission(),
-    );
+    let permission =
+        voice_policy.map_or(MicrophonePermission::Unknown, |policy| policy.permission());
     menu.set_microphone_permission_status(match permission {
         MicrophonePermission::Unknown => MicrophonePermissionStatus::Unknown,
         MicrophonePermission::Granted => MicrophonePermissionStatus::Granted,

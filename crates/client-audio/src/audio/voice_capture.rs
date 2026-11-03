@@ -117,18 +117,27 @@ impl MicrophoneBackend for CpalMicrophoneBackend {
             .default_input_device()
             .and_then(|device| device.name().ok());
         let devices = host.input_devices()?;
+        let names: Vec<String> = devices
+            .map(|device| device.name().unwrap_or_default())
+            .collect();
+        let default_name = default_name.filter(|candidate| {
+            !candidate.is_empty()
+                && names.iter().filter(|name| *name == candidate).count() == 1
+        });
 
-        Ok(devices
+        Ok(names
+            .into_iter()
             .enumerate()
-            .map(|(index, device)| {
-                let name = device
-                    .name()
-                    .unwrap_or_else(|_| format!("Input device {}", index + 1));
-                MicrophoneDevice {
-                    id: format!("cpal-snapshot-{index}"),
-                    is_default: default_name.as_deref() == Some(name.as_str()),
-                    name,
-                }
+            .map(|(index, name)| MicrophoneDevice {
+                id: format!("cpal-snapshot-{index}"),
+                // CPAL's name API cannot distinguish two devices with the same name.
+                // Never mark multiple physical devices as the system default.
+                is_default: default_name.as_deref() == Some(name.as_str()),
+                name: if name.is_empty() {
+                    format!("Input device {}", index + 1)
+                } else {
+                    name
+                },
             })
             .collect())
     }
@@ -330,6 +339,37 @@ mod tests {
     fn mock_backend_can_represent_no_available_microphones() {
         let backend = MockMicrophoneBackend { devices: vec![] };
         assert!(backend.enumerate_input_devices().unwrap().is_empty());
+    }
+
+    #[test]
+    fn duplicate_device_names_do_not_claim_multiple_system_defaults() {
+        let names = vec![
+            "USB Microphone".to_owned(),
+            "USB Microphone".to_owned(),
+            "Built-in Microphone".to_owned(),
+        ];
+        let default_name = Some("USB Microphone");
+        let unique_default = default_name.filter(|candidate| {
+            !candidate.is_empty()
+                && names.iter().filter(|name| *name == candidate).count() == 1
+        });
+
+        assert!(unique_default.is_none());
+    }
+
+    #[test]
+    fn unique_default_name_is_preserved() {
+        let names = vec![
+            "USB Microphone".to_owned(),
+            "Built-in Microphone".to_owned(),
+        ];
+        let default_name = Some("USB Microphone");
+        let unique_default = default_name.filter(|candidate| {
+            !candidate.is_empty()
+                && names.iter().filter(|name| *name == candidate).count() == 1
+        });
+
+        assert_eq!(unique_default, Some("USB Microphone"));
     }
 
     #[cfg(not(target_arch = "wasm32"))]

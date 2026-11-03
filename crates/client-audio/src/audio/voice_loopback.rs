@@ -8,7 +8,9 @@
 //! an error for Stage 1.
 
 use super::voice::OUTPUT_RATE;
-use super::voice_pcm::{BoundedPcmQueue, VOICE_FRAME_SAMPLES, VOICE_SAMPLE_RATE};
+#[cfg(test)]
+use super::voice_pcm::BoundedPcmQueue;
+use super::voice_pcm::{VOICE_FRAME_SAMPLES, VOICE_SAMPLE_RATE};
 use super::voice_stream::SharedPcmQueue;
 use bevy::prelude::{NonSendMut, Res, ResMut, Resource};
 use rodio::Source;

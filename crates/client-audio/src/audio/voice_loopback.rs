@@ -205,7 +205,7 @@ mod tests {
     }
 
     #[test]
-    fn monitor_mute_suppresses_output_without_popping_when_reenabled_after_clear() {
+    fn monitor_mute_suppresses_output_and_discards_private_backlog() {
         let queue = Arc::new(BoundedPcmQueue::new(2));
         queue.set_accepting(true);
         let mut frame = PcmFrame::silence();

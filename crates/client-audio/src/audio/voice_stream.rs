@@ -344,6 +344,14 @@ impl VoiceCaptureOpener for MockVoiceCaptureOpener {
     }
 }
 
+
+#[cfg(not(target_arch = "wasm32"))]
+impl Drop for CpalMicrophoneWorkerBackend {
+    fn drop(&mut self) {
+        <Self as super::voice_capture::MicrophoneWorkerBackend>::stop(self);
+    }
+}
+
 /// Opens a CPAL microphone through the persistent owner-worker protocol.
 /// The worker constructs the CPAL host, owns every Device and Stream, and processes
 /// refresh/select/shutdown commands on that same thread.

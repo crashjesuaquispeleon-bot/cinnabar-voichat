@@ -138,7 +138,7 @@ mod voice_settings_tests {
         let open_mic = ui::VoiceChatSettings {
             enabled: true,
             muted: false,
-            activation_mode: OpenMicrophone,
+            activation_mode: ui::VoiceActivationMode::OpenMicrophone,
             input_sensitivity_percent: 100,
         };
         apply_voice_chat_settings(&mut policy, &open_mic);
@@ -159,7 +159,7 @@ mod voice_settings_tests {
         let unmuted = ui::VoiceChatSettings {
             enabled: true,
             muted: false,
-            activation_mode: OpenMicrophone,
+            activation_mode: ui::VoiceActivationMode::OpenMicrophone,
             input_sensitivity_percent: 100,
         };
         apply_voice_chat_settings(&mut policy, &unmuted);
@@ -183,7 +183,7 @@ mod voice_settings_tests {
         let settings = ui::VoiceChatSettings {
             enabled: true,
             muted: false,
-            activation_mode: OpenMicrophone,
+            activation_mode: ui::VoiceActivationMode::OpenMicrophone,
             input_sensitivity_percent: 100,
         };
         apply_voice_chat_settings(&mut policy, &settings);
@@ -236,7 +236,7 @@ mod voice_settings_tests {
         let settings = ui::VoiceChatSettings {
             enabled: true,
             muted: false,
-            activation_mode: PushToTalk,
+            activation_mode: ui::VoiceActivationMode::PushToTalk,
             input_sensitivity_percent: 100,
         };
         apply_voice_chat_settings(&mut policy, &settings);
@@ -269,7 +269,7 @@ mod voice_settings_tests {
             &ui::VoiceChatSettings {
                 enabled: true,
                 muted: false,
-                activation_mode: OpenMicrophone,
+                activation_mode: ui::VoiceActivationMode::OpenMicrophone,
                 input_sensitivity_percent: 100,
             },
         );
@@ -280,7 +280,7 @@ mod voice_settings_tests {
             &ui::VoiceChatSettings {
                 enabled: true,
                 muted: false,
-                activation_mode: PushToTalk,
+                activation_mode: ui::VoiceActivationMode::PushToTalk,
                 input_sensitivity_percent: 100,
             },
         );

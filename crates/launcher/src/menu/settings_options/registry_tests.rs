@@ -542,3 +542,22 @@ fn saved_values_survive_alongside_removed_setting_keys() {
         assert!(encoded["values"].get(retired).is_none(), "{retired}");
     }
 }
+
+
+#[test]
+fn push_to_talk_is_registered_and_remappable_in_controls() {
+    let mut settings = SettingsOptions::default();
+    assert_eq!(
+        settings.named_key_control(BindingId::PushToTalk),
+        Some(semantic_input::PhysicalControl::KeyboardUsage(0x19))
+    );
+    let row = BindingId::PushToTalk.row(false).unwrap();
+    assert!(settings.remap(
+        row,
+        semantic_input::PhysicalControl::KeyboardUsage(0x1d)
+    ));
+    assert_eq!(
+        settings.named_key_control(BindingId::PushToTalk),
+        Some(semantic_input::PhysicalControl::KeyboardUsage(0x1d))
+    );
+}

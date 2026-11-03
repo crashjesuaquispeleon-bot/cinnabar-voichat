@@ -101,9 +101,11 @@ pub trait MicrophoneBackend: Send + Sync {
 /// Returns a default label only when it identifies exactly one enumerated device.
 fn unique_default_name<'a>(names: &[String], default_name: Option<&'a str>) -> Option<&'a str> {
     let candidate = default_name?;
-    if candidate.is_empty()
-        || names.iter().filter(|name| name.as_str() == candidate).count() != 1
-    {
+    let matches = names
+        .iter()
+        .filter(|name| name.as_str() == candidate)
+        .count();
+    if candidate.is_empty() || matches != 1 {
         None
     } else {
         Some(candidate)

@@ -146,6 +146,12 @@ impl VoiceInputPolicy {
     pub fn session_active(&self) -> bool {
         self.session_active
     }
+
+    /// Whether local microphone transmission is currently muted.
+    #[must_use]
+    pub fn muted(&self) -> bool {
+        self.muted
+    }
 }
 
 #[cfg(test)]

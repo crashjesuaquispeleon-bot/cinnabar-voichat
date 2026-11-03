@@ -105,6 +105,7 @@ mod voice_settings_tests {
 
         let open_mic = ui::VoiceChatSettings {
             enabled: true,
+            muted: false,
             activation_mode: ui::VoiceActivationMode::OpenMicrophone,
         };
         apply_voice_chat_settings(&mut policy, &open_mic);

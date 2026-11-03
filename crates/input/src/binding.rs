@@ -307,6 +307,8 @@ fn default_bindings() -> Vec<ActionBinding> {
     bind(&mut bindings, PickItem, Gameplay, MouseButton(3));
     // Default only; users can remap this action through the ordinary controls settings.
     bind(&mut bindings, PushToTalk, Gameplay, KeyboardUsage(0x19));
+    // One press toggles the local microphone mute; users can remap this action.
+    bind(&mut bindings, ToggleVoiceMute, Gameplay, KeyboardUsage(0x10));
     for (action, axis) in [
         (LookRight, XPositive),
         (LookLeft, XNegative),

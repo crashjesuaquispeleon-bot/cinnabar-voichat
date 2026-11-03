@@ -24,8 +24,7 @@ pub struct MicrophoneDevice {
 /// The native backend should create and resolve this catalog on the same worker that
 /// owns its CPAL host and devices. The generic handle is never exposed through the
 /// descriptor API. Refreshing the catalog invalidates every earlier ID.
-static NEXT_CATALOG_ID: std::sync::atomic::AtomicU64 =
-    std::sync::atomic::AtomicU64::new(1);
+static NEXT_CATALOG_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 pub struct MicrophoneCatalog<T> {
     catalog_id: u64,

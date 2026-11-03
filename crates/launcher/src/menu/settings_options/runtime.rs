@@ -140,10 +140,7 @@ mod tests {
         assert!(restored.reset_group(super::super::SettingsGroup::Audio));
         let reset = restored.user_settings().voice_chat;
         assert!(!reset.enabled);
-        assert_eq!(
-            reset.activation_mode,
-            ui::VoiceActivationMode::PushToTalk
-        );
+        assert_eq!(reset.activation_mode, ui::VoiceActivationMode::PushToTalk);
     }
 
     #[test]

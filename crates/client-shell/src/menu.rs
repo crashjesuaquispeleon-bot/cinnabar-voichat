@@ -362,6 +362,11 @@ impl MenuRuntime {
         self.local_world_requested.take()
     }
 
+    /// Whether any device rows currently belong to the visible microphone snapshot.
+    pub fn has_microphone_devices(&self) -> bool {
+        !self.microphone_devices.is_empty()
+    }
+
     /// Consumes one UI request to enumerate native microphone inputs.
     pub fn take_microphone_refresh_request(&mut self) -> bool {
         std::mem::take(&mut self.microphone_refresh_requested)

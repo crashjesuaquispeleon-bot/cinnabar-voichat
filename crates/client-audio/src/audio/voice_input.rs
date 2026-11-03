@@ -46,7 +46,7 @@ impl Default for VoiceInputPolicy {
     fn default() -> Self {
         Self {
             permission: MicrophonePermission::Unknown,
-            mode: MicrophoneMode::OpenMicrophone,
+            mode: MicrophoneMode::Unselected,
             enabled: false,
             session_active: false,
             muted: false,

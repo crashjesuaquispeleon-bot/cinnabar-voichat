@@ -48,6 +48,12 @@ impl PcmFrame {
     pub fn samples(&self) -> &[f32; VOICE_FRAME_SAMPLES] {
         &self.samples
     }
+
+    #[must_use]
+    pub fn is_current_for(&self, queue: &BoundedPcmQueue) -> bool {
+        queue.accepting.load(Ordering::Acquire)
+            && self.generation == queue.generation.load(Ordering::Acquire)
+    }
 }
 
 impl Default for PcmFrame {

@@ -607,6 +607,43 @@ mod tests {
     }
 
     #[test]
+    fn quick_voice_mute_default_is_remappable_and_persists_through_reload() {
+        let mut settings = SettingsOptions::default();
+        let row = BindingId::ToggleVoiceMute.row(false).unwrap();
+        let default = PhysicalControl::KeyboardUsage(0x10);
+        let replacement = PhysicalControl::KeyboardUsage(0x18);
+
+        assert_eq!(settings.key_control(row), Some(default));
+        assert_eq!(
+            settings.named_key_control(BindingId::ToggleVoiceMute),
+            Some(default)
+        );
+
+        assert!(settings.remap(row, replacement));
+        let bindings = settings.controls().unwrap();
+        let mute_bindings: Vec<_> = bindings
+            .bindings()
+            .iter()
+            .filter(|binding| binding.action == Action::ToggleVoiceMute)
+            .collect();
+        assert_eq!(mute_bindings.len(), 1);
+        assert_eq!(mute_bindings[0].context, InputContext::Gameplay);
+        assert_eq!(mute_bindings[0].chord.control, replacement);
+
+        let encoded = serde_json::to_vec(&settings).unwrap();
+        let mut restored = SettingsOptions::decode(&encoded).unwrap();
+        assert_eq!(
+            restored.named_key_control(BindingId::ToggleVoiceMute),
+            Some(replacement)
+        );
+        assert!(restored.reset_key(row));
+        assert_eq!(
+            restored.named_key_control(BindingId::ToggleVoiceMute),
+            Some(default)
+        );
+    }
+
+    #[test]
     fn controller_pick_remap_creates_a_semantic_binding() {
         let mut settings = SettingsOptions::default();
         let row = BindingId::PickItem.row(true).unwrap();

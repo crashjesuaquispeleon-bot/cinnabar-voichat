@@ -167,7 +167,7 @@ mod tests {
 
     #[test]
     fn mock_capture_reaches_the_existing_mixer_without_draining_transmit_and_stops_cleanly() {
-        use crate::audio::voice_stream::{MockVoiceCaptureStream, VoiceCaptureQueues};
+        use crate::audio::voice_stream::{MockVoiceCaptureStream, VoiceCaptureQueues, VoiceCaptureStream};
 
         let transmit = Arc::new(BoundedPcmQueue::new(2));
         let monitor = Arc::new(BoundedPcmQueue::new(2));

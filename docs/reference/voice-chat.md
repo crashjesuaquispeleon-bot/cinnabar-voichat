@@ -217,3 +217,34 @@ The current native discovery and capture adapters are intentionally not a select
 **Do not wire the snapshot identifier directly into persisted audio settings or claim that the settings select a microphone.** A real selection implementation needs one backend-owned selection contract that binds a fresh enumeration snapshot to the corresponding CPAL device handle, handles disappearance/re-enumeration, and opens the selected handle on the capture owner thread. Persisted preferences should use a backend-supported stable identity where available and fall back explicitly to the OS default when the device is missing. Device handles and native identifiers must remain local and must never become network identity or room authorization.
 
 Until that contract and platform behavior are tested, keep the UI selection marked as pending and continue to use the OS default input device.
+
+
+## Selectable microphone contract (2026-11-03)
+
+The next device-selection implementation must use a catalog/command boundary owned by the native audio backend, rather than extending the current descriptor-only trait with a naked CPAL index.
+
+### Required lifecycle
+
+1. A backend worker creates the CPAL host, enumerates inputs, and retains the resulting device handles in that worker's private catalog. The UI receives only display descriptors and opaque, process-local selection tokens.
+2. Every catalog refresh advances a catalog generation. A token is valid only for the generation that produced it; a refresh, host reset, or device-removal event invalidates older tokens.
+3. Selecting a device sends the opaque token to the same backend worker. The worker resolves it against its retained catalog and opens that exact handle. It must reject an unknown or stale token rather than reinterpret it as an index or silently open another microphone.
+4. The capture stream remains owned and stopped on the capture worker, as today. The command protocol must not move a CPAL handle across threads unless the pinned CPAL/backend contract explicitly guarantees that operation; keeping enumeration, handle lookup, stream construction, and destruction on one owner thread is the safe default design.
+5. If the selected device disappears, stop capture, close both PCM gates, clear transmit and monitor queues, invalidate the catalog, and surface a device-unavailable state. Do not silently switch to another physical microphone. A user-visible “Use system default” choice may deliberately select the current OS default.
+
+### Identity and persistence
+
+- Selection tokens are random/opaque backend-local capabilities, not `cpal-snapshot-{index}`, hardware identifiers, player IDs, or server room IDs.
+- Never persist a catalog token. Persist a preferred device only if the platform backend exposes a documented stable identity with suitable semantics. Otherwise persist “system default” and ask the user to choose again after restart.
+- Display names are labels only. Duplicate names must remain separately selectable through distinct opaque tokens; name equality must never resolve a selection.
+- Enumeration and selection are local-only. No native device ID, display name, or hardware fingerprint is sent to the voice service.
+
+### Required tests before exposing the selector
+
+- Selecting each of two mock devices opens the exact matching retained handle, including when both have the same display name.
+- A token from an earlier catalog generation is rejected after refresh.
+- Removing a selected device stops capture and clears both PCM queues; it does not fall back silently.
+- An explicit system-default selection resolves the default at selection time and handles a changed default deterministically.
+- Repeated selection, refresh, disconnect, and shutdown do not leak worker threads or leave a stale stream running.
+- Native qualification verifies device changes and unplug/replug behavior on Windows, macOS, and Linux. Mock tests alone do not establish OS behavior.
+
+This is an implementation contract, not a claim that selection is already available. The current CPAL path still opens the system default device, and the current discovery list must not be wired to settings until the worker-owned catalog and selected-handle open path exist.

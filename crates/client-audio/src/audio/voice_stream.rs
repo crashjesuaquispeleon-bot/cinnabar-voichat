@@ -420,12 +420,13 @@ impl VoiceCaptureOpener for CpalVoiceCaptureOpener {
                         return;
                     }
                 };
+                thread_running.store(true, Ordering::Release);
                 if let Err(error) = stream.play() {
+                    thread_running.store(false, Ordering::Release);
                     let _ = ready_tx.send(Err(VoiceCaptureError::Other(error.to_string())));
                     return;
                 }
 
-                thread_running.store(true, Ordering::Release);
                 if ready_tx.send(Ok(())).is_err() {
                     thread_running.store(false, Ordering::Release);
                     drop(stream);
@@ -445,6 +446,7 @@ impl VoiceCaptureOpener for CpalVoiceCaptureOpener {
 
                 // Stream is dropped here, on the same owner thread that created it.
                 drop(stream);
+                thread_queue.clear();
                 thread_running.store(false, Ordering::Release);
             })
             .map_err(|error| VoiceCaptureError::Other(error.to_string()))?;

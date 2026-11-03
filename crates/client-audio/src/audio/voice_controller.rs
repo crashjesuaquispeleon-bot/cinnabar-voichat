@@ -107,6 +107,58 @@ impl VoiceCaptureController {
         self.stop_count
     }
 
+    /// Requests a fresh local input-device snapshot from the active native worker.
+    /// The returned descriptors arrive asynchronously through poll_microphone_events.
+    pub fn refresh_microphone_devices(&mut self) -> Result<(), String> {
+        let stream = self
+            .stream
+            .as_mut()
+            .ok_or_else(|| "microphone capture worker is not active".to_owned())?;
+        stream
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .refresh_input_devices()
+    }
+
+    /// Requests an exact selection from the latest device snapshot. A stale token is
+    /// rejected by the worker; it is never treated as a request for the system default.
+    pub fn select_microphone_device(
+        &mut self,
+        selection: super::voice_capture::MicrophoneSelection,
+    ) -> Result<(), String> {
+        let stream = self
+            .stream
+            .as_mut()
+            .ok_or_else(|| "microphone capture worker is not active".to_owned())?;
+        stream
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .select_input_device(selection)
+    }
+
+    /// Drains pending device-list, selection, and disconnect events without blocking.
+    pub fn poll_microphone_events(&mut self) -> Vec<super::voice_capture::MicrophoneWorkerEvent> {
+        let Some(stream) = self.stream.as_mut() else {
+            return Vec::new();
+        };
+        let mut stream = stream
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut events = Vec::new();
+        while let Some(event) = stream.try_recv_input_event() {
+            events.push(event);
+        }
+        events
+    }
+
+    fn has_persistent_device_worker(&self) -> bool {
+        self.stream.as_ref().is_some_and(|stream| {
+            stream
+                .lock()
+                .is_ok_and(|stream| stream.has_persistent_device_worker())
+        })
+    }
+
     /// Whether the controller should attempt to open the device for this policy.
     ///
     /// `Unknown` permission is allowed once as an OS probe when voice is enabled in a session.
@@ -150,9 +202,22 @@ impl VoiceCaptureController {
             return;
         }
 
-        // A live stream can fail asynchronously (for example, a device unplug or host
-        // audio error). Detect that transition once and apply the same bounded backoff as
-        // an open failure; otherwise the frame schedule could reopen it every frame.
+        // The CPAL owner worker remains alive after a device disappears. Keep it
+        // available so settings can refresh the snapshot and select another exact device;
+        // reopening the OS default here would silently override the user's selection.
+        if self.has_persistent_device_worker() && !self.is_running() {
+            self.queue.set_accepting(false);
+            self.monitor_queue.set_accepting(false);
+            self.queue.clear();
+            self.monitor_queue.clear();
+            self.next_open_attempt = None;
+            self.open_retry_delay = INITIAL_OPEN_RETRY_DELAY;
+            self.last_capture_permitted = false;
+            return;
+        }
+
+        // A legacy/non-worker stream can fail asynchronously (for example, a device
+        // unplug or host error). Apply bounded retry rather than reopening every frame.
         if self.stream.is_some() && !self.is_running() {
             // A stream can fail before the frame loop first observes it as running.
             // Retire the dead handle immediately so this path is detected exactly once.

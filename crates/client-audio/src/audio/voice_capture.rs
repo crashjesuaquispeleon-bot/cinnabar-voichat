@@ -251,7 +251,6 @@ impl<T> MicrophoneCatalog<T> {
     }
 }
 
-
 /// Operations that must run on the microphone worker's owner thread.
 ///
 /// This trait intentionally has no `Send` or `Sync` supertrait: implementations may
@@ -284,7 +283,10 @@ pub struct MicrophoneWorker {
 
 impl MicrophoneWorker {
     /// Submit an owned command. Native device handles never cross this channel.
-    pub fn send(&self, command: MicrophoneWorkerCommand) -> Result<(), std::sync::mpsc::SendError<MicrophoneWorkerCommand>> {
+    pub fn send(
+        &self,
+        command: MicrophoneWorkerCommand,
+    ) -> Result<(), std::sync::mpsc::SendError<MicrophoneWorkerCommand>> {
         self.commands.send(command)
     }
 
@@ -294,7 +296,10 @@ impl MicrophoneWorker {
     }
 
     /// Wait for an event up to the supplied duration.
-    pub fn recv_timeout(&self, timeout: std::time::Duration) -> Result<MicrophoneWorkerEvent, std::sync::mpsc::RecvTimeoutError> {
+    pub fn recv_timeout(
+        &self,
+        timeout: std::time::Duration,
+    ) -> Result<MicrophoneWorkerEvent, std::sync::mpsc::RecvTimeoutError> {
         self.events.recv_timeout(timeout)
     }
 
@@ -352,13 +357,19 @@ where
                         match backend.enumerate() {
                             Ok(devices) => {
                                 let descriptors = catalog.refresh(devices);
-                                if event_tx.send(MicrophoneWorkerEvent::Devices(descriptors)).is_err() {
+                                if event_tx
+                                    .send(MicrophoneWorkerEvent::Devices(descriptors))
+                                    .is_err()
+                                {
                                     break;
                                 }
                             }
                             Err(error) => {
                                 catalog.invalidate();
-                                if event_tx.send(MicrophoneWorkerEvent::BackendError(error)).is_err() {
+                                if event_tx
+                                    .send(MicrophoneWorkerEvent::BackendError(error))
+                                    .is_err()
+                                {
                                     break;
                                 }
                             }
@@ -380,22 +391,31 @@ where
                             Ok(device) => match backend.start(device) {
                                 Ok(()) => {
                                     active_id = resolved_id.clone();
-                                    if event_tx.send(MicrophoneWorkerEvent::Selected {
-                                        device_id: resolved_id.unwrap_or_default(),
-                                    }).is_err() {
+                                    if event_tx
+                                        .send(MicrophoneWorkerEvent::Selected {
+                                            device_id: resolved_id.unwrap_or_default(),
+                                        })
+                                        .is_err()
+                                    {
                                         backend.stop();
                                         break;
                                     }
                                 }
                                 Err(error) => {
                                     backend.stop();
-                                    if event_tx.send(MicrophoneWorkerEvent::BackendError(error)).is_err() {
+                                    if event_tx
+                                        .send(MicrophoneWorkerEvent::BackendError(error))
+                                        .is_err()
+                                    {
                                         break;
                                     }
                                 }
                             },
                             Err(error) => {
-                                if event_tx.send(MicrophoneWorkerEvent::SelectionRejected(error)).is_err() {
+                                if event_tx
+                                    .send(MicrophoneWorkerEvent::SelectionRejected(error))
+                                    .is_err()
+                                {
                                     break;
                                 }
                             }

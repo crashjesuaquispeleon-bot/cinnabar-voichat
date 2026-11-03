@@ -59,6 +59,31 @@ pub trait VoiceCaptureStream: Send {
     /// Whether the underlying device is still open.
     #[must_use]
     fn is_running(&self) -> bool;
+
+    /// Whether this stream keeps a persistent device-owner worker alive after unplug.
+    fn has_persistent_device_worker(&self) -> bool {
+        false
+    }
+
+    /// Refreshes the local device snapshot when the backend supports device selection.
+    fn refresh_input_devices(&mut self) -> Result<(), String> {
+        Err("microphone device refresh is unsupported".to_owned())
+    }
+
+    /// Selects an exact token from the most recently published device snapshot.
+    fn select_input_device(
+        &mut self,
+        _selection: super::voice_capture::MicrophoneSelection,
+    ) -> Result<(), String> {
+        Err("microphone device selection is unsupported".to_owned())
+    }
+
+    /// Returns one pending local device event without blocking.
+    fn try_recv_input_event(
+        &mut self,
+    ) -> Option<super::voice_capture::MicrophoneWorkerEvent> {
+        None
+    }
 }
 
 /// Opens a capture stream that writes into `queue`.
@@ -519,6 +544,35 @@ impl VoiceCaptureStream for CpalVoiceCaptureHandle {
 
     fn is_running(&self) -> bool {
         self.running.load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    fn has_persistent_device_worker(&self) -> bool {
+        self.worker.is_some()
+    }
+
+    fn refresh_input_devices(&mut self) -> Result<(), String> {
+        self.worker
+            .as_ref()
+            .ok_or_else(|| "microphone owner worker has stopped".to_owned())?
+            .send(super::voice_capture::MicrophoneWorkerCommand::Refresh)
+            .map_err(|error| error.to_string())
+    }
+
+    fn select_input_device(
+        &mut self,
+        selection: super::voice_capture::MicrophoneSelection,
+    ) -> Result<(), String> {
+        self.worker
+            .as_ref()
+            .ok_or_else(|| "microphone owner worker has stopped".to_owned())?
+            .send(super::voice_capture::MicrophoneWorkerCommand::Select(selection))
+            .map_err(|error| error.to_string())
+    }
+
+    fn try_recv_input_event(
+        &mut self,
+    ) -> Option<super::voice_capture::MicrophoneWorkerEvent> {
+        self.worker.as_ref()?.try_recv().ok()
     }
 }
 

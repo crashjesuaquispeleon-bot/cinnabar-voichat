@@ -136,6 +136,32 @@ mod tests {
     use crate::audio::voice_pcm::PcmFrame;
 
     #[test]
+    fn attaches_to_the_existing_memory_mixer_without_opening_another_device() {
+        let queue = Arc::new(BoundedPcmQueue::new(2));
+        queue.set_accepting(true);
+        let mut frame = PcmFrame::silence();
+        let mut samples = [0.0_f32; VOICE_FRAME_SAMPLES];
+        samples[0] = 0.4;
+        samples[1] = -0.2;
+        frame.copy_from_slice(&samples);
+        queue.push(frame);
+
+        let (mut device, mut mixer) = crate::named_audio::AudioDevice::memory_mixer();
+        assert!(device.play_source(VoiceLoopbackSource::new(queue)));
+        assert!((mixer.next().unwrap() - 0.4).abs() < 1e-6);
+        assert!((mixer.next().unwrap() - 0.4).abs() < 1e-6);
+        assert!((mixer.next().unwrap() + 0.2).abs() < 1e-6);
+        assert!((mixer.next().unwrap() + 0.2).abs() < 1e-6);
+    }
+
+    #[test]
+    fn disabled_audio_device_rejects_loopback_without_panicking() {
+        let queue = Arc::new(BoundedPcmQueue::new(2));
+        let mut device = crate::named_audio::AudioDevice::disabled();
+        assert!(!device.play_source(VoiceLoopbackSource::new(queue)));
+    }
+
+    #[test]
     fn empty_queue_yields_silence_stereo_pairs() {
         let queue = Arc::new(BoundedPcmQueue::new(4));
         queue.set_accepting(true);

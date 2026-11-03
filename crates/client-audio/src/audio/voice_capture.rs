@@ -401,7 +401,7 @@ where
                                 backend.stop();
                                 active_id = None;
                                 match backend.start(device) {
-                                    Ok(()) => {
+                                    Ok(()) if backend.is_running() => {
                                         active_id = resolved_id.clone();
                                         if event_tx
                                             .send(MicrophoneWorkerEvent::Selected {
@@ -410,6 +410,20 @@ where
                                             .is_err()
                                         {
                                             backend.stop();
+                                            break;
+                                        }
+                                    }
+                                    Ok(()) => {
+                                        // Some hosts can report an asynchronous stream error
+                                        // immediately after opening. Never publish a selected
+                                        // state for a stream that has already stopped.
+                                        backend.stop();
+                                        if event_tx
+                                            .send(MicrophoneWorkerEvent::BackendError(
+                                                "microphone stream stopped during startup".to_owned(),
+                                            ))
+                                            .is_err()
+                                        {
                                             break;
                                         }
                                     }
@@ -823,6 +837,91 @@ mod tests {
 
         assert!(!running.load(Ordering::Acquire));
         assert!(stops.load(Ordering::Relaxed) >= 3);
+    }
+
+    #[test]
+    fn owner_worker_does_not_publish_selected_when_stream_stops_during_startup() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, AtomicU32, Ordering},
+        };
+
+        struct ImmediateFailureBackend {
+            running: Arc<AtomicBool>,
+            stop_count: Arc<AtomicU32>,
+        }
+
+        impl MicrophoneWorkerBackend for ImmediateFailureBackend {
+            type Device = u8;
+
+            fn enumerate(&mut self) -> Result<Vec<(String, bool, Self::Device)>, String> {
+                Ok(vec![("Built-in microphone".to_owned(), true, 1)])
+            }
+
+            fn stop(&mut self) {
+                self.stop_count.fetch_add(1, Ordering::Relaxed);
+                self.running.store(false, Ordering::Release);
+            }
+
+            fn start(&mut self, _device: &Self::Device) -> Result<(), String> {
+                // Model a host that accepts the open request but reports an immediate
+                // asynchronous stream error before the worker can publish readiness.
+                self.running.store(false, Ordering::Release);
+                Ok(())
+            }
+
+            fn is_running(&self) -> bool {
+                self.running.load(Ordering::Acquire)
+            }
+        }
+
+        let running = Arc::new(AtomicBool::new(false));
+        let stop_count = Arc::new(AtomicU32::new(0));
+        let worker_running = Arc::clone(&running);
+        let worker_stops = Arc::clone(&stop_count);
+        let worker = spawn_microphone_worker(move || ImmediateFailureBackend {
+            running: worker_running,
+            stop_count: worker_stops,
+        })
+        .unwrap();
+
+        worker.send(MicrophoneWorkerCommand::Refresh).unwrap();
+        let MicrophoneWorkerEvent::Devices(devices) = worker
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .unwrap()
+        else {
+            panic!("expected the refreshed microphone snapshot");
+        };
+
+        worker
+            .send(MicrophoneWorkerCommand::Select(MicrophoneSelection::Device(
+                devices[0].id.clone(),
+            )))
+            .unwrap();
+        assert_eq!(
+            worker
+                .recv_timeout(std::time::Duration::from_secs(2))
+                .unwrap(),
+            MicrophoneWorkerEvent::BackendError(
+                "microphone stream stopped during startup".to_owned()
+            )
+        );
+        assert!(!running.load(Ordering::Acquire));
+        assert_eq!(
+            worker.recv_timeout(std::time::Duration::from_millis(150)),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout),
+            "a failed startup must not emit Selected or a phantom disconnect"
+        );
+
+        worker.send(MicrophoneWorkerCommand::Shutdown).unwrap();
+        assert_eq!(
+            worker
+                .recv_timeout(std::time::Duration::from_secs(2))
+                .unwrap(),
+            MicrophoneWorkerEvent::Stopped
+        );
+        worker.shutdown();
+        assert!(stop_count.load(Ordering::Relaxed) >= 2);
     }
 
     #[test]

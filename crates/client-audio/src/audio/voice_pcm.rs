@@ -23,6 +23,7 @@ pub const VOICE_QUEUE_CAPACITY: usize = 15;
 #[derive(Clone, Copy, Debug)]
 pub struct PcmFrame {
     samples: [f32; VOICE_FRAME_SAMPLES],
+    generation: u64,
 }
 
 impl PcmFrame {
@@ -30,6 +31,7 @@ impl PcmFrame {
     pub const fn silence() -> Self {
         Self {
             samples: [0.0; VOICE_FRAME_SAMPLES],
+            generation: 0,
         }
     }
 
@@ -64,6 +66,9 @@ pub struct BoundedPcmQueue {
     slots: ArrayQueue<PcmFrame>,
     pushed: AtomicU64,
     dropped: AtomicU64,
+    suppressed: AtomicU64,
+    accepting: std::sync::atomic::AtomicBool,
+    generation: AtomicU64,
 }
 
 impl BoundedPcmQueue {
@@ -74,6 +79,9 @@ impl BoundedPcmQueue {
             slots: ArrayQueue::new(capacity.max(1)),
             pushed: AtomicU64::new(0),
             dropped: AtomicU64::new(0),
+            suppressed: AtomicU64::new(0),
+            accepting: std::sync::atomic::AtomicBool::new(false),
+            generation: AtomicU64::new(0),
         }
     }
 
@@ -97,6 +105,34 @@ impl BoundedPcmQueue {
         self.slots.is_empty()
     }
 
+    /// Whether microphone frames may enter the queue under the current policy.
+    #[must_use]
+    pub fn is_accepting(&self) -> bool {
+        self.accepting.load(Ordering::Acquire)
+    }
+
+    /// Changes the capture gate and advances an epoch so in-flight callbacks from an
+    /// earlier PTT/mute/session state can never be consumed after the gate reopens.
+    pub fn set_accepting(&self, accepting: bool) {
+        let current = self.accepting.load(Ordering::Acquire);
+        if current == accepting {
+            return;
+        }
+        if !accepting {
+            self.accepting.store(false, Ordering::Release);
+            self.generation.fetch_add(1, Ordering::AcqRel);
+            self.clear();
+        } else {
+            self.generation.fetch_add(1, Ordering::AcqRel);
+            self.accepting.store(true, Ordering::Release);
+        }
+    }
+
+    #[must_use]
+    pub fn suppressed(&self) -> u64 {
+        self.suppressed.load(Ordering::Relaxed)
+    }
+
     #[must_use]
     pub fn pushed(&self) -> u64 {
         self.pushed.load(Ordering::Relaxed)
@@ -108,7 +144,17 @@ impl BoundedPcmQueue {
     }
 
     /// Enqueues a frame without waiting. A full queue drops the newest frame.
-    pub fn push(&self, frame: PcmFrame) {
+    pub fn push(&self, mut frame: PcmFrame) {
+        if !self.accepting.load(Ordering::Acquire) {
+            self.suppressed.fetch_add(1, Ordering::Relaxed);
+            return;
+        }
+        let generation = self.generation.load(Ordering::Acquire);
+        if !self.accepting.load(Ordering::Acquire) {
+            self.suppressed.fetch_add(1, Ordering::Relaxed);
+            return;
+        }
+        frame.generation = generation;
         if self.slots.push(frame).is_ok() {
             self.pushed.fetch_add(1, Ordering::Relaxed);
         } else {
@@ -125,7 +171,19 @@ impl BoundedPcmQueue {
 
     #[must_use]
     pub fn pop(&self) -> Option<PcmFrame> {
-        self.slots.pop()
+        if !self.accepting.load(Ordering::Acquire) {
+            return None;
+        }
+        let generation = self.generation.load(Ordering::Acquire);
+        loop {
+            let frame = self.slots.pop()?;
+            if frame.generation == generation
+                && self.accepting.load(Ordering::Acquire)
+                && self.generation.load(Ordering::Acquire) == generation
+            {
+                return Some(frame);
+            }
+        }
     }
 
     /// Drops every queued frame (session end, mute, device stop, etc.).
@@ -147,6 +205,7 @@ mod tests {
     #[test]
     fn queue_preserves_order_until_capacity() {
         let q = BoundedPcmQueue::new(3);
+        q.set_accepting(true);
         for i in 0..3 {
             let mut frame = PcmFrame::silence();
             frame.samples[0] = i as f32;
@@ -163,6 +222,8 @@ mod tests {
     #[test]
     fn overflow_drops_newest_and_counts() {
         let q = BoundedPcmQueue::new(2);
+        q.set_accepting(true);
+        q.set_accepting(true);
         for i in 0..5 {
             let mut frame = PcmFrame::silence();
             frame.samples[0] = i as f32;
@@ -177,6 +238,7 @@ mod tests {
     #[test]
     fn push_samples_keeps_capacity_stable() {
         let q = BoundedPcmQueue::with_default_capacity();
+        q.set_accepting(true);
         let capacity = q.capacity();
         let src = [0.5_f32; VOICE_FRAME_SAMPLES];
         for _ in 0..(capacity + 4) {

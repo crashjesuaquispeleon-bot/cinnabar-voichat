@@ -19,6 +19,55 @@ pub struct MicrophoneDevice {
     pub is_default: bool,
 }
 
+/// A generation-scoped catalog binding presentation descriptors to backend-owned handles.
+///
+/// The native backend should create and resolve this catalog on the same worker that
+/// owns its CPAL host and devices. The generic handle is never exposed through the
+/// descriptor API. Refreshing the catalog invalidates every earlier ID.
+pub struct MicrophoneCatalog<T> {
+    generation: u64,
+    entries: Vec<(MicrophoneDevice, T)>,
+}
+
+impl<T> Default for MicrophoneCatalog<T> {
+    fn default() -> Self {
+        Self { generation: 0, entries: Vec::new() }
+    }
+}
+
+impl<T> MicrophoneCatalog<T> {
+    /// Replaces the current snapshot and returns descriptors for the new generation.
+    /// Names are labels only; duplicate names still receive distinct IDs.
+    pub fn refresh(
+        &mut self,
+        devices: impl IntoIterator<Item = (String, bool, T)>,
+    ) -> Vec<MicrophoneDevice> {
+        self.generation = self.generation.wrapping_add(1);
+        self.entries = devices.into_iter().enumerate().map(|(index, (name, is_default, handle))| {
+            let descriptor = MicrophoneDevice {
+                id: format!("mic-{}-{index}", self.generation),
+                name,
+                is_default,
+            };
+            (descriptor, handle)
+        }).collect();
+        self.descriptors()
+    }
+
+    /// Returns current presentation-only descriptors.
+    #[must_use]
+    pub fn descriptors(&self) -> Vec<MicrophoneDevice> {
+        self.entries.iter().map(|(descriptor, _)| descriptor.clone()).collect()
+    }
+
+    /// Resolves an ID only in the current snapshot; the handle stays backend-owned.
+    pub fn resolve(&self, id: &str) -> Option<&T> {
+        self.entries.iter().find(|(descriptor, _)| descriptor.id == id).map(|(_, handle)| handle)
+    }
+
+    #[must_use]
+    pub fn generation(&self) -> u64 { self.generation }
+}
 /// Boundary for enumerating local microphone devices.
 ///
 /// Implementations must perform operating-system enumeration outside Bevy's frame
@@ -79,6 +128,36 @@ mod tests {
         }
     }
 
+    #[test]
+    fn catalog_resolves_exact_handle_when_device_names_are_duplicated() {
+        let mut catalog = MicrophoneCatalog::default();
+        let devices = catalog.refresh([
+            ("USB Microphone".to_owned(), true, 10_u32),
+            ("USB Microphone".to_owned(), false, 20_u32),
+        ]);
+        assert_ne!(devices[0].id, devices[1].id);
+        assert_eq!(catalog.resolve(&devices[0].id), Some(&10));
+        assert_eq!(catalog.resolve(&devices[1].id), Some(&20));
+    }
+
+    #[test]
+    fn catalog_refresh_invalidates_ids_from_the_previous_generation() {
+        let mut catalog = MicrophoneCatalog::default();
+        let old = catalog.refresh([("Old device".to_owned(), true, 10_u32)]);
+        let new = catalog.refresh([("New device".to_owned(), true, 20_u32)]);
+        assert!(catalog.generation() > 1);
+        assert!(catalog.resolve(&old[0].id).is_none());
+        assert_eq!(catalog.resolve(&new[0].id), Some(&20));
+    }
+
+    #[test]
+    fn catalog_refresh_can_represent_device_disappearance() {
+        let mut catalog = MicrophoneCatalog::default();
+        let old = catalog.refresh([("USB Microphone".to_owned(), true, 10_u32)]);
+        assert_eq!(catalog.resolve(&old[0].id), Some(&10));
+        assert!(catalog.refresh(std::iter::empty()).is_empty());
+        assert!(catalog.resolve(&old[0].id).is_none());
+    }
     #[test]
     fn mock_backend_exposes_only_local_device_descriptors() {
         let backend = MockMicrophoneBackend {

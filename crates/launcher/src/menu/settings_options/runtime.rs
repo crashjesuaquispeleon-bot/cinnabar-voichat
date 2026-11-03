@@ -82,6 +82,8 @@ impl SettingsOptions {
         settings.voice_chat.muted = self.value(SettingId::VoiceChatMuted) != 0;
         settings.voice_chat.activation_mode =
             ui::VoiceActivationMode::from_value(self.value(SettingId::VoiceActivationMode));
+        settings.voice_chat.input_sensitivity_percent =
+            self.value(SettingId::VoiceInputSensitivity).clamp(0, 200) as u8;
         settings
     }
 }
@@ -127,10 +129,12 @@ mod tests {
             defaults.activation_mode,
             ui::VoiceActivationMode::PushToTalk
         );
+        assert_eq!(defaults.input_sensitivity_percent, 100);
 
         assert!(options.set(SettingId::VoiceChatEnabled.index(), 1));
         assert!(options.set(SettingId::VoiceActivationMode.index(), 0));
         assert!(options.set(SettingId::VoiceChatMuted.index(), 1));
+        assert!(options.set(SettingId::VoiceInputSensitivity.index(), 175));
         let encoded = serde_json::to_vec(&options).unwrap();
         let mut restored = SettingsOptions::decode(&encoded).unwrap();
         let saved = restored.user_settings().voice_chat;
@@ -140,12 +144,14 @@ mod tests {
             saved.activation_mode,
             ui::VoiceActivationMode::OpenMicrophone
         );
+        assert_eq!(saved.input_sensitivity_percent, 175);
 
         assert!(restored.reset_group(super::super::SettingsGroup::Audio));
         let reset = restored.user_settings().voice_chat;
         assert!(!reset.enabled);
         assert!(!reset.muted);
         assert_eq!(reset.activation_mode, ui::VoiceActivationMode::PushToTalk);
+        assert_eq!(reset.input_sensitivity_percent, 100);
     }
 
     #[test]

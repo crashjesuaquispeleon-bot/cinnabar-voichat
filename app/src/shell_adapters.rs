@@ -100,7 +100,7 @@ fn drive_microphone_settings(
                 menu.mark_microphone_selected(device_id);
             }
             client_audio::audio::voice_capture::MicrophoneWorkerEvent::SelectionRejected(error) => {
-                menu.set_microphone_message(format!(
+                menu.clear_microphone_devices(format!(
                     "The microphone selection was rejected: {error:?}. Refresh the list and try again."
                 ));
             }
@@ -112,7 +112,9 @@ fn drive_microphone_settings(
                 );
             }
             client_audio::audio::voice_capture::MicrophoneWorkerEvent::BackendError(error) => {
-                menu.set_microphone_message(format!("Microphone device error: {error}"));
+                menu.clear_microphone_devices(format!(
+                    "Microphone device error: {error}. Refresh the list before choosing another input."
+                ));
             }
             client_audio::audio::voice_capture::MicrophoneWorkerEvent::Stopped => {
                 menu.clear_microphone_devices(
@@ -125,7 +127,7 @@ fn drive_microphone_settings(
     if menu.take_microphone_refresh_request() {
         match controller.refresh_microphone_devices() {
             Ok(()) => menu.set_microphone_message("Refreshing microphone input devices…"),
-            Err(error) => menu.set_microphone_message(format!(
+            Err(error) => menu.clear_microphone_devices(format!(
                 "Could not refresh microphones: {error}. Enable Voice Chat in an active multiplayer session first."
             )),
         }
@@ -141,7 +143,9 @@ fn drive_microphone_settings(
             }
         };
         if let Err(error) = controller.select_microphone_device(selection) {
-            menu.set_microphone_message(format!("Could not switch microphone: {error}"));
+            menu.clear_microphone_devices(format!(
+                "Could not switch microphone: {error}. Refresh the list before trying again."
+            ));
         }
     }
 }

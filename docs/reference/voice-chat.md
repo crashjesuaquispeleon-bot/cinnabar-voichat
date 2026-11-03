@@ -68,9 +68,11 @@ A server-routed SFU is the leading option to evaluate for global rooms. A full-m
 
 ### Stage 1 — Local audio vertical slice
 
-- [ ] Implement microphone device enumeration, permission/error states and capture lifecycle on the selected desktop platforms.
-- [ ] Implement open-mic and PTT state transitions with tests; no network transmission yet.
-- [ ] Implement a bounded capture-to-playback loopback test and verify that capture shutdown is immediate on mute, disconnect and application exit.
+- [x] Add a device-independent `VoiceInputPolicy` in `client-audio` and register it as a client resource. It gates capture on OS permission, explicit enablement and an active multiplayer session; it gates transmission separately for open-mic/PTT and local mute.
+- [x] Add deterministic tests for permission gating, open-mic, PTT press/release, mute, disconnect, permission revocation, disable and mode changes.
+- [ ] Implement the desktop microphone backend, OS permission/error reporting and device enumeration. No capture device is opened by the current policy.
+- [ ] Connect physical PTT input and settings to the policy.
+- [ ] Implement a bounded capture-to-playback loopback test and verify device shutdown on mute, disconnect and application exit.
 - [ ] Add device selection and input-level configuration without changing existing game sound behavior.
 
 ### Stage 2 — Authenticated global rooms
@@ -86,6 +88,10 @@ A server-routed SFU is the leading option to evaluate for global rooms. A full-m
 - [ ] Qualify Windows, macOS and Linux capture/playback and device switching.
 - [ ] Measure CPU, memory, bandwidth, end-to-end latency and queue drops at representative room sizes.
 - [ ] Document server deployment, configuration, privacy behavior and troubleshooting.
+
+## Local input policy implemented
+
+`crates/client-audio/src/audio/voice_input.rs` now contains a pure lifecycle/privacy gate, registered by `ClientAudioPlugin`. The default is safe: permission unknown, voice disabled and no active multiplayer session. The future platform backend must consult `capture_permitted()` before opening a microphone and `transmission_permitted()` before forwarding frames. PTT state is cleared on mute, disable, permission loss, session end and mode changes, so a stale held-key state cannot reopen transmission. This is policy only: no OS device, microphone capture, physical key binding, PCM queue or loopback playback has been implemented yet.
 
 ## Confirmed session-isolation behavior
 

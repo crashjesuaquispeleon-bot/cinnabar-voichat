@@ -174,7 +174,7 @@ pub enum MicrophoneSelection {
     Device(String),
 }
 
-/// Commands accepted by the future CPAL owner worker.
+/// Commands accepted by the persistent CPAL owner worker.
 ///
 /// The worker must execute every command on the same thread that owns the CPAL host,
 /// device handles and active stream. These values contain only owned, Send-safe data;

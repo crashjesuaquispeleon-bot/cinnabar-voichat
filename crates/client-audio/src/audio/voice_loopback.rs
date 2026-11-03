@@ -23,6 +23,7 @@ pub struct VoiceLoopbackSource {
     index: usize,
     /// When true, emit zeros instead of pulling (local mute of monitor only).
     muted: Arc<std::sync::atomic::AtomicBool>,
+    stopped: Arc<AtomicBool>,
     gain: f32,
     pending_right: Option<f32>,
 }
@@ -34,7 +35,8 @@ impl VoiceLoopbackSource {
             queue,
             current: None,
             index: 0,
-            muted: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            muted: Arc::new(AtomicBool::new(false)),
+            stopped: Arc::new(AtomicBool::new(false)),
             gain: 1.0,
             pending_right: None,
         }
@@ -42,8 +44,14 @@ impl VoiceLoopbackSource {
 
     /// Shared mute flag for the monitor path (does not stop capture).
     #[must_use]
-    pub fn mute_flag(&self) -> Arc<std::sync::atomic::AtomicBool> {
+    pub fn mute_flag(&self) -> Arc<AtomicBool> {
         Arc::clone(&self.muted)
+    }
+
+    /// Shared cancellation flag; setting it ends the source on the next mixer pull.
+    #[must_use]
+    pub fn stop_flag(&self) -> Arc<AtomicBool> {
+        Arc::clone(&self.stopped)
     }
 
     pub fn set_gain(&mut self, gain: f32) {
@@ -60,6 +68,9 @@ impl Iterator for VoiceLoopbackSource {
     type Item = f32;
 
     fn next(&mut self) -> Option<f32> {
+        if self.stopped.load(Ordering::Acquire) {
+            return None;
+        }
         // The monitor has a private queue, so mute may discard its backlog without
         // touching the transmit queue. Do not play buffered audio after a policy epoch.
         if self.muted.load(Ordering::Acquire) || !self.queue.is_accepting() {
@@ -258,6 +269,7 @@ mod tests {
 pub struct VoiceLoopbackAttachment {
     attached: bool,
     muted: Option<Arc<AtomicBool>>,
+    stopped: Option<Arc<AtomicBool>>,
     muted_requested: bool,
 }
 
@@ -285,7 +297,15 @@ pub fn attach_voice_loopback_to_named_audio(
     mut attachment: ResMut<VoiceLoopbackAttachment>,
     mut device: Option<NonSendMut<crate::named_audio::AudioDevice>>,
 ) {
-    if attachment.attached || !capture.is_running() {
+    if !capture.is_running() {
+        if let Some(stopped) = attachment.stopped.take() {
+            stopped.store(true, Ordering::Release);
+        }
+        attachment.muted = None;
+        attachment.attached = false;
+        return;
+    }
+    if attachment.attached {
         return;
     }
     let Some(device) = device.as_mut() else {
@@ -297,9 +317,11 @@ pub fn attach_voice_loopback_to_named_audio(
 
     let source = VoiceLoopbackSource::new(capture.monitor_queue());
     let muted = source.mute_flag();
+    let stopped = source.stop_flag();
     muted.store(attachment.muted_requested, Ordering::Release);
     if device.play_source(source) {
         attachment.muted = Some(muted);
+        attachment.stopped = Some(stopped);
         attachment.attached = true;
     }
 }

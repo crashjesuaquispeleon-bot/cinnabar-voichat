@@ -108,7 +108,10 @@ impl VoiceInputPolicy {
     /// Whether opening/keeping the local input device is permitted after a successful grant.
     #[must_use]
     pub fn capture_permitted(&self) -> bool {
-        self.permission == MicrophonePermission::Granted && self.enabled && self.session_active
+        self.permission == MicrophonePermission::Granted
+            && self.enabled
+            && self.session_active
+            && self.mode != MicrophoneMode::Unselected
     }
 
     /// Whether captured frames may leave this client.
@@ -160,7 +163,7 @@ mod tests {
     fn unselected_mode_never_transmits() {
         let policy = ready();
         assert_eq!(policy.mode(), MicrophoneMode::Unselected);
-        assert!(policy.capture_permitted());
+        assert!(!policy.capture_permitted());
         assert!(!policy.transmission_permitted());
     }
 
@@ -172,6 +175,8 @@ mod tests {
         policy.set_session_active(true);
         assert!(!policy.capture_permitted());
         policy.set_permission(MicrophonePermission::Granted);
+        assert!(!policy.capture_permitted());
+        policy.set_mode(MicrophoneMode::OpenMicrophone);
         assert!(policy.capture_permitted());
     }
 

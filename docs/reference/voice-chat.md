@@ -190,3 +190,17 @@ This separation is required because queue reads are destructive. A local loopbac
 VoiceLoopbackSource is a pull-driven rodio source attached through the existing AudioDevice::play_source path. The attachment system waits for microphone capture and the existing named-audio device to become available and adds at most one source. The source is cancelled when capture ends. It does not open another output device. If the app has no named-audio carrier, the device is disabled, or output initialization fails, attachment remains a no-op and the client continues without local monitoring.
 
 The loopback source is still a local monitor only. It does not implement the voice network, remote playback, room membership, or server authorization. The monitor must remain independently muteable without changing capture/transmission policy.
+
+
+## Service-boundary audit (2026-11-03)
+
+The Stage-2 gate was rechecked against the current Go integration code before selecting a transport:
+
+- `core/webrelay` is an existing operator-configured HTTP/3 + WebTransport service with an HTTPS/WebSocket fallback. Its exposed channels are the reliable `control` and `play` channels defined by the relay contract. The play channel carries the Minecraft session stream; it is not a low-latency voice media channel and must not be overloaded with microphone packets.
+- The relay's browser session keeps its Microsoft account/authcache state and a `proxy.SessionHandler` for the Bedrock join. This is useful evidence of an existing authenticated game-session lifecycle, but it is not yet a documented native-client voice authorization API or a server-issued, opaque voice-room capability.
+- `core/cinnabarapi` is a separate authenticated API connection for Cinnabar account-facing features. Its existing lookup and presence contract does not, by itself, authorize a participant for a particular live Minecraft partida.
+- `core/go.mod` pins Pion WebRTC, but a dependency declaration is not an operational SFU. No native voice-room admission, signaling, room lifecycle, or media-routing contract was established by this audit.
+
+**Stage-2 implementation remains blocked on service ownership, not on the local microphone prototype.** Before adding network code, the service operator must identify (1) the trusted account identity available to native Cinnabar clients, (2) the authoritative server-side partida/session identifier and its lifecycle, (3) the API that can mint and revoke a short-lived room admission token bound to both identities, and (4) the deployed media-router/SFU endpoint and operational owner. The client must never send an arbitrary room ID and treat it as authorization, nor use local `actor_session_id` / `session_generation` values as backend proof.
+
+Until those contracts are supplied, keep Stage 2 unchecked. Do not add a client-only room implementation, trust a user-supplied room name, send audio through the Bedrock relay, or introduce an unowned SFU deployment. Safe parallel work remains Stage-1 hardening: loopback/mute/disconnect/exit acceptance tests, device-selection and permission UX, and Windows/macOS/Linux qualification.

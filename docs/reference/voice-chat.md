@@ -260,3 +260,9 @@ The platform-independent catalog now exposes `MicrophoneSelection` with two expl
 `MicrophoneCatalog::invalidate()` now advances the catalog generation and drops every retained descriptor/handle entry. A token issued before invalidation therefore resolves as `DeviceUnavailable`, and an explicit `SystemDefault` request returns `NoDefaultDevice` until a fresh snapshot is published. A deterministic unit test verifies both outcomes and confirms the exposed descriptor list is empty after invalidation.
 
 This is a backend building block for unplug/host-reset handling; it does not yet subscribe to CPAL hot-plug notifications or stop/reopen the active stream. The CPAL worker must invoke invalidation on the owner thread when it detects removal or a host reset, then report the unavailable state to the caller. No UI selector should be exposed until that worker command path is integrated and tested.
+
+## CPAL owner-worker command contract (2026-11-03)
+
+`audio::voice_capture` now defines the Send-safe command/event vocabulary for the upcoming owner worker: `Refresh`, `Select(MicrophoneSelection)` and `Shutdown`, with `Devices`, `Selected`, `SelectionRejected`, `DeviceUnavailable` and `Stopped` events. Commands carry only owned descriptors/tokens; native CPAL host/device/stream handles must remain inside the worker thread. A selection must stop the previous stream and resolve only against the current catalog generation. A stale token is rejected, never replaced by the system default. Shutdown stops capture and invalidates the catalog.
+
+This commit defines the typed protocol only. It does not yet create the channel, worker loop, hot-plug watcher, or connect settings UI/controller calls. The existing `CpalVoiceCaptureOpener::open_default` remains the only native stream-opening path until those pieces are implemented and tested.

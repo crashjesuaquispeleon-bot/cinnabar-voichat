@@ -420,7 +420,7 @@ where
                                         backend.stop();
                                         if event_tx
                                             .send(MicrophoneWorkerEvent::BackendError(
-                                                "microphone stream stopped during startup".to_owned(),
+                                                String::from("microphone stream stopped during startup"),
                                             ))
                                             .is_err()
                                         {

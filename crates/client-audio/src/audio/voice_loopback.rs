@@ -19,7 +19,7 @@ use std::time::Duration;
 pub struct VoiceLoopbackSource {
     queue: SharedPcmQueue,
     /// Current frame samples (mono), or none when idle.
-    current: Option<[f32; VOICE_FRAME_SAMPLES]>,
+    current: Option<super::voice_pcm::PcmFrame>,
     index: usize,
     /// When true, emit zeros instead of pulling (local mute of monitor only).
     muted: Arc<std::sync::atomic::AtomicBool>,
@@ -51,24 +51,8 @@ impl VoiceLoopbackSource {
     }
 
     fn pull_frame(&mut self) {
-        if self
-            .muted
-            .load(std::sync::atomic::Ordering::Acquire)
-        {
-            self.current = None;
-            self.index = 0;
-            return;
-        }
-        match self.queue.pop() {
-            Some(frame) => {
-                self.current = Some(*frame.samples());
-                self.index = 0;
-            }
-            None => {
-                self.current = None;
-                self.index = 0;
-            }
-        }
+        self.current = self.queue.pop();
+        self.index = 0;
     }
 }
 
@@ -76,6 +60,20 @@ impl Iterator for VoiceLoopbackSource {
     type Item = f32;
 
     fn next(&mut self) -> Option<f32> {
+        // The monitor has a private queue, so mute may discard its backlog without
+        // touching the transmit queue. Do not play buffered audio after a policy epoch.
+        if self.muted.load(Ordering::Acquire) || !self.queue.is_accepting() {
+            self.current = None;
+            self.index = 0;
+            self.pending_right = None;
+            self.queue.clear();
+            return Some(0.0);
+        }
+        if self.current.as_ref().is_some_and(|frame| !frame.is_current_for(&self.queue)) {
+            self.current = None;
+            self.index = 0;
+            self.pending_right = None;
+        }
         // Endless source: the mixer keeps us until the device is torn down.
         if let Some(right) = self.pending_right.take() {
             return Some(right);
@@ -84,10 +82,10 @@ impl Iterator for VoiceLoopbackSource {
             self.pull_frame();
         }
         let mono = match &self.current {
-            Some(samples) => {
-                let s = samples[self.index] * self.gain;
+            Some(frame) => {
+                let sample = frame.samples()[self.index] * self.gain;
                 self.index += 1;
-                s
+                sample
             }
             None => 0.0,
         };

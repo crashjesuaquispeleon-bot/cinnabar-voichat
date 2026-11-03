@@ -63,7 +63,13 @@ pub(crate) fn drain_sequenced_audio_into_session(
     });
     if current_voice_session != *voice_session {
         voice_controller.reset_for_session_change();
+        // Treat a direct server/WorldStream replacement as a privacy boundary too:
+        // release any PTT hold even when the old and new sessions are both active.
+        voice_policy.set_session_active(false);
         voice_policy.set_session_active(current_voice_session.is_some());
+        // Discard any temporary quick-mute override when joining a different session;
+        // the explicitly saved Sound-panel preference becomes the new baseline.
+        *last_saved_voice_mute = None;
         *voice_session = current_voice_session;
     }
     // Saved Sound-panel preferences configure the local voice policy. Voice stays
@@ -201,6 +207,21 @@ mod voice_settings_tests {
         toggle_quick_voice_mute(&mut policy);
         assert!(!policy.muted());
         assert!(policy.transmission_permitted());
+    }
+
+    #[test]
+    fn new_session_restores_saved_mute_preference_after_quick_override() {
+        let mut policy = VoiceInputPolicy::default();
+        let mut last_saved_mute = None;
+        apply_saved_voice_mute(&mut policy, false, &mut last_saved_mute);
+        toggle_quick_voice_mute(&mut policy);
+        assert!(policy.muted());
+
+        // The session boundary clears the cache so the next application restores
+        // the persisted preference rather than carrying a temporary toggle forward.
+        last_saved_mute = None;
+        apply_saved_voice_mute(&mut policy, false, &mut last_saved_mute);
+        assert!(!policy.muted());
     }
 
     #[test]

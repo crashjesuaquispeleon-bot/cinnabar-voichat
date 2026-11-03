@@ -157,6 +157,7 @@ impl Action {
                 | Self::UiTabNext
                 | Self::UiTabPrevious
                 | Self::ToggleVoiceMute
+                | Self::ToggleVoiceMute
         )
     }
 

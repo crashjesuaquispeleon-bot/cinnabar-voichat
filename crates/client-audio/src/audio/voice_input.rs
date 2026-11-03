@@ -41,6 +41,7 @@ pub struct VoiceInputPolicy {
     session_active: bool,
     muted: bool,
     push_to_talk_held: bool,
+    push_to_talk_requires_release: bool,
 }
 
 impl Default for VoiceInputPolicy {
@@ -52,6 +53,7 @@ impl Default for VoiceInputPolicy {
             session_active: false,
             muted: false,
             push_to_talk_held: false,
+            push_to_talk_requires_release: false,
         }
     }
 }
@@ -61,7 +63,7 @@ impl VoiceInputPolicy {
     pub fn set_permission(&mut self, permission: MicrophonePermission) {
         self.permission = permission;
         if permission != MicrophonePermission::Granted {
-            self.push_to_talk_held = false;
+            self.require_push_to_talk_release();
         }
     }
 
@@ -69,7 +71,7 @@ impl VoiceInputPolicy {
     pub fn set_enabled(&mut self, enabled: bool) {
         self.enabled = enabled;
         if !enabled {
-            self.push_to_talk_held = false;
+            self.require_push_to_talk_release();
         }
     }
 
@@ -77,14 +79,14 @@ impl VoiceInputPolicy {
     pub fn set_session_active(&mut self, active: bool) {
         self.session_active = active;
         if !active {
-            self.push_to_talk_held = false;
+            self.require_push_to_talk_release();
         }
     }
 
     /// Selects open microphone or PTT. A mode change requires a fresh PTT press.
     pub fn set_mode(&mut self, mode: MicrophoneMode) {
         if self.mode != mode {
-            self.push_to_talk_held = false;
+            self.require_push_to_talk_release();
         }
         self.mode = mode;
     }
@@ -93,17 +95,34 @@ impl VoiceInputPolicy {
     pub fn set_muted(&mut self, muted: bool) {
         self.muted = muted;
         if muted {
-            self.push_to_talk_held = false;
+            self.require_push_to_talk_release();
         }
     }
 
     /// Updates the physical PTT state supplied by the input adapter.
+    ///
+    /// Any mute, permission loss, disable, session end or mode change requires an
+    /// observed release before a later press can transmit. A key held across a privacy
+    /// boundary therefore cannot become active again merely because that boundary clears.
     pub fn set_push_to_talk_held(&mut self, held: bool) {
-        self.push_to_talk_held = held
-            && self.permission == MicrophonePermission::Granted
+        if !held {
+            self.push_to_talk_held = false;
+            self.push_to_talk_requires_release = false;
+            return;
+        }
+        if self.push_to_talk_requires_release {
+            self.push_to_talk_held = false;
+            return;
+        }
+        self.push_to_talk_held = self.permission == MicrophonePermission::Granted
             && self.enabled
             && self.session_active
             && !self.muted;
+    }
+
+    fn require_push_to_talk_release(&mut self) {
+        self.push_to_talk_held = false;
+        self.push_to_talk_requires_release = true;
     }
 
     /// Whether opening/keeping the local input device is permitted after a successful grant.
@@ -201,6 +220,7 @@ mod tests {
     fn push_to_talk_requires_a_fresh_press_and_release() {
         let mut policy = ready();
         policy.set_mode(MicrophoneMode::PushToTalk);
+        policy.set_push_to_talk_held(false);
         assert!(!policy.transmission_permitted());
         policy.set_push_to_talk_held(true);
         assert!(policy.transmission_permitted());
@@ -212,6 +232,7 @@ mod tests {
     fn mute_disconnect_and_permission_revocation_stop_transmission_immediately() {
         let mut policy = ready();
         policy.set_mode(MicrophoneMode::PushToTalk);
+        policy.set_push_to_talk_held(false);
         policy.set_push_to_talk_held(true);
         assert!(policy.transmission_permitted());
 
@@ -229,6 +250,7 @@ mod tests {
         assert!(!policy.transmission_permitted());
 
         policy.set_session_active(true);
+        policy.set_push_to_talk_held(false);
         policy.set_push_to_talk_held(true);
         policy.set_permission(MicrophonePermission::Denied);
         assert!(!policy.capture_permitted());
@@ -236,9 +258,29 @@ mod tests {
     }
 
     #[test]
+    fn ptt_must_be_physically_released_after_quick_mute_is_cleared() {
+        let mut policy = ready();
+        policy.set_mode(MicrophoneMode::PushToTalk);
+        policy.set_push_to_talk_held(false);
+        policy.set_push_to_talk_held(true);
+        assert!(policy.transmission_permitted());
+
+        policy.set_muted(true);
+        policy.set_push_to_talk_held(true);
+        policy.set_muted(false);
+        policy.set_push_to_talk_held(true);
+        assert!(!policy.transmission_permitted());
+
+        policy.set_push_to_talk_held(false);
+        policy.set_push_to_talk_held(true);
+        assert!(policy.transmission_permitted());
+    }
+
+    #[test]
     fn changing_mode_or_disabling_voice_cannot_reuse_a_stale_ptt_press() {
         let mut policy = ready();
         policy.set_mode(MicrophoneMode::PushToTalk);
+        policy.set_push_to_talk_held(false);
         policy.set_push_to_talk_held(true);
         policy.set_mode(MicrophoneMode::OpenMicrophone);
         policy.set_mode(MicrophoneMode::PushToTalk);

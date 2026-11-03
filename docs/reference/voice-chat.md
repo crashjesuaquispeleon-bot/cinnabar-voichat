@@ -176,3 +176,16 @@ Router and launcher tests cover PTT press/hold/release and remapping. OS permiss
 The capture device can remain open to avoid repeatedly opening the OS microphone for every PTT press, but the PCM queue is closed unless the selected activation mode currently permits transmission. The queue advances a generation whenever this gate changes. Each callback frame is tagged with the generation it observed, and the consumer rejects frames from an older generation. This prevents a callback already in flight during PTT release, mute or session shutdown from being replayed after the gate reopens.
 
 This is a local capture/queue privacy boundary only. The future network sender must independently enforce the same current-session and `transmission_permitted()` checks before encoding or sending any frame.
+
+
+## Local loopback mixer attachment
+
+The microphone callback now fans each accepted 20 ms PCM frame into two independently bounded queues:
+- the transmit queue, reserved for the future network encoder/sender;
+- the monitor queue, consumed only by local playback.
+
+This separation is required because queue reads are destructive. A local loopback consumer must never drain the only copy of a frame before the network sender can read it. Both queues share the same transmission-policy gate and generation invalidation, so PTT release, mute, permission loss, and session teardown close and clear both destinations together.
+
+VoiceLoopbackSource is a pull-driven rodio source attached through the existing AudioDevice::play_source path. The attachment system waits for the existing named-audio device to become available and adds at most one source. It does not open another output device. If the app has no named-audio carrier, the device is disabled, or output initialization fails, attachment remains a no-op and the client continues without local monitoring.
+
+The loopback source is still a local monitor only. It does not implement the voice network, remote playback, room membership, or server authorization. The monitor must remain independently muteable without changing capture/transmission policy.

@@ -1,8 +1,8 @@
 //! Local microphone stream ownership boundary.
 //!
-//! Opening a real CPAL input stream is the next platform step. This module defines the
-//! handle and conversion helpers so a dedicated owner thread can start/stop capture and
-//! push fixed frames into [`super::voice_pcm::BoundedPcmQueue`] without touching Bevy.
+//! The native CPAL opener owns the input stream on a dedicated thread and pushes fixed
+//! frames into [`super::voice_pcm::BoundedPcmQueue`] without touching Bevy. The mock
+//! implementation keeps lifecycle and conversion tests independent of physical devices.
 
 use super::voice_pcm::{BoundedPcmQueue, PcmFrame, VOICE_FRAME_SAMPLES, VOICE_SAMPLE_RATE};
 use std::sync::Arc;

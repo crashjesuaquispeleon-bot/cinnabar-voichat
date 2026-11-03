@@ -304,9 +304,7 @@ impl MicrophoneWorker {
     }
 
     /// Polls for an event without blocking the caller's frame schedule.
-    pub fn try_recv(
-        &self,
-    ) -> Result<MicrophoneWorkerEvent, std::sync::mpsc::TryRecvError> {
+    pub fn try_recv(&self) -> Result<MicrophoneWorkerEvent, std::sync::mpsc::TryRecvError> {
         self.events.try_recv()
     }
 
@@ -351,9 +349,12 @@ where
                     let unavailable_id = active_id.take();
                     backend.stop();
                     catalog.invalidate();
-                    if event_tx.send(MicrophoneWorkerEvent::DeviceUnavailable {
-                        device_id: unavailable_id,
-                    }).is_err() {
+                    if event_tx
+                        .send(MicrophoneWorkerEvent::DeviceUnavailable {
+                            device_id: unavailable_id,
+                        })
+                        .is_err()
+                    {
                         break;
                     }
                 }
@@ -598,8 +599,8 @@ mod tests {
     fn owner_worker_refreshes_and_selects_exact_current_device() {
         use std::rc::Rc;
         use std::sync::{
-            atomic::{AtomicU32, Ordering},
             Arc,
+            atomic::{AtomicU32, Ordering},
         };
 
         struct LocalOnlyBackend {
@@ -644,23 +645,34 @@ mod tests {
         .unwrap();
 
         worker.send(MicrophoneWorkerCommand::Refresh).unwrap();
-        let MicrophoneWorkerEvent::Devices(devices) = worker.recv_timeout(std::time::Duration::from_secs(2)).unwrap() else {
+        let MicrophoneWorkerEvent::Devices(devices) = worker
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .unwrap()
+        else {
             panic!("expected refreshed device list");
         };
         assert_eq!(devices.len(), 2);
         assert_ne!(devices[0].id, devices[1].id);
 
-        worker.send(MicrophoneWorkerCommand::Select(MicrophoneSelection::Device(
-            devices[1].id.clone(),
-        ))).unwrap();
+        worker
+            .send(MicrophoneWorkerCommand::Select(
+                MicrophoneSelection::Device(devices[1].id.clone()),
+            ))
+            .unwrap();
         assert_eq!(
-            worker.recv_timeout(std::time::Duration::from_secs(2)).unwrap(),
-            MicrophoneWorkerEvent::Selected { device_id: devices[1].id.clone() }
+            worker
+                .recv_timeout(std::time::Duration::from_secs(2))
+                .unwrap(),
+            MicrophoneWorkerEvent::Selected {
+                device_id: devices[1].id.clone()
+            }
         );
 
-        worker.send(MicrophoneWorkerCommand::Select(MicrophoneSelection::Device(
-            "stale-token".to_owned(),
-        ))).unwrap();
+        worker
+            .send(MicrophoneWorkerCommand::Select(
+                MicrophoneSelection::Device("stale-token".to_owned()),
+            ))
+            .unwrap();
         assert_eq!(
             worker.recv_timeout(std::time::Duration::from_secs(2)).unwrap(),
             MicrophoneWorkerEvent::SelectionRejected(MicrophoneSelectionError::DeviceUnavailable)
@@ -674,8 +686,8 @@ mod tests {
     fn owner_worker_switches_exact_devices_and_stops_on_shutdown() {
         use std::rc::Rc;
         use std::sync::{
-            atomic::{AtomicBool, AtomicU32, Ordering},
             Arc,
+            atomic::{AtomicBool, AtomicU32, Ordering},
         };
 
         struct SwitchingBackend {
@@ -740,9 +752,9 @@ mod tests {
         };
 
         worker
-            .send(MicrophoneWorkerCommand::Select(MicrophoneSelection::Device(
-                devices[0].id.clone(),
-            )))
+            .send(MicrophoneWorkerCommand::Select(
+                MicrophoneSelection::Device(devices[0].id.clone()),
+            ))
             .unwrap();
         assert_eq!(
             worker
@@ -755,9 +767,9 @@ mod tests {
         assert_eq!(selected.load(Ordering::Acquire), 1);
 
         worker
-            .send(MicrophoneWorkerCommand::Select(MicrophoneSelection::Device(
-                devices[1].id.clone(),
-            )))
+            .send(MicrophoneWorkerCommand::Select(
+                MicrophoneSelection::Device(devices[1].id.clone()),
+            ))
             .unwrap();
         assert_eq!(
             worker
@@ -781,9 +793,7 @@ mod tests {
             worker
                 .recv_timeout(std::time::Duration::from_secs(2))
                 .unwrap(),
-            MicrophoneWorkerEvent::SelectionRejected(
-                MicrophoneSelectionError::DeviceUnavailable
-            )
+            MicrophoneWorkerEvent::SelectionRejected(MicrophoneSelectionError::DeviceUnavailable)
         );
         assert_eq!(selected.load(Ordering::Acquire), 2);
         assert!(running.load(Ordering::Acquire));
@@ -797,8 +807,8 @@ mod tests {
     #[test]
     fn owner_worker_reports_disconnect_and_invalidates_the_selected_token() {
         use std::sync::{
-            atomic::{AtomicBool, Ordering},
             Arc,
+            atomic::{AtomicBool, Ordering},
         };
 
         struct DisconnectBackend {
@@ -843,9 +853,9 @@ mod tests {
         let selected_id = devices[0].id.clone();
 
         worker
-            .send(MicrophoneWorkerCommand::Select(MicrophoneSelection::Device(
-                selected_id.clone(),
-            )))
+            .send(MicrophoneWorkerCommand::Select(
+                MicrophoneSelection::Device(selected_id.clone()),
+            ))
             .unwrap();
         assert_eq!(
             worker
@@ -870,9 +880,9 @@ mod tests {
 
         // The worker invalidates the old generation and never substitutes the default.
         worker
-            .send(MicrophoneWorkerCommand::Select(MicrophoneSelection::Device(
-                selected_id,
-            )))
+            .send(MicrophoneWorkerCommand::Select(
+                MicrophoneSelection::Device(selected_id),
+            ))
             .unwrap();
         assert_eq!(
             worker

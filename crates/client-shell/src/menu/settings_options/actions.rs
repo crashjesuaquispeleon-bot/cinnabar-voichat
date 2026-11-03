@@ -218,3 +218,80 @@ impl MenuRuntime {
         }
     }
 }
+
+#[cfg(test)]
+mod microphone_settings_tests {
+    use crate::menu::MenuRuntime;
+    use launcher::menu::{
+        MenuAction,
+        view::{MicrophoneDeviceView, MicrophoneSelectionRequest},
+    };
+
+    fn menu() -> MenuRuntime {
+        MenuRuntime::new(true, 2, "Microphone test".to_owned())
+    }
+
+    #[test]
+    fn refresh_request_is_one_shot_and_device_choice_is_transient() {
+        let mut menu = menu();
+        menu.activate_from_input(MenuAction::SettingsMicrophoneRefresh);
+        assert!(menu.take_microphone_refresh_request());
+        assert!(!menu.take_microphone_refresh_request());
+
+        menu.publish_microphone_devices(vec![MicrophoneDeviceView {
+            id: "snapshot-token-a".to_owned(),
+            name: "USB Microphone".to_owned(),
+            is_default: true,
+        }]);
+        let revision = menu.view().microphone_devices_revision;
+        menu.activate_from_input(MenuAction::SettingsMicrophoneSelect(0, revision));
+        assert_eq!(
+            menu.take_microphone_selection_request(),
+            Some(MicrophoneSelectionRequest::Device(
+                "snapshot-token-a".to_owned()
+            ))
+        );
+
+        // The opaque token belongs only to the menu's transient request and is not a saved option.
+        assert!(!serde_json::to_string(menu.settings_snapshot().0.as_ref())
+            .unwrap()
+            .contains("snapshot-token-a"));
+    }
+
+    #[test]
+    fn stale_device_row_revision_is_rejected_after_refresh() {
+        let mut menu = menu();
+        menu.publish_microphone_devices(vec![MicrophoneDeviceView {
+            id: "old-snapshot-token".to_owned(),
+            name: "Old microphone".to_owned(),
+            is_default: false,
+        }]);
+        let stale_revision = menu.view().microphone_devices_revision;
+
+        menu.publish_microphone_devices(vec![MicrophoneDeviceView {
+            id: "fresh-snapshot-token".to_owned(),
+            name: "New microphone".to_owned(),
+            is_default: true,
+        }]);
+        menu.activate_from_input(MenuAction::SettingsMicrophoneSelect(
+            0,
+            stale_revision,
+        ));
+
+        assert_eq!(menu.take_microphone_selection_request(), None);
+        assert_eq!(
+            menu.view().microphone_message.as_deref(),
+            Some("The microphone list changed. Refresh it before selecting a device.")
+        );
+    }
+
+    #[test]
+    fn system_default_request_is_explicit_and_not_a_persisted_device_token() {
+        let mut menu = menu();
+        menu.activate_from_input(MenuAction::SettingsMicrophoneUseSystemDefault);
+        assert_eq!(
+            menu.take_microphone_selection_request(),
+            Some(MicrophoneSelectionRequest::SystemDefault)
+        );
+    }
+}

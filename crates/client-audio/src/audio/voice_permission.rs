@@ -5,8 +5,8 @@
 //! success means the process can capture; errors that look like access denial mean Denied.
 //! macOS still requires `NSMicrophoneUsageDescription` in the bundle (already added).
 
-use super::voice_stream::VoiceCaptureError;
 use super::voice_input::MicrophonePermission;
+use super::voice_stream::VoiceCaptureError;
 
 /// Classifies an open failure for policy updates.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -94,10 +94,7 @@ mod tests {
             CaptureOpenOutcome::Transient
         );
         assert_eq!(
-            permission_after_outcome(
-                MicrophonePermission::Unknown,
-                CaptureOpenOutcome::Transient
-            ),
+            permission_after_outcome(MicrophonePermission::Unknown, CaptureOpenOutcome::Transient),
             MicrophonePermission::Unknown
         );
     }
@@ -105,10 +102,7 @@ mod tests {
     #[test]
     fn success_grants() {
         assert_eq!(
-            permission_after_outcome(
-                MicrophonePermission::Unknown,
-                outcome_from_success()
-            ),
+            permission_after_outcome(MicrophonePermission::Unknown, outcome_from_success()),
             MicrophonePermission::Granted
         );
     }

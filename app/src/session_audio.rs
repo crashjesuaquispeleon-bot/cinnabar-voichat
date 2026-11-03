@@ -147,35 +147,81 @@ mod voice_settings_tests {
         let mut policy = VoiceInputPolicy::default();
         policy.set_permission(client_audio::audio::voice_input::MicrophonePermission::Granted);
         policy.set_session_active(true);
-        apply_voice_chat_settings(
-            &mut policy,
-            &ui::VoiceChatSettings {
-                enabled: true,
-                muted: false,
-                activation_mode: ui::VoiceActivationMode::OpenMicrophone,
-            },
-        );
+        let mut last_saved_mute = None;
+        let unmuted = ui::VoiceChatSettings {
+            enabled: true,
+            muted: false,
+            activation_mode: ui::VoiceActivationMode::OpenMicrophone,
+        };
+        apply_voice_chat_settings(&mut policy, &unmuted);
+        apply_saved_voice_mute(&mut policy, unmuted.muted, &mut last_saved_mute);
         assert!(policy.transmission_permitted());
 
-        apply_voice_chat_settings(
-            &mut policy,
-            &ui::VoiceChatSettings {
-                enabled: true,
-                muted: true,
-                activation_mode: ui::VoiceActivationMode::OpenMicrophone,
-            },
-        );
+        apply_saved_voice_mute(&mut policy, true, &mut last_saved_mute);
         assert!(policy.enabled());
         assert!(!policy.transmission_permitted());
 
-        apply_voice_chat_settings(
-            &mut policy,
-            &ui::VoiceChatSettings {
-                enabled: true,
-                muted: false,
-                activation_mode: ui::VoiceActivationMode::OpenMicrophone,
-            },
-        );
+        apply_saved_voice_mute(&mut policy, false, &mut last_saved_mute);
+        assert!(policy.transmission_permitted());
+    }
+
+    #[test]
+    fn quick_mute_toggles_and_saved_mute_changes_reset_the_runtime_override() {
+        let mut policy = VoiceInputPolicy::default();
+        policy.set_permission(client_audio::audio::voice_input::MicrophonePermission::Granted);
+        policy.set_session_active(true);
+        let mut last_saved_mute = None;
+        let settings = ui::VoiceChatSettings {
+            enabled: true,
+            muted: false,
+            activation_mode: ui::VoiceActivationMode::OpenMicrophone,
+        };
+        apply_voice_chat_settings(&mut policy, &settings);
+        apply_saved_voice_mute(&mut policy, settings.muted, &mut last_saved_mute);
+        assert!(policy.transmission_permitted());
+
+        toggle_quick_voice_mute(&mut policy);
+        assert!(policy.muted());
+        assert!(!policy.transmission_permitted());
+
+        // The router reports a fresh pressed edge once, not on repeated held frames.
+        toggle_quick_voice_mute(&mut policy);
+        assert!(!policy.muted());
+        assert!(policy.transmission_permitted());
+
+        // A persisted Sound-panel edit becomes the new baseline.
+        toggle_quick_voice_mute(&mut policy);
+        assert!(policy.muted());
+        apply_saved_voice_mute(&mut policy, true, &mut last_saved_mute);
+        assert!(policy.muted());
+        toggle_quick_voice_mute(&mut policy);
+        assert!(!policy.muted());
+        assert!(policy.transmission_permitted());
+    }
+
+    #[test]
+    fn quick_mute_does_not_restore_a_ptt_press_that_started_before_muting() {
+        let mut policy = VoiceInputPolicy::default();
+        policy.set_permission(client_audio::audio::voice_input::MicrophonePermission::Granted);
+        policy.set_session_active(true);
+        let settings = ui::VoiceChatSettings {
+            enabled: true,
+            muted: false,
+            activation_mode: ui::VoiceActivationMode::PushToTalk,
+        };
+        apply_voice_chat_settings(&mut policy, &settings);
+        let mut last_saved_mute = None;
+        apply_saved_voice_mute(&mut policy, settings.muted, &mut last_saved_mute);
+        policy.set_push_to_talk_held(true);
+        assert!(policy.transmission_permitted());
+
+        toggle_quick_voice_mute(&mut policy);
+        assert!(!policy.transmission_permitted());
+        toggle_quick_voice_mute(&mut policy);
+        assert!(!policy.transmission_permitted());
+
+        // A fresh PTT held phase is required after unmuting.
+        policy.set_push_to_talk_held(true);
         assert!(policy.transmission_permitted());
     }
 

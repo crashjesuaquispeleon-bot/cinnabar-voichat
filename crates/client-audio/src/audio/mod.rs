@@ -18,6 +18,7 @@ pub mod systems;
 mod voice;
 mod water;
 pub mod weather;
+pub mod voice_capture;
 pub mod voice_input;
 
 pub use bank::{SoundBank, SoundDecodeDriver, SoundDecodeRequest, sound_bank_path};

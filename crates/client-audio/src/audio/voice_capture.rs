@@ -894,9 +894,9 @@ mod tests {
         };
 
         worker
-            .send(MicrophoneWorkerCommand::Select(MicrophoneSelection::Device(
-                devices[0].id.clone(),
-            )))
+            .send(MicrophoneWorkerCommand::Select(
+                MicrophoneSelection::Device(devices[0].id.clone()),
+            ))
             .unwrap();
         assert_eq!(
             worker

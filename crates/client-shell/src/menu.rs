@@ -858,6 +858,7 @@ impl MenuRuntime {
             | MenuAction::SettingsAdvancedGraphics
             | MenuAction::SettingsMicrophoneRefresh
             | MenuAction::SettingsMicrophoneUseSystemDefault
+            | MenuAction::SettingsMicrophoneRetryPermission
             | MenuAction::SettingsMicrophoneSelect(..)
             | MenuAction::EditTouchControls) => self.activate_settings(action),
             MenuAction::Respawn => {

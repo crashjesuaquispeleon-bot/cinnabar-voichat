@@ -11,11 +11,28 @@ use semantic_input::Action;
 /// Copies saved, local voice preferences into the capture policy.
 fn apply_voice_chat_settings(policy: &mut VoiceInputPolicy, settings: &ui::VoiceChatSettings) {
     policy.set_enabled(settings.enabled);
-    policy.set_muted(settings.muted);
     policy.set_mode(match settings.activation_mode {
         ui::VoiceActivationMode::OpenMicrophone => MicrophoneMode::OpenMicrophone,
         ui::VoiceActivationMode::PushToTalk => MicrophoneMode::PushToTalk,
     });
+}
+
+/// Applies the saved Sound-panel mute only when that preference changes.
+/// This allows the in-game quick-mute action to override it between settings edits.
+fn apply_saved_voice_mute(
+    policy: &mut VoiceInputPolicy,
+    saved_muted: bool,
+    last_saved_mute: &mut Option<bool>,
+) {
+    if *last_saved_mute != Some(saved_muted) {
+        policy.set_muted(saved_muted);
+        *last_saved_mute = Some(saved_muted);
+    }
+}
+
+/// Toggles the current local mute state after a one-shot semantic input press.
+fn toggle_quick_voice_mute(policy: &mut VoiceInputPolicy) {
+    policy.set_muted(!policy.muted());
 }
 
 /// Borrows current owner facts and forwards them at the existing system boundary.
@@ -33,6 +50,7 @@ pub(crate) fn drain_sequenced_audio_into_session(
     input: Res<client_state::SemanticInputSnapshot>,
     settings: Res<client_state::RuntimeSettings>,
     mut voice_session: Local<Option<(u64, u64)>>,
+    mut last_saved_voice_mute: Local<Option<bool>>,
 ) {
     // Bind microphone lifetime to the exact local WorldStream lifetime and the
     // session generation. A transfer/reconnect can replace the stream without
@@ -50,10 +68,17 @@ pub(crate) fn drain_sequenced_audio_into_session(
     }
     // Saved Sound-panel preferences configure the local voice policy. Voice stays
     // disabled by default; capture still requires OS permission and a live game session.
-    apply_voice_chat_settings(
+    let voice_settings = &settings.user_settings_update().1.voice_chat;
+    apply_voice_chat_settings(&mut voice_policy, voice_settings);
+    apply_saved_voice_mute(
         &mut voice_policy,
-        &settings.user_settings_update().1.voice_chat,
+        voice_settings.muted,
+        &mut last_saved_voice_mute,
     );
+    // Quick mute is a remappable one-shot action, not frame-by-frame key polling.
+    if input.phase(Action::ToggleVoiceMute).pressed {
+        toggle_quick_voice_mute(&mut voice_policy);
+    }
     // PTT is sourced from the finalized semantic action, never raw keyboard polling.
     // Missing/stale snapshots report the neutral released phase.
     voice_policy.set_push_to_talk_held(input.phase(Action::PushToTalk).held);

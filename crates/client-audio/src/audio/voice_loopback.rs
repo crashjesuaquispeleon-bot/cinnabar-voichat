@@ -10,9 +10,12 @@
 use super::voice::OUTPUT_RATE;
 use super::voice_pcm::{BoundedPcmQueue, VOICE_FRAME_SAMPLES, VOICE_SAMPLE_RATE};
 use super::voice_stream::SharedPcmQueue;
-use rodio::Source;
 use bevy::prelude::{NonSendMut, Res, ResMut, Resource};
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use rodio::Source;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::time::Duration;
 
 /// Pulls mono voice frames and emits interleaved stereo samples for the game mixer.
@@ -55,7 +58,11 @@ impl VoiceLoopbackSource {
     }
 
     pub fn set_gain(&mut self, gain: f32) {
-        self.gain = if gain.is_finite() { gain.clamp(0.0, 2.0) } else { 0.0 };
+        self.gain = if gain.is_finite() {
+            gain.clamp(0.0, 2.0)
+        } else {
+            0.0
+        };
     }
 
     fn pull_frame(&mut self) {
@@ -82,7 +89,11 @@ impl Iterator for VoiceLoopbackSource {
             }
             return Some(0.0);
         }
-        if self.current.as_ref().is_some_and(|frame| !frame.is_current_for(&self.queue)) {
+        if self
+            .current
+            .as_ref()
+            .is_some_and(|frame| !frame.is_current_for(&self.queue))
+        {
             self.current = None;
             self.index = 0;
             self.pending_right = None;
@@ -126,19 +137,6 @@ impl Source for VoiceLoopbackSource {
     fn total_duration(&self) -> Option<Duration> {
         None
     }
-}
-
-/// Test helper: drain up to `max_frames` accepted frames into a contiguous mono buffer.
-#[cfg(test)]
-pub fn drain_mono_for_test(queue: &BoundedPcmQueue, max_frames: usize) -> Vec<f32> {
-    let mut out = Vec::new();
-    for _ in 0..max_frames {
-        match queue.pop() {
-            Some(frame) => out.extend_from_slice(frame.samples()),
-            None => break,
-        }
-    }
-    out
 }
 
 #[cfg(test)]
@@ -280,12 +278,13 @@ mod tests {
         queue.push(frame);
 
         let mut source = VoiceLoopbackSource::new(Arc::clone(&queue));
-        source.mute_flag().store(true, std::sync::atomic::Ordering::Release);
+        source
+            .mute_flag()
+            .store(true, std::sync::atomic::Ordering::Release);
         let silenced: Vec<f32> = source.by_ref().take(4).collect();
         assert!(silenced.iter().all(|s| *s == 0.0));
     }
 }
-
 
 /// Tracks the one local monitor source attached to the shared named-audio mixer.
 ///

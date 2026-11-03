@@ -78,6 +78,9 @@ impl SettingsOptions {
             2 => PerspectiveMode::ThirdPersonFront,
             _ => PerspectiveMode::FirstPerson,
         };
+        settings.voice_chat.enabled = self.value(SettingId::VoiceChatEnabled) != 0;
+        settings.voice_chat.activation_mode =
+            ui::VoiceActivationMode::from_value(self.value(SettingId::VoiceActivationMode));
         settings
     }
 }

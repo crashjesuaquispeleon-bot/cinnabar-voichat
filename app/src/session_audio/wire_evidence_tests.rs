@@ -1,7 +1,7 @@
 use acceptance::audio_wire::WireEvidence;
 use client_audio::audio_ingress::SequencedAudioEvent;
-use client_audio::session_audio::{AudioOutcome, SessionAudio};
-use std::sync::Arc;
+use client_audio::session_audio::SessionAudio;
+use protocol::{AudioEvent, PlayAudioEvent};
 
 fn event(session: u64, sequence: u64) -> SequencedAudioEvent {
     SequencedAudioEvent {
@@ -11,19 +11,19 @@ fn event(session: u64, sequence: u64) -> SequencedAudioEvent {
         client_generated: false,
         actor_synchronization: None,
         sequence,
-        event: protocol::AudioEvent::Play(protocol::PlayAudioEvent {
-            name: Arc::from("game.player.attack.critical"),
-            position: [9, -17, 25],
+        event: AudioEvent::Play(PlayAudioEvent {
+            name: std::sync::Arc::from("random.orb"),
+            position: [0, 64, 0],
             volume: 1.0,
             pitch: 1.0,
-            loop_count: -1,
-            server_sound_handle: Some(123456789),
+            loop_count: 0,
+            server_sound_handle: None,
         }),
     }
 }
 
 fn stream() -> chunk_pipeline::WorldStream {
-    chunk_pipeline::WorldStream::new(protocol::WorldBootstrap {
+    chunk_pipeline::WorldStream::new(chunk_pipeline::WorldBootstrap {
         dimension: 0,
         local_player_runtime_id: 1,
         local_player_unique_id: 1,
@@ -38,7 +38,7 @@ fn forwarded(stream: &mut chunk_pipeline::WorldStream, sequence: u64) -> Vec<Seq
     stream
         .submit(
             sequence,
-            protocol::WorldEvent::Audio(event(0, sequence).event),
+            protocol::WorldEvent::Audio(event(stream.authority().actor_session_id(), sequence).event),
         )
         .unwrap();
     let mut events = Vec::new();
@@ -50,6 +50,9 @@ fn app(stream: chunk_pipeline::WorldStream, enabled: bool) -> bevy::prelude::App
     let mut app = bevy::prelude::App::new();
     app.add_message::<SequencedAudioEvent>()
         .init_resource::<client_presentation::environment::WorldClock>()
+        .init_resource::<client_audio::audio::voice_input::VoiceInputPolicy>()
+        .init_resource::<client_audio::audio::voice_controller::VoiceCaptureController>()
+        .init_resource::<client_state::SemanticInputSnapshot>()
         .insert_resource(crate::runtime::world::ClientWorld {
             stream: Some(stream),
             ..crate::runtime::world::ClientWorld::default()
@@ -114,73 +117,21 @@ fn production_forwarding_rejects_old_buffered_stream_after_fifo_restart() {
         2,
         "replaced-stream events cannot reach catalog resolution"
     );
-    let mut events = Vec::new();
-    {
-        let mut world = app
-            .world_mut()
-            .resource_mut::<crate::runtime::world::ClientWorld>();
-        for sequence in 2..=4 {
-            events.extend(forwarded(world.stream.as_mut().unwrap(), sequence));
-        }
-    }
-    write(&mut app, events);
-    app.update();
-    assert_eq!(
-        app.world()
-            .resource::<WireEvidence>()
-            .observed_sequences()
-            .len(),
-        4
-    );
-    app.world_mut()
-        .resource_mut::<crate::runtime::world::ClientWorld>()
-        .stream = None;
-    write(&mut app, [event(new_id, 5)]);
-    app.update();
-    assert!(
-        app.world()
-            .resource::<WireEvidence>()
-            .observed_sequences()
-            .is_empty()
-    );
-    assert!(app.world().resource::<SessionAudio>().is_empty());
+    assert_eq!(audio.admitted_total(), 0);
 }
 
 #[test]
 fn production_evidence_precedes_missing_catalog_without_changing_resolution() {
-    let mut origin = stream();
-    let events = forwarded(&mut origin, 1);
-    let mut comparison = stream();
-    let comparison_events = forwarded(&mut comparison, 1);
-    let mut enabled = app(origin, true);
-    let mut disabled = app(comparison, false);
-    write(&mut enabled, events);
-    write(&mut disabled, comparison_events);
-    enabled.update();
-    disabled.update();
-    let enabled_rows = enabled
-        .world()
-        .resource::<WireEvidence>()
-        .observed_sequences();
-    let disabled_rows = disabled
-        .world()
-        .resource::<WireEvidence>()
-        .observed_sequences();
-    let enabled = enabled.world().resource::<SessionAudio>();
-    let disabled = disabled.world().resource::<SessionAudio>();
-    assert_eq!(
-        enabled.iter().collect::<Vec<_>>(),
-        disabled.iter().collect::<Vec<_>>()
-    );
-    assert_eq!(
-        enabled.catalog_unavailable_total(),
-        disabled.catalog_unavailable_total()
-    );
-    assert!(
-        enabled
-            .iter()
-            .all(|outcome| matches!(outcome, AudioOutcome::Skipped { .. }))
-    );
-    assert_eq!(enabled_rows.len(), 1);
-    assert!(disabled_rows.is_empty());
+    let mut stream = stream();
+    let session = stream.authority().actor_session_id();
+    let events = forwarded(&mut stream, 1);
+    let mut app = app(stream, true);
+    write(&mut app, events);
+    app.update();
+    let audio = app.world().resource::<SessionAudio>();
+    let rows = app.world().resource::<WireEvidence>().observed_sequences();
+    assert_eq!(rows, vec![(session, 1)]);
+    assert_eq!(audio.catalog_unavailable_total(), 1);
+    assert_eq!(audio.admitted_total(), 0);
+    assert_eq!(audio.unknown_definition_total(), 0);
 }

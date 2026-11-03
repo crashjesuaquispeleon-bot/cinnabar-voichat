@@ -104,7 +104,7 @@ References:
 - [x] Implement a dedicated owner-thread CPAL opener with a synchronous ready/error handshake and exact 48 kHz `f32` / `i16` negotiation.
 - [x] Rate-limit transient microphone open failures and unexpected runtime stream stops with bounded exponential backoff; clear stale PCM before reopening.
 - [x] Wire capture policy to the active `WorldStream` lifecycle; stop and clear on disconnect, transfer or stream-generation change.
-- [ ] Add dedicated OS permission UX, denial recovery and a permission-status presentation. The in-game quick-mute action is implemented and remappable. Sound settings persist enablement, local mute, activation mode and input sensitivity.
+- [ ] Add dedicated OS permission UX and guided denial recovery. The Sound panel now displays the capture policy's best-effort permission status. The in-game quick-mute action is implemented and remappable. Sound settings persist enablement, local mute, activation mode and input sensitivity.
 - [x] Define mockable `VoiceCaptureOpener` / `VoiceCaptureStream` traits, fixed-frame accumulation, allocation-free conversion helpers, mock lifecycle tests, and the first native CPAL stream owner.
 - [x] Connect the remappable semantic PTT input and saved enablement/activation-mode settings to the policy.
 - [x] Add a bounded, thread-safe PCM frame queue with fixed internal format, explicit overflow accounting and a live policy-gated CPAL capture producer.
@@ -125,6 +125,10 @@ References:
 - [ ] Qualify Windows, macOS and Linux capture/playback and device switching.
 - [ ] Measure CPU, memory, bandwidth, end-to-end latency and queue drops at representative room sizes.
 - [ ] Document server deployment, configuration, privacy behavior and troubleshooting.
+
+## Microphone permission status
+
+The Sound panel reflects `VoiceInputPolicy` permission state as **Not checked**, **Granted** or **Denied**. The first permitted capture-open attempt is the probe: a successful stream marks Granted, an explicit access-denied outcome marks Denied, and missing devices/unsupported formats remain Unknown or retain the previous state. On desktop this is best-effort error classification, not a portable OS permission API; the native OS prompt may appear when the player enables Voice Chat in an active multiplayer session. A dedicated retry/deep-link flow for operating-system privacy settings remains pending.
 
 ## Microphone device selection
 

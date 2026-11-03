@@ -124,9 +124,17 @@ References:
 - [ ] Measure CPU, memory, bandwidth, end-to-end latency and queue drops at representative room sizes.
 - [ ] Document server deployment, configuration, privacy behavior and troubleshooting.
 
-## Local input policy implemented
+## Local capture and permission probe implemented
 
-`crates/client-audio/src/audio/voice_input.rs` now contains a pure lifecycle/privacy gate, registered by `ClientAudioPlugin`. The default is safe: permission unknown, voice disabled, no active multiplayer session and no activation mode selected. The user must explicitly select open-mic or PTT before transmission can occur. The future platform backend must consult `capture_permitted()` before opening a microphone and `transmission_permitted()` before forwarding frames. PTT state is cleared on mute, disable, permission loss, session end and mode changes, so a stale held-key state cannot reopen transmission. This is policy only: no OS device, microphone capture, physical key binding, PCM queue or loopback playback has been implemented yet.
+- `VoiceInputPolicy` remains closed by default: permission unknown, voice disabled, no active multiplayer session and no activation mode selected.
+- Native capture uses CPAL 0.15.3 through the existing `rodio::cpal` re-export. The default input device is opened on a dedicated owner thread; the current first slice accepts exact 48 kHz F32/I16 input only.
+- The first open attempt is the Stage-1 permission probe. A successful stream open marks permission Granted; explicit permission/access-denied-like errors mark Denied; missing devices and unsupported formats remain retryable. Error-string classification is best-effort, not a portable OS permission API or native permission dialog.
+- `VoiceCaptureController` opens only while voice is enabled and a multiplayer session is active. Unknown permission is probed once the controller attempts to open; Denied does not spin-reopen.
+- The capture callback writes fixed 20 ms mono frames into a bounded, preallocated queue. It does not allocate, log, encode or block.
+- The queue has a policy gate and generation tag. It accepts samples only while `transmission_permitted()` is true; PTT keeps the device open but does not retain microphone PCM until the held action is active. Mute, release, mode change, disconnect and session replacement close the gate, advance its epoch and retire stale in-flight frames.
+- macOS packaging includes `NSMicrophoneUsageDescription`. Native settings/deep-link UX, denial recovery, device selection, local loopback playback and network transport are still pending.
+
+The permission probe may open the microphone device while voice is enabled in a live session even if PTT is not held. The queue gate prevents samples from being retained or forwarded during that interval.
 
 ## Input and lifecycle adapter findings
 
@@ -161,4 +169,10 @@ The semantic input domain now includes `Action::PushToTalk` as a persistent held
 
 The app session-audio adapter reads only the finalized `SemanticInputSnapshot` phase for `Action::PushToTalk` and forwards its `held` value to `VoiceInputPolicy::set_push_to_talk_held()`. It runs after `ClientFrameSet::SemanticFinalize` and before `sync_voice_capture_with_policy`, so the controller observes the same frame's policy. Missing or cleared snapshots are neutral/released. The audio crate never reads Bevy keyboard state.
 
-A router integration test covers PTT press, continued hold, and release phases. OS microphone permission, PTT UI affordances, mute/settings UI, loopback and network transport remain separate follow-up work.
+Router and launcher tests cover PTT press/hold/release and remapping. OS permission settings UI, mute/settings UI, local loopback and network transport remain separate follow-up work.
+
+## PTT-aware PCM privacy gate
+
+The capture device can remain open to avoid repeatedly opening the OS microphone for every PTT press, but the PCM queue is closed unless the selected activation mode currently permits transmission. The queue advances a generation whenever this gate changes. Each callback frame is tagged with the generation it observed, and the consumer rejects frames from an older generation. This prevents a callback already in flight during PTT release, mute or session shutdown from being replayed after the gate reopens.
+
+This is a local capture/queue privacy boundary only. The future network sender must independently enforce the same current-session and `transmission_permitted()` checks before encoding or sending any frame.

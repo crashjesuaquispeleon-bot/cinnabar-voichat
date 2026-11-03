@@ -104,7 +104,7 @@ References:
 - [x] Implement a dedicated owner-thread CPAL opener with a synchronous ready/error handshake and exact 48 kHz `f32` / `i16` negotiation.
 - [x] Rate-limit transient microphone open failures and unexpected runtime stream stops with bounded exponential backoff; clear stale PCM before reopening.
 - [x] Wire capture policy to the active `WorldStream` lifecycle; stop and clear on disconnect, transfer or stream-generation change.
-- [ ] Add dedicated OS permission UX and guided denial recovery. The Sound panel now displays the capture policy's best-effort permission status. The in-game quick-mute action is implemented and remappable. Sound settings persist enablement, local mute, activation mode and input sensitivity.
+- [ ] Add OS-specific privacy-settings links and platform-qualified permission guidance. The Sound panel displays best-effort permission status and offers a denied-state retry after the player changes system privacy settings. The in-game quick-mute action is implemented and remappable. Sound settings persist enablement, local mute, activation mode and input sensitivity.
 - [x] Define mockable `VoiceCaptureOpener` / `VoiceCaptureStream` traits, fixed-frame accumulation, allocation-free conversion helpers, mock lifecycle tests, and the first native CPAL stream owner.
 - [x] Connect the remappable semantic PTT input and saved enablement/activation-mode settings to the policy.
 - [x] Add a bounded, thread-safe PCM frame queue with fixed internal format, explicit overflow accounting and a live policy-gated CPAL capture producer.
@@ -128,7 +128,7 @@ References:
 
 ## Microphone permission status
 
-The Sound panel reflects `VoiceInputPolicy` permission state as **Not checked**, **Granted** or **Denied**. The first permitted capture-open attempt is the probe: a successful stream marks Granted, an explicit access-denied outcome marks Denied, and missing devices/unsupported formats remain Unknown or retain the previous state. On desktop this is best-effort error classification, not a portable OS permission API; the native OS prompt may appear when the player enables Voice Chat in an active multiplayer session. A dedicated retry/deep-link flow for operating-system privacy settings remains pending.
+The Sound panel reflects `VoiceInputPolicy` permission state as **Not checked**, **Granted** or **Denied**. The first permitted capture-open attempt is the probe: a successful stream marks Granted, an explicit access-denied outcome marks Denied, and missing devices/unsupported formats remain Unknown or retain the previous state. On desktop this is best-effort error classification, not a portable OS permission API; the native OS prompt may appear when the player enables Voice Chat in an active multiplayer session. After the player changes system privacy settings, the Denied state offers **Retry**; it resets the permission to Unknown so the normal policy may attempt another open, but only while voice remains enabled in a live multiplayer session. The retry does not bypass OS access controls. OS-specific privacy-settings deep links and platform-qualified prompt guidance remain pending.
 
 ## Microphone device selection
 
@@ -146,7 +146,7 @@ The Sound settings panel includes a persisted **Voice Input Sensitivity** slider
 - `VoiceCaptureController` opens only while voice is enabled and a multiplayer session is active. Unknown permission is probed once the controller attempts to open; Denied does not spin-reopen. After a persistent worker loses its device, the controller deliberately does not reopen a different default device; it remains available for an explicit refresh and selection.
 - The capture callback writes fixed 20 ms mono frames into a bounded, preallocated queue. It does not allocate, log, encode or block.
 - The queue has a policy gate and generation tag. It accepts samples only while `transmission_permitted()` is true; PTT keeps the device open but does not retain microphone PCM until the held action is active. Mute, release, mode change, disconnect and session replacement close the gate, advance its epoch and retire stale in-flight frames.
-- macOS packaging includes `NSMicrophoneUsageDescription`. Native settings/deep-link UX, denial recovery, the visible device list, runtime loopback validation and network transport are still pending. The controller exposes nonblocking refresh, exact-device selection and worker-event polling, but no UI currently presents those APIs. A pull-driven loopback source and optional existing-mixer attachment are implemented in source but still need runtime/device validation.
+- macOS packaging includes `NSMicrophoneUsageDescription`. The Sound panel presents best-effort permission status, a denied-state retry and the native device list; OS-specific privacy-settings deep links and platform-qualified prompt behavior remain pending. The controller exposes nonblocking refresh, exact-device selection and worker-event polling, now routed through the menu. The mock loopback path is covered; real-device playback and shutdown still need platform qualification. Network transport remains a Stage-2 task.
 
 The permission probe may open the microphone device while voice is enabled in a live session even if PTT is not held. The queue gate prevents samples from being retained or forwarded during that interval.
 

@@ -91,7 +91,7 @@ A server-routed SFU is the leading option to evaluate for global rooms. A full-m
 
 ## Local input policy implemented
 
-`crates/client-audio/src/audio/voice_input.rs` now contains a pure lifecycle/privacy gate, registered by `ClientAudioPlugin`. The default is safe: permission unknown, voice disabled and no active multiplayer session. The future platform backend must consult `capture_permitted()` before opening a microphone and `transmission_permitted()` before forwarding frames. PTT state is cleared on mute, disable, permission loss, session end and mode changes, so a stale held-key state cannot reopen transmission. This is policy only: no OS device, microphone capture, physical key binding, PCM queue or loopback playback has been implemented yet.
+`crates/client-audio/src/audio/voice_input.rs` now contains a pure lifecycle/privacy gate, registered by `ClientAudioPlugin`. The default is safe: permission unknown, voice disabled, no active multiplayer session and no activation mode selected. The user must explicitly select open-mic or PTT before transmission can occur. The future platform backend must consult `capture_permitted()` before opening a microphone and `transmission_permitted()` before forwarding frames. PTT state is cleared on mute, disable, permission loss, session end and mode changes, so a stale held-key state cannot reopen transmission. This is policy only: no OS device, microphone capture, physical key binding, PCM queue or loopback playback has been implemented yet.
 
 ## Confirmed session-isolation behavior
 

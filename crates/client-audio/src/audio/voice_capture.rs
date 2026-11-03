@@ -566,11 +566,16 @@ mod tests {
 
     #[test]
     fn owner_worker_refreshes_and_selects_exact_current_device() {
-        use std::cell::Cell;
         use std::rc::Rc;
+        use std::sync::{
+            atomic::{AtomicU32, Ordering},
+            Arc,
+        };
 
         struct LocalOnlyBackend {
-            starts: Rc<Cell<u32>>,
+            starts: Arc<AtomicU32>,
+            // Deliberately !Send: this value is constructed and retained only on the worker.
+            _thread_local_marker: Rc<()>,
             running: bool,
         }
 
@@ -589,7 +594,7 @@ mod tests {
             }
 
             fn start(&mut self, _device: &Self::Device) -> Result<(), String> {
-                self.starts.set(self.starts.get() + 1);
+                self.starts.fetch_add(1, Ordering::Relaxed);
                 self.running = true;
                 Ok(())
             }
@@ -599,10 +604,11 @@ mod tests {
             }
         }
 
-        let starts = Rc::new(Cell::new(0));
-        let worker_starts = Rc::clone(&starts);
+        let starts = Arc::new(AtomicU32::new(0));
+        let worker_starts = Arc::clone(&starts);
         let worker = spawn_microphone_worker(move || LocalOnlyBackend {
             starts: worker_starts,
+            _thread_local_marker: Rc::new(()),
             running: false,
         })
         .unwrap();
@@ -631,7 +637,7 @@ mod tests {
         );
 
         worker.shutdown();
-        assert_eq!(starts.get(), 1);
+        assert_eq!(starts.load(Ordering::Relaxed), 1);
     }
 
     #[test]

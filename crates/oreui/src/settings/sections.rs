@@ -162,8 +162,7 @@ fn audio(content: &mut Content<'_, '_>) -> Result<(), PaintError> {
         let Ok(index) = u16::try_from(index) else {
             continue;
         };
-        let selected =
-            content.view.selected_microphone_id.as_deref() == Some(device.id.as_str());
+        let selected = content.view.selected_microphone_id.as_deref() == Some(device.id.as_str());
         let description = if device.is_default {
             "System default device"
         } else {

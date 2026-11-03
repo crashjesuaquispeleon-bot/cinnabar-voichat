@@ -289,6 +289,32 @@ mod microphone_settings_tests {
     }
 
     #[test]
+    fn selected_device_is_marked_only_for_the_current_snapshot_and_clear_invalidates_rows() {
+        let mut menu = menu();
+        menu.publish_microphone_devices(vec![MicrophoneDeviceView {
+            id: "current-device-token".to_owned(),
+            name: "Built-in microphone".to_owned(),
+            is_default: true,
+        }]);
+        menu.mark_microphone_selected("current-device-token".to_owned());
+        assert_eq!(
+            menu.view().selected_microphone_id.as_deref(),
+            Some("current-device-token")
+        );
+
+        let revision = menu.view().microphone_devices_revision;
+        menu.clear_microphone_devices("The active microphone disconnected.");
+        let view = menu.view();
+        assert!(view.microphone_devices.is_empty());
+        assert!(view.selected_microphone_id.is_none());
+        assert!(view.microphone_devices_revision > revision);
+        assert_eq!(
+            view.microphone_message.as_deref(),
+            Some("The active microphone disconnected.")
+        );
+    }
+
+    #[test]
     fn system_default_request_is_explicit_and_not_a_persisted_device_token() {
         let mut menu = menu();
         menu.activate_from_input(MenuAction::SettingsMicrophoneUseSystemDefault);

@@ -18,13 +18,11 @@ impl MenuRuntime {
             MenuAction::SettingsMicrophoneRefresh => {
                 self.microphone_selection_requested = None;
                 self.microphone_refresh_requested = true;
-                self.microphone_message =
-                    Some("Refreshing microphone input devices…".to_owned());
+                self.microphone_message = Some("Refreshing microphone input devices…".to_owned());
             }
             MenuAction::SettingsMicrophoneUseSystemDefault => {
-                self.microphone_selection_requested = Some(
-                    launcher::menu::view::MicrophoneSelectionRequest::SystemDefault,
-                );
+                self.microphone_selection_requested =
+                    Some(launcher::menu::view::MicrophoneSelectionRequest::SystemDefault);
                 self.microphone_message =
                     Some("Switching to the system default microphone…".to_owned());
             }
@@ -40,11 +38,8 @@ impl MenuRuntime {
                             .to_owned(),
                     );
                 } else if let Some(device) = self.microphone_devices.get(usize::from(index)) {
-                    self.microphone_selection_requested = Some(
-                        launcher::menu::view::MicrophoneSelectionRequest::Device(
-                            device.id.clone(),
-                        ),
-                    );
+                    self.microphone_selection_requested =
+                        Some(launcher::menu::view::MicrophoneSelectionRequest::Device(device.id.clone()));
                     self.microphone_message = Some(format!("Switching to {}…", device.name));
                 } else {
                     self.microphone_message = Some(

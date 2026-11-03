@@ -452,11 +452,15 @@ mod tests {
         assert_eq!(controller.open_retry_delay, MAX_OPEN_RETRY_DELAY);
 
         // A policy/session stop resets the retry window for the next deliberate start.
+        let attempts_before_restart = attempts.load(Ordering::Relaxed);
         policy.set_session_active(false);
         controller.sync_with_policy_at(&mut policy, start + Duration::from_secs(2));
         policy.set_session_active(true);
         controller.sync_with_policy_at(&mut policy, start + Duration::from_secs(2));
-        assert_eq!(attempts.load(Ordering::Relaxed), 4);
+        assert_eq!(
+            attempts.load(Ordering::Relaxed),
+            attempts_before_restart + 1
+        );
     }
 
     #[test]

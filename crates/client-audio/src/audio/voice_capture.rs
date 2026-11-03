@@ -771,6 +771,23 @@ mod tests {
         assert_eq!(starts.load(Ordering::Relaxed), 2);
         assert!(running.load(Ordering::Acquire));
 
+        // An old/unknown token is rejected without stopping the selected microphone.
+        worker
+            .send(MicrophoneWorkerCommand::Select(MicrophoneSelection::Device(
+                "stale-token".to_owned(),
+            )))
+            .unwrap();
+        assert_eq!(
+            worker
+                .recv_timeout(std::time::Duration::from_secs(2))
+                .unwrap(),
+            MicrophoneWorkerEvent::SelectionRejected(
+                MicrophoneSelectionError::DeviceUnavailable
+            )
+        );
+        assert_eq!(selected.load(Ordering::Acquire), 2);
+        assert!(running.load(Ordering::Acquire));
+
         worker.shutdown();
 
         assert!(!running.load(Ordering::Acquire));

@@ -66,7 +66,9 @@ impl Iterator for VoiceLoopbackSource {
             self.current = None;
             self.index = 0;
             self.pending_right = None;
-            self.queue.clear();
+            if !self.queue.is_empty() {
+                self.queue.clear();
+            }
             return Some(0.0);
         }
         if self.current.as_ref().is_some_and(|frame| !frame.is_current_for(&self.queue)) {
@@ -255,7 +257,7 @@ pub fn attach_voice_loopback_to_named_audio(
     mut attachment: ResMut<VoiceLoopbackAttachment>,
     mut device: Option<NonSendMut<crate::named_audio::AudioDevice>>,
 ) {
-    if attachment.attached {
+    if attachment.attached || !capture.is_running() {
         return;
     }
     let Some(device) = device.as_mut() else {

@@ -85,6 +85,7 @@ fn section_rows_keep_order_and_shared_controls_from_the_registry() {
             SettingId::VoiceChatEnabled,
             SettingId::VoiceActivationMode,
             SettingId::VoiceChatMuted,
+            SettingId::VoiceInputSensitivity,
         ]
     );
 }

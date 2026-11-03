@@ -233,7 +233,7 @@ The next device-selection implementation must use a catalog/command boundary own
 
 ### Identity and persistence
 
-- Selection tokens are random/opaque backend-local capabilities, not `cpal-snapshot-{index}`, hardware identifiers, player IDs, or server room IDs.
+- Selection tokens are opaque, process-local catalog capabilities, not `cpal-snapshot-{index}`, hardware identifiers, player IDs, or server room IDs. They are valid only within the catalog instance and generation that issued them.
 - Never persist a catalog token. Persist a preferred device only if the platform backend exposes a documented stable identity with suitable semantics. Otherwise persist “system default” and ask the user to choose again after restart.
 - Display names are labels only. Duplicate names must remain separately selectable through distinct opaque tokens; name equality must never resolve a selection.
 - Enumeration and selection are local-only. No native device ID, display name, or hardware fingerprint is sent to the voice service.

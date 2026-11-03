@@ -174,6 +174,40 @@ pub enum MicrophoneSelection {
     Device(String),
 }
 
+/// Commands accepted by the future CPAL owner worker.
+///
+/// The worker must execute every command on the same thread that owns the CPAL host,
+/// device handles and active stream. These values contain only owned, Send-safe data;
+/// native CPAL handles must never cross this boundary.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum MicrophoneWorkerCommand {
+    /// Enumerate inputs and publish a fresh generation-scoped snapshot.
+    Refresh,
+    /// Stop the active stream and open exactly this current-snapshot selection.
+    /// A stale token is an error; it must never trigger an implicit default fallback.
+    Select(MicrophoneSelection),
+    /// Stop capture, invalidate the catalog and terminate the owner worker.
+    Shutdown,
+}
+
+/// Events returned by the CPAL owner worker to the local settings/controller layer.
+///
+/// Device IDs are presentation tokens scoped to one catalog generation. They are not
+/// hardware identities and must not be persisted or transmitted to other players.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum MicrophoneWorkerEvent {
+    /// A refreshed local device snapshot.
+    Devices(Vec<MicrophoneDevice>),
+    /// The requested device was opened successfully.
+    Selected { device_id: String },
+    /// The requested selection could not be resolved in the current snapshot.
+    SelectionRejected(MicrophoneSelectionError),
+    /// The active stream stopped or its device disappeared.
+    DeviceUnavailable { device_id: Option<String> },
+    /// Worker has stopped and invalidated all previously issued IDs.
+    Stopped,
+}
+
 /// Why a microphone preference could not be resolved against the current snapshot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MicrophoneSelectionError {

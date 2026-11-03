@@ -28,8 +28,7 @@ impl MenuRuntime {
             }
             MenuAction::SettingsMicrophoneRetryPermission => {
                 self.microphone_permission_retry_requested = true;
-                self.microphone_message =
-                    Some("Retrying microphone permission check…".to_owned());
+                self.microphone_message = Some("Retrying microphone permission check…".to_owned());
             }
             MenuAction::SettingsMicrophoneSelect(index, revision) => {
                 if revision != self.microphone_devices_revision {
@@ -38,8 +37,9 @@ impl MenuRuntime {
                             .to_owned(),
                     );
                 } else if let Some(device) = self.microphone_devices.get(usize::from(index)) {
-                    self.microphone_selection_requested =
-                        Some(launcher::menu::view::MicrophoneSelectionRequest::Device(device.id.clone()));
+                    self.microphone_selection_requested = Some(
+                        launcher::menu::view::MicrophoneSelectionRequest::Device(device.id.clone()),
+                    );
                     self.microphone_message = Some(format!("Switching to {}…", device.name));
                 } else {
                     self.microphone_message = Some(

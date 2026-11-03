@@ -117,6 +117,36 @@ mod tests {
 
     /// Touch sensitivity survives a save and changes only the touch look multiplier.
     #[test]
+    fn voice_chat_preferences_default_closed_and_round_trip_through_settings_storage() {
+        let mut options = SettingsOptions::default();
+        let defaults = options.user_settings().voice_chat;
+        assert!(!defaults.enabled);
+        assert_eq!(
+            defaults.activation_mode,
+            ui::VoiceActivationMode::PushToTalk
+        );
+
+        assert!(options.set(SettingId::VoiceChatEnabled.index(), 1));
+        assert!(options.set(SettingId::VoiceActivationMode.index(), 0));
+        let encoded = serde_json::to_vec(&options).unwrap();
+        let mut restored = SettingsOptions::decode(&encoded).unwrap();
+        let saved = restored.user_settings().voice_chat;
+        assert!(saved.enabled);
+        assert_eq!(
+            saved.activation_mode,
+            ui::VoiceActivationMode::OpenMicrophone
+        );
+
+        assert!(restored.reset_group(super::super::SettingsGroup::Audio));
+        let reset = restored.user_settings().voice_chat;
+        assert!(!reset.enabled);
+        assert_eq!(
+            reset.activation_mode,
+            ui::VoiceActivationMode::PushToTalk
+        );
+    }
+
+    #[test]
     fn touch_sensitivity_is_persisted_and_applied_to_touch_input() {
         let mut options = SettingsOptions::default();
         let original = options.user_settings().controls;

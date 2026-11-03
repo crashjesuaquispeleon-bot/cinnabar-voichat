@@ -98,6 +98,18 @@ pub trait MicrophoneBackend: Send + Sync {
     fn enumerate_input_devices(&self) -> anyhow::Result<Vec<MicrophoneDevice>>;
 }
 
+/// Returns a default label only when it identifies exactly one enumerated device.
+fn unique_default_name<'a>(names: &[String], default_name: Option<&'a str>) -> Option<&'a str> {
+    let candidate = default_name?;
+    if candidate.is_empty()
+        || names.iter().filter(|name| name.as_str() == candidate).count() != 1
+    {
+        None
+    } else {
+        Some(candidate)
+    }
+}
+
 /// CPAL-backed local input-device discovery.
 ///
 /// The adapter intentionally returns descriptors only. It does not retain CPAL device
@@ -120,10 +132,7 @@ impl MicrophoneBackend for CpalMicrophoneBackend {
         let names: Vec<String> = devices
             .map(|device| device.name().unwrap_or_default())
             .collect();
-        let default_name = default_name.filter(|candidate| {
-            !candidate.is_empty()
-                && names.iter().filter(|name| *name == candidate).count() == 1
-        });
+        let default_name = unique_default_name(&names, default_name.as_deref());
 
         Ok(names
             .into_iter()
@@ -348,11 +357,7 @@ mod tests {
             "USB Microphone".to_owned(),
             "Built-in Microphone".to_owned(),
         ];
-        let default_name = Some("USB Microphone");
-        let unique_default = default_name.filter(|candidate| {
-            !candidate.is_empty()
-                && names.iter().filter(|name| *name == candidate).count() == 1
-        });
+        let unique_default = unique_default_name(&names, Some("USB Microphone"));
 
         assert!(unique_default.is_none());
     }
@@ -363,11 +368,7 @@ mod tests {
             "USB Microphone".to_owned(),
             "Built-in Microphone".to_owned(),
         ];
-        let default_name = Some("USB Microphone");
-        let unique_default = default_name.filter(|candidate| {
-            !candidate.is_empty()
-                && names.iter().filter(|name| *name == candidate).count() == 1
-        });
+        let unique_default = unique_default_name(&names, Some("USB Microphone"));
 
         assert_eq!(unique_default, Some("USB Microphone"));
     }

@@ -258,11 +258,13 @@ mod tests {
 pub struct VoiceLoopbackAttachment {
     attached: bool,
     muted: Option<Arc<AtomicBool>>,
+    muted_requested: bool,
 }
 
 impl VoiceLoopbackAttachment {
     /// Mutes only local monitoring; capture and future network transmission are unchanged.
     pub fn set_muted(&mut self, muted: bool) {
+        self.muted_requested = muted;
         if let Some(flag) = &self.muted {
             flag.store(muted, Ordering::Release);
         }
@@ -295,6 +297,7 @@ pub fn attach_voice_loopback_to_named_audio(
 
     let source = VoiceLoopbackSource::new(capture.monitor_queue());
     let muted = source.mute_flag();
+    muted.store(attachment.muted_requested, Ordering::Release);
     if device.play_source(source) {
         attachment.muted = Some(muted);
         attachment.attached = true;

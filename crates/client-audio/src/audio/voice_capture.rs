@@ -675,7 +675,9 @@ mod tests {
             ))
             .unwrap();
         assert_eq!(
-            worker.recv_timeout(std::time::Duration::from_secs(2)).unwrap(),
+            worker
+                .recv_timeout(std::time::Duration::from_secs(2))
+                .unwrap(),
             MicrophoneWorkerEvent::SelectionRejected(MicrophoneSelectionError::DeviceUnavailable)
         );
 
@@ -786,9 +788,9 @@ mod tests {
 
         // An old/unknown token is rejected without stopping the selected microphone.
         worker
-            .send(MicrophoneWorkerCommand::Select(MicrophoneSelection::Device(
-                "stale-token".to_owned(),
-            )))
+            .send(MicrophoneWorkerCommand::Select(
+                MicrophoneSelection::Device("stale-token".to_owned()),
+            ))
             .unwrap();
         assert_eq!(
             worker
@@ -889,9 +891,7 @@ mod tests {
             worker
                 .recv_timeout(std::time::Duration::from_secs(2))
                 .unwrap(),
-            MicrophoneWorkerEvent::SelectionRejected(
-                MicrophoneSelectionError::DeviceUnavailable
-            )
+            MicrophoneWorkerEvent::SelectionRejected(MicrophoneSelectionError::DeviceUnavailable)
         );
 
         worker.shutdown();

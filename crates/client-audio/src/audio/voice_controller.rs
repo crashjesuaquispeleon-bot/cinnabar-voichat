@@ -4,13 +4,14 @@
 //! microphone through [`super::voice_stream::VoiceCaptureOpener`]. Device work stays on the
 //! capture owner thread; this module only issues start/stop decisions on the frame schedule.
 
-use super::voice_input::VoiceInputPolicy;
+use super::voice_input::{MicrophonePermission, VoiceInputPolicy};
+use super::voice_permission::{outcome_from_error, outcome_from_success, permission_after_outcome};
 use super::voice_pcm::BoundedPcmQueue;
 use super::voice_stream::{
     MockVoiceCaptureOpener, SharedPcmQueue, VoiceCaptureError, VoiceCaptureOpener,
     VoiceCaptureStream,
 };
-use bevy::prelude::{Res, ResMut, Resource};
+use bevy::prelude::{ResMut, Resource};
 use std::sync::Arc;
 
 /// Owns the shared PCM queue and the optional running capture stream.
@@ -82,49 +83,65 @@ impl VoiceCaptureController {
         self.stop_count
     }
 
-    /// Applies the current policy: open when capture becomes permitted, stop when not.
-    pub fn sync_with_policy(&mut self, policy: &VoiceInputPolicy) {
-        let permitted = policy.capture_permitted();
-        if permitted == self.last_capture_permitted && self.is_running() == permitted {
-            // Still re-check a dead stream while permitted so a device error can reopen later.
-            if permitted && !self.is_running() {
-                self.try_open();
+    /// Whether the controller should attempt to open the device for this policy.
+    ///
+    /// `Unknown` permission is allowed once as an OS probe when voice is enabled in a session.
+    fn should_open(policy: &VoiceInputPolicy) -> bool {
+        if !policy.enabled() || !policy.session_active() {
+            return false;
+        }
+        match policy.permission() {
+            MicrophonePermission::Granted | MicrophonePermission::Unknown => true,
+            MicrophonePermission::Denied => false,
+        }
+    }
+
+    /// Applies the current policy: open when capture may run, stop when not.
+    ///
+    /// Updates [`VoiceInputPolicy`] permission from the open outcome (probe-on-first-open).
+    pub fn sync_with_policy(&mut self, policy: &mut VoiceInputPolicy) {
+        let should_open = Self::should_open(policy);
+        if should_open == self.last_capture_permitted && self.is_running() == should_open {
+            if should_open && !self.is_running() {
+                self.try_open(policy);
             }
-            self.last_capture_permitted = permitted;
+            self.last_capture_permitted = should_open;
             return;
         }
 
-        if permitted {
-            self.try_open();
+        if should_open {
+            self.try_open(policy);
         } else {
             self.force_stop();
         }
-        self.last_capture_permitted = permitted;
+        self.last_capture_permitted = should_open && self.is_running();
     }
 
-    fn try_open(&mut self) {
+    fn try_open(&mut self, policy: &mut VoiceInputPolicy) {
         if self.is_running() {
             return;
         }
-        // Drop a stale non-running handle before opening again.
         self.stream = None;
         self.open_attempts = self.open_attempts.saturating_add(1);
         match self.opener.open_default(Arc::clone(&self.queue)) {
             Ok(stream) => {
                 self.last_error = None;
                 self.stream = Some(stream);
+                policy.set_permission(permission_after_outcome(
+                    policy.permission(),
+                    outcome_from_success(),
+                ));
             }
             Err(error) => {
                 self.last_error = Some(error.to_string());
                 self.stream = None;
+                let outcome = outcome_from_error(&error);
+                policy.set_permission(permission_after_outcome(policy.permission(), outcome));
             }
         }
     }
 
     /// Stops capture and retires queued PCM when the observed game session changes.
-    ///
-    /// The app-side lifecycle adapter calls this before publishing the next session as active,
-    /// so frames captured for the previous world cannot survive a transfer or reconnect.
     pub fn reset_for_session_change(&mut self) {
         self.force_stop();
         self.last_capture_permitted = false;
@@ -140,16 +157,14 @@ impl VoiceCaptureController {
 }
 
 /// Frame-schedule system: keep capture aligned with [`VoiceInputPolicy`].
-///
-/// Must not perform CPAL work itself; open/stop delegate to the owner thread inside the opener.
 pub fn sync_voice_capture_with_policy(
-    policy: Res<VoiceInputPolicy>,
+    mut policy: ResMut<VoiceInputPolicy>,
     mut controller: ResMut<VoiceCaptureController>,
 ) {
-    controller.sync_with_policy(&policy);
+    controller.sync_with_policy(&mut policy);
 }
 
-/// Helper for tests and future session adapters: mark multiplayer session active/inactive.
+/// Helper for tests and session adapters: mark multiplayer session active/inactive.
 pub fn set_session_active_for_voice(policy: &mut VoiceInputPolicy, active: bool) {
     policy.set_session_active(active);
 }
@@ -159,12 +174,17 @@ mod tests {
     use super::*;
     use crate::audio::voice_input::{MicrophoneMode, MicrophonePermission, VoiceInputPolicy};
 
-    fn permitted_policy() -> VoiceInputPolicy {
+    fn enabled_session() -> VoiceInputPolicy {
         let mut policy = VoiceInputPolicy::default();
-        policy.set_permission(MicrophonePermission::Granted);
         policy.set_enabled(true);
         policy.set_session_active(true);
         policy.set_mode(MicrophoneMode::OpenMicrophone);
+        policy
+    }
+
+    fn permitted_policy() -> VoiceInputPolicy {
+        let mut policy = enabled_session();
+        policy.set_permission(MicrophonePermission::Granted);
         policy
     }
 
@@ -175,22 +195,61 @@ mod tests {
     #[test]
     fn opens_when_capture_becomes_permitted() {
         let mut controller = test_controller();
-        let policy = permitted_policy();
+        let mut policy = permitted_policy();
         assert!(!controller.is_running());
-        controller.sync_with_policy(&policy);
+        controller.sync_with_policy(&mut policy);
         assert!(controller.is_running());
         assert_eq!(controller.open_attempts(), 1);
+    }
+
+    #[test]
+    fn unknown_permission_probes_and_becomes_granted_on_success() {
+        let mut controller = test_controller();
+        let mut policy = enabled_session();
+        assert_eq!(policy.permission(), MicrophonePermission::Unknown);
+        controller.sync_with_policy(&mut policy);
+        assert!(controller.is_running());
+        assert_eq!(policy.permission(), MicrophonePermission::Granted);
+    }
+
+    #[test]
+    fn denied_permission_does_not_open() {
+        let mut controller = test_controller();
+        let mut policy = enabled_session();
+        policy.set_permission(MicrophonePermission::Denied);
+        controller.sync_with_policy(&mut policy);
+        assert!(!controller.is_running());
+        assert_eq!(controller.open_attempts(), 0);
+    }
+
+    #[test]
+    fn access_denied_open_marks_permission_denied() {
+        struct DeniedOpener;
+        impl VoiceCaptureOpener for DeniedOpener {
+            fn open_default(
+                &self,
+                _queue: SharedPcmQueue,
+            ) -> Result<Box<dyn VoiceCaptureStream>, VoiceCaptureError> {
+                Err(VoiceCaptureError::Other("Access Denied".into()))
+            }
+        }
+
+        let mut controller = VoiceCaptureController::with_opener(Box::new(DeniedOpener));
+        let mut policy = enabled_session();
+        controller.sync_with_policy(&mut policy);
+        assert!(!controller.is_running());
+        assert_eq!(policy.permission(), MicrophonePermission::Denied);
     }
 
     #[test]
     fn stops_and_clears_queue_when_session_ends() {
         let mut controller = test_controller();
         let mut policy = permitted_policy();
-        controller.sync_with_policy(&policy);
+        controller.sync_with_policy(&mut policy);
         assert!(controller.is_running());
 
         policy.set_session_active(false);
-        controller.sync_with_policy(&policy);
+        controller.sync_with_policy(&mut policy);
         assert!(!controller.is_running());
         assert!(controller.queue().is_empty());
         assert_eq!(controller.stop_count(), 1);
@@ -199,8 +258,8 @@ mod tests {
     #[test]
     fn session_reset_stops_stream_and_discards_queued_pcm() {
         let mut controller = test_controller();
-        let policy = permitted_policy();
-        controller.sync_with_policy(&policy);
+        let mut policy = permitted_policy();
+        controller.sync_with_policy(&mut policy);
         controller.queue().push(crate::audio::voice_pcm::PcmFrame::silence());
         assert!(controller.is_running());
         assert_eq!(controller.queue().len(), 1);
@@ -216,9 +275,9 @@ mod tests {
     fn permission_loss_stops_capture() {
         let mut controller = test_controller();
         let mut policy = permitted_policy();
-        controller.sync_with_policy(&policy);
+        controller.sync_with_policy(&mut policy);
         policy.set_permission(MicrophonePermission::Denied);
-        controller.sync_with_policy(&policy);
+        controller.sync_with_policy(&mut policy);
         assert!(!controller.is_running());
         assert!(!policy.capture_permitted());
     }
@@ -227,19 +286,19 @@ mod tests {
     fn disable_voice_stops_without_requiring_mode_change() {
         let mut controller = test_controller();
         let mut policy = permitted_policy();
-        controller.sync_with_policy(&policy);
+        controller.sync_with_policy(&mut policy);
         policy.set_enabled(false);
-        controller.sync_with_policy(&policy);
+        controller.sync_with_policy(&mut policy);
         assert!(!controller.is_running());
     }
 
     #[test]
     fn repeated_sync_while_permitted_does_not_reopen() {
         let mut controller = test_controller();
-        let policy = permitted_policy();
-        controller.sync_with_policy(&policy);
-        controller.sync_with_policy(&policy);
-        controller.sync_with_policy(&policy);
+        let mut policy = permitted_policy();
+        controller.sync_with_policy(&mut policy);
+        controller.sync_with_policy(&mut policy);
+        controller.sync_with_policy(&mut policy);
         assert_eq!(controller.open_attempts(), 1);
         assert!(controller.is_running());
     }
@@ -257,9 +316,11 @@ mod tests {
         }
 
         let mut controller = VoiceCaptureController::with_opener(Box::new(FailingOpener));
-        let policy = permitted_policy();
-        controller.sync_with_policy(&policy);
+        let mut policy = permitted_policy();
+        controller.sync_with_policy(&mut policy);
         assert!(!controller.is_running());
         assert_eq!(controller.last_error(), Some("no input device available"));
+        // Transient failure keeps Granted so the user can retry after plugging a device.
+        assert_eq!(policy.permission(), MicrophonePermission::Granted);
     }
 }

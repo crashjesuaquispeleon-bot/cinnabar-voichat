@@ -427,6 +427,7 @@ where
                                     .send(MicrophoneWorkerEvent::SelectionRejected(error))
                                     .is_err()
                                 {
+                                    backend.stop();
                                     break;
                                 }
                             }

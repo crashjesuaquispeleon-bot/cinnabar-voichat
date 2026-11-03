@@ -493,6 +493,7 @@ mod tests {
         assert!(!controller.queue().is_accepting());
         assert!(!controller.monitor_queue().is_accepting());
 
+        policy.set_push_to_talk_held(false);
         policy.set_push_to_talk_held(true);
         controller.sync_with_policy(&mut policy);
         assert!(controller.is_running());

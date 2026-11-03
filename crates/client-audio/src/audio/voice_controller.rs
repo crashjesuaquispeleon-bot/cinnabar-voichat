@@ -167,6 +167,16 @@ impl VoiceCaptureController {
         })
     }
 
+    /// Whether the active native capture owner can enumerate and select local inputs.
+    ///
+    /// A persistent worker remains available after unplug so the user can refresh the
+    /// catalog and select another device. Mock and browser streams do not expose CPAL
+    /// device selection.
+    #[must_use]
+    pub fn supports_input_device_selection(&self) -> bool {
+        self.has_persistent_device_worker()
+    }
+
     /// Whether the controller should attempt to open the device for this policy.
     ///
     /// `Unknown` permission is allowed once as an OS probe when voice is enabled in a session.

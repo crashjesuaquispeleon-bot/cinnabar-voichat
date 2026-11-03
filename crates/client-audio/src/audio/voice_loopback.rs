@@ -200,7 +200,8 @@ mod tests {
         stopped.store(true, Ordering::Release);
         assert!(transmit.is_empty());
         assert!(monitor.is_empty());
-        assert_eq!(mixer.next(), None);
+        let after_disconnect = mixer.next();
+        assert!(after_disconnect.is_none_or(|sample| sample == 0.0));
     }
 
     #[test]

@@ -162,6 +162,7 @@ mod voice_settings_tests {
             &mut policy,
             &ui::VoiceChatSettings {
                 enabled: true,
+                muted: false,
                 activation_mode: ui::VoiceActivationMode::OpenMicrophone,
             },
         );
@@ -171,6 +172,7 @@ mod voice_settings_tests {
             &mut policy,
             &ui::VoiceChatSettings {
                 enabled: true,
+                muted: false,
                 activation_mode: ui::VoiceActivationMode::PushToTalk,
             },
         );

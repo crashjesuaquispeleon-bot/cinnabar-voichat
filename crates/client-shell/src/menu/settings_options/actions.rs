@@ -253,9 +253,12 @@ mod microphone_settings_tests {
         );
 
         // The opaque token belongs only to the menu's transient request and is not a saved option.
-        assert!(!serde_json::to_string(menu.settings_snapshot().0.as_ref())
-            .unwrap()
-            .contains("snapshot-token-a"));
+        let persisted_settings = menu.view().settings_options;
+        assert!(
+            !serde_json::to_string(persisted_settings.as_ref())
+                .unwrap()
+                .contains("snapshot-token-a")
+        );
     }
 
     #[test]

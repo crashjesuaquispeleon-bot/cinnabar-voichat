@@ -254,7 +254,6 @@ mod tests {
         assert_eq!(q.dropped(), 4);
     }
 
-
     #[test]
     fn closed_gate_rejects_samples_and_old_epoch_frames() {
         let q = BoundedPcmQueue::new(2);

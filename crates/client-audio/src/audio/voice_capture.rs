@@ -303,6 +303,13 @@ impl MicrophoneWorker {
         self.events.recv_timeout(timeout)
     }
 
+    /// Polls for an event without blocking the caller's frame schedule.
+    pub fn try_recv(
+        &self,
+    ) -> Result<MicrophoneWorkerEvent, std::sync::mpsc::TryRecvError> {
+        self.events.try_recv()
+    }
+
     /// Request orderly shutdown and join the owner thread.
     pub fn shutdown(mut self) {
         let _ = self.commands.send(MicrophoneWorkerCommand::Shutdown);

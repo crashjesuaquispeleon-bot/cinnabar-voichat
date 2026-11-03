@@ -15,7 +15,7 @@ The first release is a Cinnabar-client-only voice feature.
 - `crates/client-audio` owns client sound playback, audio settings and the Bevy adapter. Its current playback path uses `rodio` and decoded PCM; this is output functionality, not microphone capture.
 - `crates/bridge` owns bounded framing for the local Rust/Go process stream. That stream carries Bedrock session frames and control handoff. It should not become the real-time voice media path: voice has different latency, loss, congestion and lifecycle requirements.
 - `core/` is the Go integration process. The module already declares Pion WebRTC and the repository already has a browser relay contract in `crates/bridge` / `web/transport`. Their presence does **not** establish that a native voice room, SFU, signaling API or authorization path exists.
-- No existing microphone-capture implementation or end-to-end voice-chat feature was identified in the inspected client audio modules.
+- No existing microphone-capture implementation or end-to-end voice-chat feature was identified in the inspected client audio modules. `client-audio` currently depends on `rodio` for output; there is no capture dependency in its manifest.
 
 ## Proposed high-level media flow (not implemented)
 
@@ -32,6 +32,14 @@ Cinnabar microphone
 ```
 
 A signaling/control plane must authenticate the Cinnabar account, bind the participant to the currently joined Minecraft session, admit it to that session's room, and revoke membership on disconnect or session change. Media routing must not trust client-supplied player identity or room membership.
+
+### Existing local session signals (confirmed in source)
+
+- `client-audio::SequencedAudioEvent` carries `origin_stream_session_id`, sourced from `WorldStream::authority().actor_session_id()`. This identifies the originating local world stream; it is not a globally meaningful room ID or an authenticated account identity.
+- `SessionObservation::session_generation()` is already paired with the current stream identity in the session-audio adapter. `SessionAudio` also tracks dimension changes and clears retained outcomes when its observed `(generation, dimension)` changes.
+- When the world stream disappears, `drain_sequenced_audio_into_session` clears unread retained messages and ends the bound audio session. This is useful lifecycle precedent, but it currently governs game sound outcomes, not voice capture or remote media.
+- `client-runtime::NetworkHandle` owns the local core endpoint only while a joined session is live and exposes shutdown/retirement paths. It is a possible place to observe lifecycle transitions, not a voice-media transport.
+- These identifiers are process-local lifecycle signals. A backend must receive a separately authenticated binding from a trusted Cinnabar service; it must never accept `actor_session_id`, `session_generation`, or a client-selected room name as proof of membership.
 
 A server-routed SFU is the leading option to evaluate for global rooms. A full-mesh peer topology scales poorly as participant count grows. Do not select or implement an SFU, codec, or transport until the existing Cinnabar service/API ownership and deployment model have been inspected and an operator-controlled endpoint is identified. The Pion dependency in `core/go.mod` is only a dependency fact, not proof that Pion is the correct or currently available service boundary.
 
@@ -52,6 +60,7 @@ A server-routed SFU is the leading option to evaluate for global rooms. A full-m
 
 - [x] Confirm product choices: global voice within the same active Minecraft session, Cinnabar clients only, open mic + PTT.
 - [x] Inspect current client playback, bridge framing and browser relay ownership at a high level.
+- [x] Confirm local world-stream/session lifecycle signals and distinguish them from backend-authenticated room identity.
 - [ ] Identify the authoritative Cinnabar account/session identity and the service that can authorize a room for the same joined Minecraft server.
 - [ ] Determine whether a maintained voice SFU/service already exists in the wider Cinnabar deployment; if not, document the required service and operational owner.
 - [ ] Compare capture/codec/transport options against supported desktop platforms, latency, licensing and packaging.

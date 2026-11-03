@@ -22,6 +22,7 @@ pub mod voice_capture;
 pub mod voice_controller;
 pub mod voice_input;
 pub mod voice_pcm;
+pub mod voice_permission;
 pub mod voice_stream;
 
 pub use bank::{SoundBank, SoundDecodeDriver, SoundDecodeRequest, sound_bank_path};

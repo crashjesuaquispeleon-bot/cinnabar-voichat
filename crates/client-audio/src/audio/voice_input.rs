@@ -105,7 +105,7 @@ impl VoiceInputPolicy {
             && !self.muted;
     }
 
-    /// Whether opening/keeping the local input device is permitted.
+    /// Whether opening/keeping the local input device is permitted after a successful grant.
     #[must_use]
     pub fn capture_permitted(&self) -> bool {
         self.permission == MicrophonePermission::Granted && self.enabled && self.session_active
@@ -131,6 +131,16 @@ impl VoiceInputPolicy {
     #[must_use]
     pub fn mode(&self) -> MicrophoneMode {
         self.mode
+    }
+
+    #[must_use]
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+
+    #[must_use]
+    pub fn session_active(&self) -> bool {
+        self.session_active
     }
 }
 

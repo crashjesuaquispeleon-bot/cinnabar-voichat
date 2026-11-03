@@ -12,7 +12,7 @@ use super::voice_stream::{
     VoiceCaptureQueues, VoiceCaptureStream,
 };
 use bevy::prelude::{ResMut, Resource};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 /// Owns the shared PCM queue and the optional running capture stream.
 ///
@@ -23,7 +23,7 @@ pub struct VoiceCaptureController {
     queue: SharedPcmQueue,
     monitor_queue: SharedPcmQueue,
     opener: Box<dyn VoiceCaptureOpener>,
-    stream: Option<Box<dyn VoiceCaptureStream>>,
+    stream: Option<Mutex<Box<dyn VoiceCaptureStream>>>,
     last_capture_permitted: bool,
     last_error: Option<String>,
     open_attempts: u64,
@@ -76,7 +76,7 @@ impl VoiceCaptureController {
     pub fn is_running(&self) -> bool {
         self.stream
             .as_ref()
-            .is_some_and(|stream| stream.is_running())
+            .is_some_and(|stream| stream.lock().is_ok_and(|stream| stream.is_running()))
     }
 
     #[must_use]
@@ -148,7 +148,7 @@ impl VoiceCaptureController {
         }) {
             Ok(stream) => {
                 self.last_error = None;
-                self.stream = Some(stream);
+                self.stream = Some(Mutex::new(stream));
                 policy.set_permission(permission_after_outcome(
                     policy.permission(),
                     outcome_from_success(),
@@ -172,7 +172,8 @@ impl VoiceCaptureController {
     fn force_stop(&mut self) {
         self.queue.set_accepting(false);
         self.monitor_queue.set_accepting(false);
-        if let Some(mut stream) = self.stream.take() {
+        if let Some(stream) = self.stream.take() {
+            let mut stream = stream.into_inner().unwrap_or_else(|poisoned| poisoned.into_inner());
             stream.stop();
             self.stop_count = self.stop_count.saturating_add(1);
         }

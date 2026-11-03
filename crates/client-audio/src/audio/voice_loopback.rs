@@ -214,6 +214,23 @@ mod tests {
     }
 
     #[test]
+    fn local_monitor_consumption_never_drains_transmit_queue() {
+        let transmit = Arc::new(BoundedPcmQueue::new(2));
+        let monitor = Arc::new(BoundedPcmQueue::new(2));
+        transmit.set_accepting(true);
+        monitor.set_accepting(true);
+        let frame = PcmFrame::silence();
+        transmit.push(frame);
+        monitor.push(frame);
+
+        let mut source = VoiceLoopbackSource::new(monitor.clone());
+        let _ = source.next();
+        let _ = source.next();
+        assert!(monitor.is_empty());
+        assert_eq!(transmit.len(), 1);
+    }
+
+    #[test]
     fn closed_gate_produces_silence_even_if_stale_slots_exist() {
         let queue = Arc::new(BoundedPcmQueue::new(2));
         queue.set_accepting(true);

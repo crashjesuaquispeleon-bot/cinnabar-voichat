@@ -484,6 +484,7 @@ mod tests {
     #[test]
     fn mono_builder_emits_exact_frames() {
         let queue = Arc::new(BoundedPcmQueue::new(4));
+        queue.set_accepting(true);
         let mut builder = MonoFrameBuilder::new();
         let batch = vec![0.25_f32; VOICE_FRAME_SAMPLES * 2 + 10];
         builder.push_mono_samples(&batch, &queue);
@@ -499,6 +500,7 @@ mod tests {
     #[test]
     fn interleaved_builder_downmixes_without_temporary_vectors() {
         let queue = Arc::new(BoundedPcmQueue::new(2));
+        queue.set_accepting(true);
         let mut builder = MonoFrameBuilder::new();
         let stereo = [0.2_f32, 0.4, 0.6, 0.8];
         builder.push_interleaved_f32(&stereo, 2, &queue);
@@ -524,6 +526,7 @@ mod tests {
     #[test]
     fn mock_stream_stops_on_drop() {
         let queue = Arc::new(BoundedPcmQueue::new(4));
+        queue.set_accepting(true);
         let opener = MockVoiceCaptureOpener;
         let stream = opener.open_default(Arc::clone(&queue)).unwrap();
         assert!(stream.is_running());
@@ -536,6 +539,7 @@ mod tests {
     #[test]
     fn mock_inject_fills_queue() {
         let queue = Arc::new(BoundedPcmQueue::new(4));
+        queue.set_accepting(true);
         let mut stream = MockVoiceCaptureStream::new(Arc::clone(&queue));
         let samples = vec![0.1_f32; VOICE_FRAME_SAMPLES];
         stream.inject_mono(&samples);
@@ -564,6 +568,7 @@ mod tests {
     #[test]
     fn mock_stream_preserves_partial_frames_between_callbacks() {
         let queue = Arc::new(BoundedPcmQueue::new(2));
+        queue.set_accepting(true);
         let mut stream = MockVoiceCaptureStream::new(Arc::clone(&queue));
         let first = vec![0.2_f32; VOICE_FRAME_SAMPLES / 2];
         let second = vec![0.4_f32; VOICE_FRAME_SAMPLES / 2];

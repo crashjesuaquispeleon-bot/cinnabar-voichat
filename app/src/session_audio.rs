@@ -1,9 +1,11 @@
 //! Borrows session identity for the presentation audio lane.
 use bevy::prelude::*;
+use client_audio::audio::{
+    voice_controller::VoiceCaptureController, voice_input::VoiceInputPolicy,
+};
 use client_audio::audio_ingress::SequencedAudioEvent;
 use client_audio::session_audio::{SessionAudio, SessionAudioCatalog};
 use semantic_input::Action;
-use client_audio::audio::{voice_controller::VoiceCaptureController, voice_input::VoiceInputPolicy};
 
 /// Borrows current owner facts and forwards them at the existing system boundary.
 #[allow(clippy::too_many_arguments)]

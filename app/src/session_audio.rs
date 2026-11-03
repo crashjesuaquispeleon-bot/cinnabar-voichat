@@ -184,6 +184,10 @@ mod voice_settings_tests {
         assert!(policy.muted());
         assert!(!policy.transmission_permitted());
 
+        // Unchanged persisted settings must not erase the in-game override each frame.
+        apply_saved_voice_mute(&mut policy, false, &mut last_saved_mute);
+        assert!(policy.muted());
+
         // The router reports a fresh pressed edge once, not on repeated held frames.
         toggle_quick_voice_mute(&mut policy);
         assert!(!policy.muted());

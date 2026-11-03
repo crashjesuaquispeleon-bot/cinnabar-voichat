@@ -661,6 +661,206 @@ mod tests {
     }
 
     #[test]
+    fn owner_worker_switches_exact_devices_and_stops_on_shutdown() {
+        use std::rc::Rc;
+        use std::sync::{
+            atomic::{AtomicBool, AtomicU32, Ordering},
+            Arc,
+        };
+
+        struct SwitchingBackend {
+            running: Arc<AtomicBool>,
+            starts: Arc<AtomicU32>,
+            stops: Arc<AtomicU32>,
+            selected: Arc<AtomicU32>,
+            // CPAL Device/Stream implementations may be !Send; the worker owns this value.
+            _thread_local_marker: Rc<()>,
+        }
+
+        impl MicrophoneWorkerBackend for SwitchingBackend {
+            type Device = u32;
+
+            fn enumerate(&mut self) -> Result<Vec<(String, bool, Self::Device)>, String> {
+                Ok(vec![
+                    ("Built-in microphone".to_owned(), true, 1),
+                    ("USB microphone".to_owned(), false, 2),
+                ])
+            }
+
+            fn stop(&mut self) {
+                self.stops.fetch_add(1, Ordering::Relaxed);
+                self.running.store(false, Ordering::Release);
+            }
+
+            fn start(&mut self, device: &Self::Device) -> Result<(), String> {
+                self.selected.store(*device, Ordering::Release);
+                self.starts.fetch_add(1, Ordering::Relaxed);
+                self.running.store(true, Ordering::Release);
+                Ok(())
+            }
+
+            fn is_running(&self) -> bool {
+                self.running.load(Ordering::Acquire)
+            }
+        }
+
+        let running = Arc::new(AtomicBool::new(false));
+        let starts = Arc::new(AtomicU32::new(0));
+        let stops = Arc::new(AtomicU32::new(0));
+        let selected = Arc::new(AtomicU32::new(0));
+        let worker_running = Arc::clone(&running);
+        let worker_starts = Arc::clone(&starts);
+        let worker_stops = Arc::clone(&stops);
+        let worker_selected = Arc::clone(&selected);
+        let worker = spawn_microphone_worker(move || SwitchingBackend {
+            running: worker_running,
+            starts: worker_starts,
+            stops: worker_stops,
+            selected: worker_selected,
+            _thread_local_marker: Rc::new(()),
+        })
+        .unwrap();
+
+        worker.send(MicrophoneWorkerCommand::Refresh).unwrap();
+        let MicrophoneWorkerEvent::Devices(devices) = worker
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .unwrap()
+        else {
+            panic!("expected the refreshed microphone snapshot");
+        };
+
+        worker
+            .send(MicrophoneWorkerCommand::Select(MicrophoneSelection::Device(
+                devices[0].id.clone(),
+            )))
+            .unwrap();
+        assert_eq!(
+            worker
+                .recv_timeout(std::time::Duration::from_secs(2))
+                .unwrap(),
+            MicrophoneWorkerEvent::Selected {
+                device_id: devices[0].id.clone()
+            }
+        );
+        assert_eq!(selected.load(Ordering::Acquire), 1);
+
+        worker
+            .send(MicrophoneWorkerCommand::Select(MicrophoneSelection::Device(
+                devices[1].id.clone(),
+            )))
+            .unwrap();
+        assert_eq!(
+            worker
+                .recv_timeout(std::time::Duration::from_secs(2))
+                .unwrap(),
+            MicrophoneWorkerEvent::Selected {
+                device_id: devices[1].id.clone()
+            }
+        );
+        assert_eq!(selected.load(Ordering::Acquire), 2);
+        assert_eq!(starts.load(Ordering::Relaxed), 2);
+        assert!(running.load(Ordering::Acquire));
+
+        worker.shutdown();
+
+        assert!(!running.load(Ordering::Acquire));
+        assert!(stops.load(Ordering::Relaxed) >= 3);
+    }
+
+    #[test]
+    fn owner_worker_reports_disconnect_and_invalidates_the_selected_token() {
+        use std::sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        };
+
+        struct DisconnectBackend {
+            running: Arc<AtomicBool>,
+        }
+
+        impl MicrophoneWorkerBackend for DisconnectBackend {
+            type Device = u8;
+
+            fn enumerate(&mut self) -> Result<Vec<(String, bool, Self::Device)>, String> {
+                Ok(vec![("USB microphone".to_owned(), true, 7)])
+            }
+
+            fn stop(&mut self) {
+                self.running.store(false, Ordering::Release);
+            }
+
+            fn start(&mut self, _device: &Self::Device) -> Result<(), String> {
+                self.running.store(true, Ordering::Release);
+                Ok(())
+            }
+
+            fn is_running(&self) -> bool {
+                self.running.load(Ordering::Acquire)
+            }
+        }
+
+        let running = Arc::new(AtomicBool::new(false));
+        let worker_running = Arc::clone(&running);
+        let worker = spawn_microphone_worker(move || DisconnectBackend {
+            running: worker_running,
+        })
+        .unwrap();
+
+        worker.send(MicrophoneWorkerCommand::Refresh).unwrap();
+        let MicrophoneWorkerEvent::Devices(devices) = worker
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .unwrap()
+        else {
+            panic!("expected the refreshed microphone snapshot");
+        };
+        let selected_id = devices[0].id.clone();
+
+        worker
+            .send(MicrophoneWorkerCommand::Select(MicrophoneSelection::Device(
+                selected_id.clone(),
+            )))
+            .unwrap();
+        assert_eq!(
+            worker
+                .recv_timeout(std::time::Duration::from_secs(2))
+                .unwrap(),
+            MicrophoneWorkerEvent::Selected {
+                device_id: selected_id.clone()
+            }
+        );
+        assert!(running.load(Ordering::Acquire));
+
+        // Simulate the native backend observing an unplugged device/host failure.
+        running.store(false, Ordering::Release);
+        assert_eq!(
+            worker
+                .recv_timeout(std::time::Duration::from_secs(2))
+                .unwrap(),
+            MicrophoneWorkerEvent::DeviceUnavailable {
+                device_id: Some(selected_id.clone())
+            }
+        );
+
+        // The worker invalidates the old generation and never substitutes the default.
+        worker
+            .send(MicrophoneWorkerCommand::Select(MicrophoneSelection::Device(
+                selected_id,
+            )))
+            .unwrap();
+        assert_eq!(
+            worker
+                .recv_timeout(std::time::Duration::from_secs(2))
+                .unwrap(),
+            MicrophoneWorkerEvent::SelectionRejected(
+                MicrophoneSelectionError::DeviceUnavailable
+            )
+        );
+
+        worker.shutdown();
+        assert!(!running.load(Ordering::Acquire));
+    }
+
+    #[test]
     fn mock_backend_exposes_only_local_device_descriptors() {
         let backend = MockMicrophoneBackend {
             devices: vec![MicrophoneDevice {

@@ -344,7 +344,6 @@ impl VoiceCaptureOpener for MockVoiceCaptureOpener {
     }
 }
 
-
 #[cfg(not(target_arch = "wasm32"))]
 impl Drop for CpalMicrophoneWorkerBackend {
     fn drop(&mut self) {
@@ -574,9 +573,7 @@ impl VoiceCaptureStream for CpalVoiceCaptureHandle {
             .map_err(|error| error.to_string())
     }
 
-    fn try_recv_input_event(
-        &mut self,
-    ) -> Option<super::voice_capture::MicrophoneWorkerEvent> {
+    fn try_recv_input_event(&mut self) -> Option<super::voice_capture::MicrophoneWorkerEvent> {
         self.worker.as_ref()?.try_recv().ok()
     }
 }

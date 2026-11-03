@@ -25,7 +25,7 @@ The first release is a Cinnabar-client-only voice feature.
 - `packaging/macos/Info.plist.in` currently has no `NSMicrophoneUsageDescription`. Before shipping actual input capture, the macOS app bundle must include a clear microphone purpose string and the permission flow must handle denial/revocation. Windows and Linux permission/error behavior still needs a platform-specific review.
 - The crate declares `platform-specific = ["macos", "windows"]`, while its native output implementation is compiled for every non-wasm target. Confirm the actual release target matrix before deciding whether voice input is desktop-only or should include other native targets.
 
-The capture prototype should first use the already-locked CPAL version behind a mockable interface, with device enumeration and supported input-format negotiation isolated from Bevy. Keep the callback bounded and non-blocking: convert supported sample formats to a fixed internal PCM representation, write into a bounded queue, count/drop on overflow, and never allocate, log, encode, or wait in the real-time callback. A dedicated owner must stop and drop the stream on mute, permission loss, session end and application shutdown. Add a local loopback test only after capture and output are independently controllable.
+The native CPAL discovery adapter and bounded PCM queue now exist, but input-format negotiation and stream capture do not. `BoundedPcmQueue` uses the existing `crossbeam-queue` dependency's bounded `ArrayQueue`: 48 kHz mono, 20 ms / 960-sample frames, 15 slots by default (~300 ms), and non-blocking drop-newest overflow counted with atomics. The queue is safe to share across threads and its slots are allocated at construction; the callback-side push copies into a fixed-size frame and does not allocate. Stop the producer before clearing the queue during lifecycle teardown so no callback can repopulate stale-session audio. The future stream owner must stop and drop the CPAL stream on mute, permission loss, session end and application shutdown. Add a local loopback test only after capture and output are independently controllable.
 
 ## Proposed high-level media flow (not implemented)
 
@@ -68,7 +68,7 @@ A server-routed SFU is the leading option to evaluate for global rooms. A full-m
 
 `audio::voice_capture` defines a platform-independent `MicrophoneBackend` interface and a `MicrophoneDevice` descriptor. The descriptor exposes a display name, a default-device flag and an opaque backend-local ID that is valid only for the enumeration snapshot that produced it. The interface is deliberately limited to discovery: it does not open a device, capture PCM, or own a worker. This keeps CPAL types out of the audio policy and allows deterministic mock implementations in unit tests.
 
-The production CPAL adapter, device-handle lifetime, permission integration and asynchronous enumeration remain unimplemented. Enumeration must run outside Bevy's frame schedule. A device ID must not be persisted as a stable hardware identity or sent to a server.
+A native `CpalMicrophoneBackend` now implements discovery through the already-available `rodio::cpal` re-export. It enumerates CPAL input devices and returns snapshot-scoped index IDs; it does not retain device handles, open a stream, or capture samples. The default-device flag is matched by device name because this descriptor-only boundary does not retain or compare platform handles; duplicate device names can therefore make that flag ambiguous. The caller must invoke enumeration on a worker/owner thread, never from Bevy's frame schedule. OS permission prompting/denial handling, stream opening and asynchronous request/result wiring remain unimplemented. A device ID must not be persisted as a stable hardware identity or sent to a server.
 
 ## Capture review notes (provisional)
 
@@ -100,8 +100,10 @@ References:
 
 - [x] Add a device-independent `VoiceInputPolicy` in `client-audio` and register it as a client resource. It gates capture on OS permission, explicit enablement and an active multiplayer session; it gates transmission separately for open-mic/PTT and local mute.
 - [x] Add deterministic tests for permission gating, open-mic, PTT press/release, mute, disconnect, permission revocation, disable and mode changes.
-- [ ] Implement the desktop microphone backend, OS permission/error reporting and device enumeration. No capture device is opened by the current policy.
+- [x] Implement native CPAL input-device enumeration behind `MicrophoneBackend`; it is a synchronous discovery adapter and must be called off the Bevy frame schedule.
+- [ ] Add the worker/owner-thread request-result path and OS permission/error reporting. No capture device is opened by the current policy.
 - [ ] Connect physical PTT input and settings to the policy.
+- [x] Add a bounded, thread-safe PCM frame queue with fixed internal format and explicit overflow accounting (no live capture producer yet).
 - [ ] Implement a bounded capture-to-playback loopback test and verify device shutdown on mute, disconnect and application exit.
 - [ ] Add device selection and input-level configuration without changing existing game sound behavior.
 

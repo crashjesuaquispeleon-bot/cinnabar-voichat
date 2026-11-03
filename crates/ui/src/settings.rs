@@ -16,7 +16,7 @@ pub enum VoiceActivationMode {
 }
 
 /// Persisted voice-chat preferences shared by settings and the runtime policy adapter.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct VoiceChatSettings {
     /// Voice capture remains disabled until the player explicitly enables it.
     pub enabled: bool,
@@ -24,6 +24,19 @@ pub struct VoiceChatSettings {
     pub muted: bool,
     /// Activation mode used after voice is enabled.
     pub activation_mode: VoiceActivationMode,
+    /// Local microphone gain in percent; 100 is neutral and 200 is a 2x boost.
+    pub input_sensitivity_percent: u8,
+}
+
+impl Default for VoiceChatSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            muted: false,
+            activation_mode: VoiceActivationMode::PushToTalk,
+            input_sensitivity_percent: 100,
+        }
+    }
 }
 
 impl VoiceActivationMode {

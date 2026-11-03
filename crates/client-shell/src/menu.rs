@@ -836,6 +836,9 @@ impl MenuRuntime {
             | MenuAction::SettingsMacroCommand(_)
             | MenuAction::SettingsResetChat
             | MenuAction::SettingsAdvancedGraphics
+            | MenuAction::SettingsMicrophoneRefresh
+            | MenuAction::SettingsMicrophoneUseSystemDefault
+            | MenuAction::SettingsMicrophoneSelect(..)
             | MenuAction::EditTouchControls) => self.activate_settings(action),
             MenuAction::Respawn => {
                 if self.death_controls_ready() {

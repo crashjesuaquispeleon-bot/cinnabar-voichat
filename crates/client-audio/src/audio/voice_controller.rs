@@ -852,8 +852,7 @@ mod tests {
 
     #[test]
     fn permission_retry_clears_previous_backoff_without_opening_capture() {
-        let mut controller =
-            VoiceCaptureController::with_opener(Box::new(MockVoiceCaptureOpener));
+        let mut controller = VoiceCaptureController::with_opener(Box::new(MockVoiceCaptureOpener));
         controller.next_open_attempt = Some(Instant::now() + Duration::from_secs(8));
         controller.open_retry_delay = MAX_OPEN_RETRY_DELAY;
         controller.last_error = Some("permission denied".to_owned());

@@ -103,6 +103,13 @@ A server-routed SFU is the leading option to evaluate for global rooms. A full-m
 
 `crates/client-audio/src/audio/voice_input.rs` now contains a pure lifecycle/privacy gate, registered by `ClientAudioPlugin`. The default is safe: permission unknown, voice disabled, no active multiplayer session and no activation mode selected. The user must explicitly select open-mic or PTT before transmission can occur. The future platform backend must consult `capture_permitted()` before opening a microphone and `transmission_permitted()` before forwarding frames. PTT state is cleared on mute, disable, permission loss, session end and mode changes, so a stale held-key state cannot reopen transmission. This is policy only: no OS device, microphone capture, physical key binding, PCM queue or loopback playback has been implemented yet.
 
+## Input and lifecycle adapter findings
+
+- Physical desktop key translation is owned by `crates/client-shell/src/physical_input.rs`; the semantic input domain is `crates/input`; the Bevy-facing collection and routing adapter is `app/src/semantic_controls.rs` (with physical sampling in `app/src/semantic_controls/physical.rs`). The audio crate should not poll Bevy keyboard state or own persisted keybinding UI.
+- `semantic_input::ActionSnapshot` already exposes per-action pressed/held/released phases and authority-release information. The current `semantic_input::Action` list has no Push-to-Talk action. A configurable PTT binding should therefore be integrated through the existing semantic action/binding/settings pipeline, then forwarded as a small state update to `VoiceInputPolicy`; do not silently hardcode a key or bypass the user's bindings.
+- The Bevy app configures the session transition systems `drive_session`, `follow_server_transfer` and `recover_session_failure` before its session-audio drain. Voice lifecycle integration belongs at this app adapter boundary so it observes the same join/leave/transfer outcomes, while capture/device ownership remains in `client-audio`. The local `session_generation` is useful to invalidate local capture queues, but is not backend authorization.
+- `client-audio`'s architecture policy keeps the audio owner below app/UI orchestration. Keep the CPAL stream abstraction and bounded PCM handoff there; keep physical input and session-observation wiring in the app edge. This preserves the repository's crate direction and avoids adding Bevy input dependencies to a low-level audio backend.
+
 ## Confirmed session-isolation behavior
 
 - A voice room belongs to one exact active multiplayer session, not merely to a server address or a global Cinnabar account pool.

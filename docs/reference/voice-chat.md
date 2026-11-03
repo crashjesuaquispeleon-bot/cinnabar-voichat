@@ -255,3 +255,8 @@ The platform-independent catalog now exposes `MicrophoneSelection` with two expl
 
 **This is the selection-policy primitive, not yet end-to-end CPAL device switching.** The current `CpalVoiceCaptureOpener` still opens the OS default device independently and its owner thread does not yet expose catalog refresh or select-device commands. The native CPAL discovery adapter still drops device handles. Do not expose this as a functioning microphone selector or persist its tokens until enumeration, token issuance, selection and stream opening are integrated on the same CPAL owner thread. Runtime unplug handling and UI/settings wiring remain pending.
 
+## Microphone catalog invalidation primitive (2026-11-03)
+
+`MicrophoneCatalog::invalidate()` now advances the catalog generation and drops every retained descriptor/handle entry. A token issued before invalidation therefore resolves as `DeviceUnavailable`, and an explicit `SystemDefault` request returns `NoDefaultDevice` until a fresh snapshot is published. A deterministic unit test verifies both outcomes and confirms the exposed descriptor list is empty after invalidation.
+
+This is a backend building block for unplug/host-reset handling; it does not yet subscribe to CPAL hot-plug notifications or stop/reopen the active stream. The CPAL worker must invoke invalidation on the owner thread when it detects removal or a host reset, then report the unavailable state to the caller. No UI selector should be exposed until that worker command path is integrated and tested.

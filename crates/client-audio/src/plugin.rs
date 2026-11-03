@@ -11,9 +11,14 @@ impl bevy::prelude::Plugin for ClientAudioPlugin {
             .init_resource::<AudioSettings>()
             .init_resource::<crate::audio::voice_input::VoiceInputPolicy>()
             .init_resource::<crate::audio::voice_controller::VoiceCaptureController>()
+            .init_resource::<crate::audio::voice_loopback::VoiceLoopbackAttachment>()
             .add_systems(
                 bevy::prelude::Update,
-                crate::audio::voice_controller::sync_voice_capture_with_policy,
+                (
+                    crate::audio::voice_controller::sync_voice_capture_with_policy,
+                    crate::audio::voice_loopback::attach_voice_loopback_to_named_audio
+                        .after(crate::audio::voice_controller::sync_voice_capture_with_policy),
+                ),
             )
             .add_message::<UiSoundCue>()
             .add_message::<LocalBlockCue>()

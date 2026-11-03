@@ -15,6 +15,40 @@ impl MenuRuntime {
     /// Applies settings navigation and edits without starting a game session.
     pub(in crate::menu) fn activate_settings(&mut self, action: MenuAction) {
         match action {
+            MenuAction::SettingsMicrophoneRefresh => {
+                self.microphone_selection_requested = None;
+                self.microphone_refresh_requested = true;
+                self.microphone_message =
+                    Some("Refreshing microphone input devices…".to_owned());
+            }
+            MenuAction::SettingsMicrophoneUseSystemDefault => {
+                self.microphone_selection_requested = Some(
+                    launcher::menu::view::MicrophoneSelectionRequest::SystemDefault,
+                );
+                self.microphone_message =
+                    Some("Switching to the system default microphone…".to_owned());
+            }
+            MenuAction::SettingsMicrophoneSelect(index, revision) => {
+                if revision != self.microphone_devices_revision {
+                    self.microphone_message = Some(
+                        "The microphone list changed. Refresh it before selecting a device."
+                            .to_owned(),
+                    );
+                } else if let Some(device) = self.microphone_devices.get(usize::from(index)) {
+                    self.microphone_selection_requested = Some(
+                        launcher::menu::view::MicrophoneSelectionRequest::Device(
+                            device.id.clone(),
+                        ),
+                    );
+                    self.microphone_message =
+                        Some(format!("Switching to {}…", device.name));
+                } else {
+                    self.microphone_message = Some(
+                        "That microphone is no longer available. Refresh the device list."
+                            .to_owned(),
+                    );
+                }
+            }
             MenuAction::EditTouchControls
                 if self.touch_available && self.screen == launcher::menu::MenuScreen::Settings =>
             {

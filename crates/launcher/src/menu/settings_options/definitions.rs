@@ -489,6 +489,8 @@ settings! {
         [(SettingPanel::Audio, 10)], [SettingsGroup::Audio], None, None;
     VoiceActivationMode => "voice_activation_mode", dropdown("Voice Activation Mode", VOICE_ACTIVATION_CHOICES, 1),
         [(SettingPanel::Audio, 11)], [SettingsGroup::Audio], None, None;
+    VoiceChatMuted => "voice_chat_muted", toggle("Mute My Microphone", false),
+        [(SettingPanel::Audio, 12)], [SettingsGroup::Audio], None, None;
     ControllerInvertYAxis => "controller_invert_y_axis", toggle("options.invertYAxis", false),
         [(SettingPanel::Controller, 2)], [], None, Some("options.invertYAxis.name");
     SwapGamepadAbButtons => "swap_gamepad_ab_buttons", toggle("options.swapGamepadAB", false),

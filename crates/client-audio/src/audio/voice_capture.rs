@@ -134,6 +134,59 @@ impl MicrophoneBackend for CpalMicrophoneBackend {
     }
 }
 
+
+/// User's local microphone preference. Device tokens are valid only in the
+/// catalog generation that issued them; `SystemDefault` is an explicit choice,
+/// never an implicit fallback for a missing selected device.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum MicrophoneSelection {
+    /// Resolve the operating-system default at the time the selection is applied.
+    SystemDefault,
+    /// Resolve this exact opaque token in the current catalog snapshot.
+    Device(String),
+}
+
+/// Why a microphone preference could not be resolved against the current snapshot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MicrophoneSelectionError {
+    /// The current snapshot has no device marked as the system default.
+    NoDefaultDevice,
+    /// The token is stale, unknown, or its device is no longer present.
+    DeviceUnavailable,
+    /// The backend reported more than one default; it must not guess.
+    AmbiguousDefault,
+}
+
+impl<T> MicrophoneCatalog<T> {
+    /// Resolves an explicit preference without silently substituting another device.
+    ///
+    /// The returned handle remains borrowed from this catalog and must be used only
+    /// by the backend owner that owns the catalog and its native device handles.
+    pub fn resolve_selection(
+        &self,
+        selection: &MicrophoneSelection,
+    ) -> Result<&T, MicrophoneSelectionError> {
+        match selection {
+            MicrophoneSelection::Device(id) => self
+                .resolve(id)
+                .ok_or(MicrophoneSelectionError::DeviceUnavailable),
+            MicrophoneSelection::SystemDefault => {
+                let mut defaults = self
+                    .entries
+                    .iter()
+                    .filter(|(descriptor, _)| descriptor.is_default);
+                let Some((_, handle)) = defaults.next() else {
+                    return Err(MicrophoneSelectionError::NoDefaultDevice);
+                };
+                if defaults.next().is_some() {
+                    return Err(MicrophoneSelectionError::AmbiguousDefault);
+                }
+                Ok(handle)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -146,6 +199,69 @@ mod tests {
         fn enumerate_input_devices(&self) -> anyhow::Result<Vec<MicrophoneDevice>> {
             Ok(self.devices.clone())
         }
+    }
+
+
+    #[test]
+    fn explicit_selection_resolves_exact_device_even_with_duplicate_names() {
+        let mut catalog = MicrophoneCatalog::default();
+        let devices = catalog.refresh([
+            ("USB Microphone".to_owned(), true, 10_u32),
+            ("USB Microphone".to_owned(), false, 20_u32),
+        ]);
+
+        assert_eq!(
+            catalog.resolve_selection(&MicrophoneSelection::Device(devices[1].id.clone())),
+            Ok(&20)
+        );
+    }
+
+    #[test]
+    fn explicit_missing_device_never_falls_back_to_system_default() {
+        let mut catalog = MicrophoneCatalog::default();
+        catalog.refresh([("System microphone".to_owned(), true, 10_u32)]);
+
+        assert_eq!(
+            catalog.resolve_selection(&MicrophoneSelection::Device("stale-token".to_owned())),
+            Err(MicrophoneSelectionError::DeviceUnavailable)
+        );
+    }
+
+    #[test]
+    fn system_default_is_resolved_from_the_current_generation() {
+        let mut catalog = MicrophoneCatalog::default();
+        catalog.refresh([
+            ("Old default".to_owned(), true, 10_u32),
+            ("Other device".to_owned(), false, 20_u32),
+        ]);
+        catalog.refresh([
+            ("Other device".to_owned(), false, 20_u32),
+            ("New default".to_owned(), true, 30_u32),
+        ]);
+
+        assert_eq!(
+            catalog.resolve_selection(&MicrophoneSelection::SystemDefault),
+            Ok(&30)
+        );
+    }
+
+    #[test]
+    fn system_default_rejects_missing_or_ambiguous_default() {
+        let mut catalog = MicrophoneCatalog::default();
+        catalog.refresh([("No default".to_owned(), false, 10_u32)]);
+        assert_eq!(
+            catalog.resolve_selection(&MicrophoneSelection::SystemDefault),
+            Err(MicrophoneSelectionError::NoDefaultDevice)
+        );
+
+        catalog.refresh([
+            ("First default".to_owned(), true, 10_u32),
+            ("Second default".to_owned(), true, 20_u32),
+        ]);
+        assert_eq!(
+            catalog.resolve_selection(&MicrophoneSelection::SystemDefault),
+            Err(MicrophoneSelectionError::AmbiguousDefault)
+        );
     }
 
     #[test]

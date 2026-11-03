@@ -206,7 +206,10 @@ mod tests {
         policy.set_muted(true);
         assert!(!policy.transmission_permitted());
         policy.set_muted(false);
-        assert!(!policy.transmission_permitted(), "mute must release the PTT latch");
+        assert!(
+            !policy.transmission_permitted(),
+            "mute must release the PTT latch"
+        );
 
         policy.set_push_to_talk_held(true);
         policy.set_session_active(false);

@@ -1,0 +1,9 @@
+[1m[92m    Checking[0m dasp_sample v0.11.0
+[1m[92m    Checking[0m windows_x86_64_msvc v0.52.6
+[1m[92m    Checking[0m windows-targets v0.52.6
+[1m[92m    Checking[0m windows-result v0.1.2
+[1m[92m    Checking[0m windows-core v0.54.0
+[1m[92m    Checking[0m windows v0.54.0
+[1m[92m    Checking[0m cpal v0.15.3
+[1m[92m    Checking[0m client-voice v0.1.31 (D:\a\cinnabar-voichat\cinnabar-voichat\crates\client-voice)
+[1m[92m    Finished[0m `dev` profile [optimized + debuginfo] target(s) in 13.22s

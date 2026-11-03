@@ -1,0 +1,97 @@
+info: syncing channel updates for 1.99.0-x86_64-unknown-linux-gnu
+info: latest update on 2026-10-01 for version 1.99.0 (b940084d7 2026-09-28)
+info: downloading 3 components
+[1m[92m    Updating[0m git repository `https://github.com/cinnabar-mc/bevy`
+[1m[92m    Updating[0m git repository `https://github.com/cinnabar-mc/minidump-writer`
+[1m[92m    Updating[0m git repository `https://github.com/cinnabar-mc/wgpu`
+[1m[92m    Updating[0m crates.io index
+[1m[92m    Updating[0m git repository `https://github.com/cinnabar-mc/glslpp-rs`
+[1m[92m Downloading[0m crates ...
+[1m[92m  Downloaded[0m alsa-sys v0.3.1
+[1m[92m  Downloaded[0m cfg-if v1.0.4
+[1m[92m  Downloaded[0m alsa v0.9.1
+[1m[92m  Downloaded[0m pkg-config v0.3.32
+[1m[92m  Downloaded[0m cpal v0.15.3
+[1m[92m  Downloaded[0m bitflags v2.13.0
+[1m[92m  Downloaded[0m dasp_sample v0.11.0
+[1m[92m  Downloaded[0m libc v0.2.186
+[1m[92m   Compiling[0m pkg-config v0.3.32
+[1m[92m   Compiling[0m libc v0.2.186
+[1m[92m   Compiling[0m cfg-if v1.0.4
+[1m[92m   Compiling[0m bitflags v2.13.0
+[1m[92m   Compiling[0m cpal v0.15.3
+[1m[92m   Compiling[0m dasp_sample v0.11.0
+[1m[92m   Compiling[0m alsa-sys v0.3.1
+[1m[92m   Compiling[0m alsa v0.9.1
+[1m[92m   Compiling[0m client-voice v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/client-voice)
+[1m[92m    Finished[0m `test` profile [optimized + debuginfo] target(s) in 20.42s
+[1m[92m     Running[0m unittests src/lib.rs (/home/runner/.cargo/build/cinnabar/40/db403be11fbbf0/debug/deps/client_voice-fe69d4457d81458e)
+
+running 45 tests
+test adpcm::tests::frames_have_the_documented_size ... ok
+test adpcm::tests::concealment_fades_to_silence ... ok
+test adpcm::tests::a_lost_frame_does_not_corrupt_the_next_one ... ok
+test adpcm::tests::rejects_malformed_payloads_and_frames ... ok
+test adpcm::tests::silence_stays_silent ... ok
+test codec::tests::conceals_loss_without_a_previous_frame ... ok
+test codec::tests::round_trips_within_quantization_error ... ok
+test adpcm::tests::speech_band_tones_survive_with_good_quality ... ok
+test codec::tests::rejects_wrong_sizes ... ok
+test gate::tests::hysteresis_keeps_it_open_between_the_thresholds ... ok
+test gate::tests::rms_of_silence_and_full_scale ... ok
+test gate::tests::opens_on_speech_and_holds_through_the_tail ... ok
+test jitter::tests::bounds_memory_when_the_consumer_stalls ... ok
+test jitter::tests::drops_frames_that_arrive_after_their_slot ... ok
+test gate::tests::stays_closed_for_background_noise ... ok
+test jitter::tests::ignores_duplicates ... ok
+test jitter::tests::reorders_out_of_order_frames ... ok
+test jitter::tests::handles_sequence_wraparound ... ok
+test device::tests::resampler_produces_the_expected_number_of_samples ... ok
+test jitter::tests::reports_missing_frames_for_concealment ... ok
+test jitter::tests::resyncs_after_a_long_pause_instead_of_emitting_endless_gaps ... ok
+test proto::tests::every_packet_round_trips ... ok
+test proto::tests::rejects_empty_and_oversized_payloads ... ok
+test proto::tests::rejects_non_finite_positions ... ok
+test jitter::tests::waits_for_prebuffer_then_plays_in_order ... ok
+test relay::tests::bye_removes_the_peer_and_garbage_is_ignored ... ok
+test proto::tests::rejects_malformed_input_without_panicking ... ok
+test relay::tests::enforces_room_capacity ... ok
+test relay::tests::forwards_only_to_listeners_in_range_and_dimension ... ok
+test relay::tests::listeners_without_a_known_position_hear_nothing ... ok
+test relay::tests::reconnecting_player_replaces_old_session ... ok
+test relay::tests::expires_silent_peers ... ok
+test relay::tests::ignores_voice_from_unknown_senders ... ok
+test relay::tests::rejects_wrong_secret ... ok
+test room::tests::secrets_differ ... ok
+test room::tests::detects_typos_and_bad_input ... ok
+test room::tests::round_trips ... ok
+test room::tests::tolerates_case_spaces_and_missing_dashes ... ok
+test spatial::tests::east_of_a_south_facing_listener_is_on_the_left ... ok
+test spatial::tests::power_is_preserved_across_the_pan ... ok
+test spatial::tests::gain_curve_is_full_then_linear_then_silent ... ok
+test spatial::tests::other_dimension_or_far_is_inaudible ... ok
+test spatial::tests::speaker_straight_ahead_is_centered ... ok
+test spatial::tests::turning_moves_the_sound_across_the_stereo_field ... ok
+test spatial::tests::west_of_a_south_facing_listener_is_on_the_right ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+[1m[92m     Running[0m tests/e2e.rs (/home/runner/.cargo/build/cinnabar/40/db403be11fbbf0/debug/deps/e2e-47542be2c7788326)
+
+running 4 tests
+test wrong_secret_is_denied ... ok
+test room_code_carries_everything_a_joiner_needs ... ok
+test leaving_stops_delivery ... ok
+test nearby_players_hear_each_other_and_distant_ones_do_not ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+[1m[92m     Running[0m tests/engine_e2e.rs (/home/runner/.cargo/build/cinnabar/40/db403be11fbbf0/debug/deps/engine_e2e-d01abbd88554948a)
+
+running 3 tests
+test joining_with_a_bad_or_wrong_code_fails_cleanly ... ok
+test a_distant_listener_hears_nothing_and_mute_stops_transmission ... ok
+test bob_hears_alice_from_her_side_of_the_stereo_field ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.78s
+

@@ -1,0 +1,9 @@
+[1m[92m    Checking[0m cfg-if v1.0.4
+[1m[92m    Checking[0m libc v0.2.186
+[1m[92m    Checking[0m bitflags v2.13.0
+[1m[92m    Checking[0m dasp_sample v0.11.0
+[1m[92m    Checking[0m alsa-sys v0.3.1
+[1m[92m    Checking[0m alsa v0.9.1
+[1m[92m    Checking[0m cpal v0.15.3
+[1m[92m    Checking[0m client-voice v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/client-voice)
+[1m[92m    Finished[0m `dev` profile [optimized + debuginfo] target(s) in 1.34s

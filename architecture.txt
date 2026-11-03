@@ -1,0 +1,189 @@
+info: syncing channel updates for 1.99.0-x86_64-unknown-linux-gnu
+info: latest update on 2026-10-01 for version 1.99.0 (b940084d7 2026-09-28)
+info: component clippy is up to date
+info: downloading 2 components
+[1m[92m    Updating[0m git repository `https://github.com/cinnabar-mc/bevy`
+[1m[92m    Updating[0m git repository `https://github.com/cinnabar-mc/minidump-writer`
+[1m[92m    Updating[0m git repository `https://github.com/cinnabar-mc/wgpu`
+[1m[92m    Updating[0m crates.io index
+[1m[92m    Updating[0m git repository `https://github.com/cinnabar-mc/glslpp-rs`
+[1m[92m Downloading[0m crates ...
+[1m[92m  Downloaded[0m anstyle-query v1.1.5
+[1m[92m  Downloaded[0m anstream v1.0.0
+[1m[92m  Downloaded[0m anstyle-parse v1.0.0
+[1m[92m  Downloaded[0m colorchoice v1.0.5
+[1m[92m  Downloaded[0m adler2 v2.0.1
+[1m[92m  Downloaded[0m sha2 v0.10.9
+[1m[92m  Downloaded[0m cfg-if v1.0.4
+[1m[92m  Downloaded[0m winnow v0.7.15
+[1m[92m  Downloaded[0m is_terminal_polyfill v1.70.2
+[1m[92m  Downloaded[0m either v1.16.0
+[1m[92m  Downloaded[0m clap_lex v1.1.0
+[1m[92m  Downloaded[0m utf8parse v0.2.2
+[1m[92m  Downloaded[0m equivalent v1.0.2
+[1m[92m  Downloaded[0m generic-array v0.14.7
+[1m[92m  Downloaded[0m pin-project-lite v0.2.17
+[1m[92m  Downloaded[0m toml_datetime v0.7.5+spec-1.1.0
+[1m[92m  Downloaded[0m quote v1.0.46
+[1m[92m  Downloaded[0m tinyvec_macros v0.1.1
+[1m[92m  Downloaded[0m crypto-common v0.1.7
+[1m[92m  Downloaded[0m thiserror-impl v2.0.18
+[1m[92m  Downloaded[0m byteorder v1.5.0
+[1m[92m  Downloaded[0m heck v0.5.0
+[1m[92m  Downloaded[0m strsim v0.11.1
+[1m[92m  Downloaded[0m block-buffer v0.10.4
+[1m[92m  Downloaded[0m digest v0.10.7
+[1m[92m  Downloaded[0m proc-macro2 v1.0.106
+[1m[92m  Downloaded[0m smallvec v1.15.2
+[1m[92m  Downloaded[0m crc32fast v1.5.0
+[1m[92m  Downloaded[0m thiserror v2.0.18
+[1m[92m  Downloaded[0m crossbeam-epoch v0.9.20
+[1m[92m  Downloaded[0m tracing-attributes v0.1.31
+[1m[92m  Downloaded[0m toml_parser v1.1.2+spec-1.1.0
+[1m[92m  Downloaded[0m clap_derive v4.6.1
+[1m[92m  Downloaded[0m toml_writer v1.1.2+spec-1.1.0
+[1m[92m  Downloaded[0m tracing-core v0.1.36
+[1m[92m  Downloaded[0m bitflags v2.13.0
+[1m[92m  Downloaded[0m serde_derive v1.0.228
+[1m[92m  Downloaded[0m miniz_oxide v0.8.9
+[1m[92m  Downloaded[0m rayon-core v1.13.0
+[1m[92m  Downloaded[0m lewton v0.10.2
+[1m[92m  Downloaded[0m serde v1.0.228
+[1m[92m  Downloaded[0m zip v7.2.0
+[1m[92m  Downloaded[0m typenum v1.20.1
+[1m[92m  Downloaded[0m indexmap v2.14.0
+[1m[92m  Downloaded[0m typed-path v0.12.3
+[1m[92m  Downloaded[0m flate2 v1.1.9
+[1m[92m  Downloaded[0m hashbrown v0.17.1
+[1m[92m  Downloaded[0m png v0.18.1
+[1m[92m  Downloaded[0m clap_builder v4.6.0
+[1m[92m  Downloaded[0m syn v2.0.118
+[1m[92m  Downloaded[0m tracing v0.1.44
+[1m[92m  Downloaded[0m unicode-ident v1.0.24
+[1m[92m  Downloaded[0m glam v0.33.12
+[1m[92m  Downloaded[0m libc v0.2.186
+[1m[92m  Downloaded[0m cfg-expr v0.20.10
+[1m[92m  Downloaded[0m once_cell v1.21.4
+[1m[92m  Downloaded[0m ttf-parser v0.21.1
+[1m[92m  Downloaded[0m errno v0.3.14
+[1m[92m  Downloaded[0m serde_core v1.0.228
+[1m[92m  Downloaded[0m cpufeatures v0.2.17
+[1m[92m  Downloaded[0m serde_json v1.0.150
+[1m[92m  Downloaded[0m toml v0.9.12+spec-1.1.0
+[1m[92m  Downloaded[0m fontdue v0.9.3
+[1m[92m  Downloaded[0m winnow v1.0.3
+[1m[92m  Downloaded[0m zlib-rs v0.6.7
+[1m[92m  Downloaded[0m tinyvec v1.11.0
+[1m[92m  Downloaded[0m linux-raw-sys v0.12.1
+[1m[92m  Downloaded[0m zmij v1.0.21
+[1m[92m  Downloaded[0m crossbeam-utils v0.8.22
+[1m[92m  Downloaded[0m anstyle v1.0.14
+[1m[92m  Downloaded[0m simd-adler32 v0.3.9
+[1m[92m  Downloaded[0m crossbeam-deque v0.8.7
+[1m[92m  Downloaded[0m fdeflate v0.3.7
+[1m[92m  Downloaded[0m clap v4.6.1
+[1m[92m  Downloaded[0m version_check v0.9.5
+[1m[92m  Downloaded[0m ogg v0.8.0
+[1m[92m  Downloaded[0m serde_spanned v1.1.1
+[1m[92m  Downloaded[0m memchr v2.8.3
+[1m[92m  Downloaded[0m itoa v1.0.18
+[1m[92m  Downloaded[0m rayon v1.12.0
+[1m[92m  Downloaded[0m rustix v1.1.4
+[1m[92m   Compiling[0m unicode-ident v1.0.24
+[1m[92m   Compiling[0m proc-macro2 v1.0.106
+[1m[92m   Compiling[0m quote v1.0.46
+[1m[92m   Compiling[0m serde_core v1.0.228
+[1m[92m   Compiling[0m version_check v0.9.5
+[1m[92m   Compiling[0m crossbeam-utils v0.8.22
+[1m[92m   Compiling[0m typenum v1.20.1
+[1m[92m   Compiling[0m syn v2.0.118
+[1m[92m   Compiling[0m generic-array v0.14.7
+[1m[92m   Compiling[0m simd-adler32 v0.3.9
+[1m[92m   Compiling[0m crossbeam-epoch v0.9.20
+[1m[92m   Compiling[0m crc32fast v1.5.0
+[1m[92m   Compiling[0m cfg-if v1.0.4
+[1m[92m   Compiling[0m crossbeam-deque v0.8.7
+[1m[92m   Compiling[0m adler2 v2.0.1
+[1m[92m   Compiling[0m miniz_oxide v0.8.9
+[1m[92m   Compiling[0m zmij v1.0.21
+[1m[92m   Compiling[0m rayon-core v1.13.0
+[1m[92m   Compiling[0m utf8parse v0.2.2
+[1m[92m   Compiling[0m zlib-rs v0.6.7
+[1m[92m   Compiling[0m anstyle-parse v1.0.0
+[1m[92m   Compiling[0m block-buffer v0.10.4
+[1m[92m   Compiling[0m crypto-common v0.1.7
+[1m[92m   Compiling[0m bitflags v2.13.0
+[1m[92m   Compiling[0m hashbrown v0.17.1
+[1m[92m   Compiling[0m tinyvec_macros v0.1.1
+[1m[92m   Compiling[0m byteorder v1.5.0
+[1m[92m   Compiling[0m rustix v1.1.4
+[1m[92m   Compiling[0m serde_json v1.0.150
+[1m[92m   Compiling[0m thiserror v2.0.18
+[1m[92m   Compiling[0m anstyle v1.0.14
+[1m[92m   Compiling[0m serde v1.0.228
+[1m[92m   Compiling[0m equivalent v1.0.2
+[1m[92m   Compiling[0m is_terminal_polyfill v1.70.2
+[1m[92m   Compiling[0m colorchoice v1.0.5
+[1m[92m   Compiling[0m once_cell v1.21.4
+[1m[92m   Compiling[0m anstyle-query v1.1.5
+[1m[92m   Compiling[0m memchr v2.8.3
+[1m[92m   Compiling[0m tracing-core v0.1.36
+[1m[92m   Compiling[0m flate2 v1.1.9
+[1m[92m   Compiling[0m anstream v1.0.0
+[1m[92m   Compiling[0m indexmap v2.14.0
+[1m[92m   Compiling[0m ogg v0.8.0
+[1m[92m   Compiling[0m tinyvec v1.11.0
+[1m[92m   Compiling[0m digest v0.10.7
+[1m[92m   Compiling[0m fdeflate v0.3.7
+[1m[92m   Compiling[0m linux-raw-sys v0.12.1
+[1m[92m   Compiling[0m cpufeatures v0.2.17
+[1m[92m   Compiling[0m heck v0.5.0
+[1m[92m   Compiling[0m either v1.16.0
+[1m[92m   Compiling[0m pin-project-lite v0.2.17
+[1m[92m   Compiling[0m ttf-parser v0.21.1
+[1m[92m   Compiling[0m typed-path v0.12.3
+[1m[92m   Compiling[0m winnow v1.0.3
+[1m[92m   Compiling[0m itoa v1.0.18
+[1m[92m   Compiling[0m strsim v0.11.1
+[1m[92m   Compiling[0m clap_lex v1.1.0
+[1m[92m   Compiling[0m clap_builder v4.6.0
+[1m[92m   Compiling[0m zip v7.2.0
+[1m[92m   Compiling[0m toml_parser v1.1.2+spec-1.1.0
+[1m[92m   Compiling[0m fontdue v0.9.3
+[1m[92m   Compiling[0m rayon v1.12.0
+[1m[92m   Compiling[0m sha2 v0.10.9
+[1m[92m   Compiling[0m png v0.18.1
+[1m[92m   Compiling[0m lewton v0.10.2
+[1m[92m   Compiling[0m toml_datetime v0.7.5+spec-1.1.0
+[1m[92m   Compiling[0m serde_spanned v1.1.1
+[1m[92m   Compiling[0m env-compat v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/env-compat)
+[1m[92m   Compiling[0m protocol-ids v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/protocol-ids)
+[1m[92m   Compiling[0m smallvec v1.15.2
+[1m[92m   Compiling[0m block-transform v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/block-transform)
+[1m[92m   Compiling[0m glam v0.33.12
+[1m[92m   Compiling[0m winnow v0.7.15
+[1m[92m   Compiling[0m toml_writer v1.1.2+spec-1.1.0
+[1m[92m   Compiling[0m toml v0.9.12+spec-1.1.0
+[1m[92m   Compiling[0m cfg-expr v0.20.10
+[1m[92m   Compiling[0m workspace-declarations v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/tools/workspace-declarations)
+[1m[92m   Compiling[0m tracing-attributes v0.1.31
+[1m[92m   Compiling[0m serde_derive v1.0.228
+[1m[92m   Compiling[0m thiserror-impl v2.0.18
+[1m[92m   Compiling[0m tracing v0.1.44
+[1m[92m   Compiling[0m clap_derive v4.6.1
+[1m[92m   Compiling[0m assets v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/assets)
+[1m[92m   Compiling[0m clap v4.6.1
+[1m[92m   Compiling[0m architecture v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/tools/architecture)
+[1m[92m    Finished[0m `dev` profile [optimized + debuginfo] target(s) in 2m 17s
+[1m[92m     Running[0m `target/debug/architecture check --root . --policy tools/architecture/policy.toml`
+crates/client-voice/tests/e2e.rs:133: tests wait with `test_time::eventually` (Rust) or `testwait` or `testing/synctest` (Go), never sleep
+crates/client-voice/tests/e2e.rs:135: tests wait with `test_time::eventually` (Rust) or `testwait` or `testing/synctest` (Go), never sleep
+crates/client-voice/tests/e2e.rs:57: tests wait with `test_time::eventually` (Rust) or `testwait` or `testing/synctest` (Go), never sleep
+crates/client-voice/tests/e2e.rs:73: tests wait with `test_time::eventually` (Rust) or `testwait` or `testing/synctest` (Go), never sleep
+crates/client-voice/tests/e2e.rs:84: tests wait with `test_time::eventually` (Rust) or `testwait` or `testing/synctest` (Go), never sleep
+crates/client-voice/tests/engine_e2e.rs:128: tests wait with `test_time::eventually` (Rust) or `testwait` or `testing/synctest` (Go), never sleep
+crates/client-voice/tests/engine_e2e.rs:152: tests wait with `test_time::eventually` (Rust) or `testwait` or `testing/synctest` (Go), never sleep
+crates/client-voice/tests/engine_e2e.rs:164: tests wait with `test_time::eventually` (Rust) or `testwait` or `testing/synctest` (Go), never sleep
+crates/client-voice/tests/engine_e2e.rs:166: tests wait with `test_time::eventually` (Rust) or `testwait` or `testing/synctest` (Go), never sleep
+crates/client-voice/tests/engine_e2e.rs:81: tests wait with `test_time::eventually` (Rust) or `testwait` or `testing/synctest` (Go), never sleep
+docs/architecture/workspace.md: workspace crate `client-voice` has no complete ownership row for `crates/client-voice`

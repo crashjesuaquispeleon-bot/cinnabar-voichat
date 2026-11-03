@@ -1,0 +1,1128 @@
+[1m[92m Downloading[0m crates ...
+[1m[92m  Downloaded[0m ab_glyph v0.2.32
+[1m[92m  Downloaded[0m ab_glyph_rasterizer v0.1.10
+[1m[92m  Downloaded[0m addr2line v0.25.1
+[1m[92m  Downloaded[0m accesskit v0.24.1
+[1m[92m  Downloaded[0m async-task v4.7.1
+[1m[92m  Downloaded[0m accesskit_winit v0.33.2
+[1m[92m  Downloaded[0m debugid v0.8.0
+[1m[92m  Downloaded[0m approx v0.5.1
+[1m[92m  Downloaded[0m as-raw-xcb-connection v1.0.1
+[1m[92m  Downloaded[0m deranged v0.5.8
+[1m[92m  Downloaded[0m async-executor v1.14.0
+[1m[92m  Downloaded[0m atomicow v1.2.0
+[1m[92m  Downloaded[0m macro-string v0.2.0
+[1m[92m  Downloaded[0m arrayref v0.3.9
+[1m[92m  Downloaded[0m async-broadcast v0.7.2
+[1m[92m  Downloaded[0m blocking v1.6.2
+[1m[92m  Downloaded[0m cap-rand v3.4.6
+[1m[92m  Downloaded[0m cap-time-ext v3.4.6
+[1m[92m  Downloaded[0m ciborium-ll v0.2.2
+[1m[92m  Downloaded[0m cobs v0.3.0
+[1m[92m  Downloaded[0m alsa-sys v0.3.1
+[1m[92m  Downloaded[0m autocfg v1.5.1
+[1m[92m  Downloaded[0m lru-slab v0.1.2
+[1m[92m  Downloaded[0m logos-derive v0.16.1
+[1m[92m  Downloaded[0m calloop-wayland-source v0.3.0
+[1m[92m  Downloaded[0m constgebra v0.1.4
+[1m[92m  Downloaded[0m anyhow v1.0.103
+[1m[92m  Downloaded[0m arrayvec v0.7.8
+[1m[92m  Downloaded[0m cap-net-ext v3.4.6
+[1m[92m  Downloaded[0m cranelift-native v0.123.16
+[1m[92m  Downloaded[0m cap-fs-ext v3.4.6
+[1m[92m  Downloaded[0m byteorder-lite v0.1.0
+[1m[92m  Downloaded[0m cranelift-codegen-shared v0.123.16
+[1m[92m  Downloaded[0m ambient-authority v0.0.2
+[1m[92m  Downloaded[0m async-channel v2.5.0
+[1m[92m  Downloaded[0m cfg_aliases v0.2.2
+[1m[92m  Downloaded[0m const-fnv1a-hash v1.1.0
+[1m[92m  Downloaded[0m cursor-icon v1.2.0
+[1m[92m  Downloaded[0m ciborium-io v0.2.2
+[1m[92m  Downloaded[0m cpubits v0.1.1
+[1m[92m  Downloaded[0m cpufeatures v0.3.0
+[1m[92m  Downloaded[0m cranelift-bitset v0.123.16
+[1m[92m  Downloaded[0m logos-codegen v0.16.1
+[1m[92m  Downloaded[0m async-fs v2.2.0
+[1m[92m  Downloaded[0m async-process v2.5.0
+[1m[92m  Downloaded[0m async-signal v0.2.14
+[1m[92m  Downloaded[0m atomic-waker v1.1.2
+[1m[92m  Downloaded[0m bit-vec v0.9.1
+[1m[92m  Downloaded[0m cipher v0.5.2
+[1m[92m  Downloaded[0m pp-rs v0.2.1
+[1m[92m  Downloaded[0m color_quant v1.1.0
+[1m[92m  Downloaded[0m ctrlc v3.5.2
+[1m[92m  Downloaded[0m crossbeam-queue v0.3.13
+[1m[92m  Downloaded[0m crypto-common v0.2.2
+[1m[92m  Downloaded[0m arboard v3.6.1
+[1m[92m  Downloaded[0m bit-set v0.10.0
+[1m[92m  Downloaded[0m parking_lot_core v0.9.12
+[1m[92m  Downloaded[0m plain v0.2.3
+[1m[92m  Downloaded[0m aes v0.9.3
+[1m[92m  Downloaded[0m annotate-snippets v0.12.16
+[1m[92m  Downloaded[0m cranelift-srcgen v0.123.16
+[1m[92m  Downloaded[0m percent-encoding v2.3.2
+[1m[92m  Downloaded[0m assert_type_match v0.1.1
+[1m[92m  Downloaded[0m async-trait v0.1.92
+[1m[92m  Downloaded[0m constant_time_eq v0.4.2
+[1m[92m  Downloaded[0m core_detect v1.0.0
+[1m[92m  Downloaded[0m cranelift-entity v0.123.16
+[1m[92m  Downloaded[0m critical-section v1.2.0
+[1m[92m  Downloaded[0m dasp_sample v0.11.0
+[1m[92m  Downloaded[0m paste v1.0.15
+[1m[92m  Downloaded[0m arc-swap v1.9.3
+[1m[92m  Downloaded[0m async-io v2.6.0
+[1m[92m  Downloaded[0m async-recursion v1.2.0
+[1m[92m  Downloaded[0m bytemuck_derive v1.10.2
+[1m[92m  Downloaded[0m cap-std v3.4.6
+[1m[92m  Downloaded[0m chacha20 v0.10.1
+[1m[92m  Downloaded[0m ciborium v0.2.2
+[1m[92m  Downloaded[0m codespan-reporting v0.13.1
+[1m[92m  Downloaded[0m concurrent-queue v2.5.0
+[1m[92m  Downloaded[0m convert_case v0.10.0
+[1m[92m  Downloaded[0m cranelift-assembler-x64-meta v0.123.16
+[1m[92m  Downloaded[0m cranelift-bforest v0.123.16
+[1m[92m  Downloaded[0m yoke-derive v0.8.2
+[1m[92m  Downloaded[0m ahash v0.8.12
+[1m[92m  Downloaded[0m allocator-api2 v0.2.21
+[1m[92m  Downloaded[0m arbitrary v1.4.2
+[1m[92m  Downloaded[0m async-lock v3.4.2
+[1m[92m  Downloaded[0m bytemuck v1.25.0
+[1m[92m  Downloaded[0m bytes v1.12.1
+[1m[92m  Downloaded[0m calloop v0.13.0
+[1m[92m  Downloaded[0m const_panic v0.2.15
+[1m[92m  Downloaded[0m const_soft_float v0.1.4
+[1m[92m  Downloaded[0m cranelift-assembler-x64 v0.123.16
+[1m[92m  Downloaded[0m cranelift-control v0.123.16
+[1m[92m  Downloaded[0m crash-context v0.8.0
+[1m[92m  Downloaded[0m crash-handler v0.8.1
+[1m[92m  Downloaded[0m litrs v1.0.0
+[1m[92m  Downloaded[0m offset-allocator v0.2.0
+[1m[92m  Downloaded[0m piper v0.2.5
+[1m[92m  Downloaded[0m polling v3.11.0
+[1m[92m  Downloaded[0m powerfmt v0.2.0
+[1m[92m  Downloaded[0m prettyplease v0.2.37
+[1m[92m  Downloaded[0m proc-macro-crate v3.5.0
+[1m[92m  Downloaded[0m wayland-client v0.31.14
+[1m[92m  Downloaded[0m wayland-protocols-plasma v0.3.12
+[1m[92m  Downloaded[0m weak-table v0.4.0
+[1m[92m  Downloaded[0m wgsl-types v0.6.0
+[1m[92m  Downloaded[0m witx v0.9.1
+[1m[92m  Downloaded[0m alsa v0.9.1
+[1m[92m  Downloaded[0m base64 v0.22.1
+[1m[92m  Downloaded[0m blake3 v1.8.5
+[1m[92m  Downloaded[0m bumpalo v3.20.3
+[1m[92m  Downloaded[0m cap-primitives v3.4.6
+[1m[92m  Downloaded[0m cranelift-codegen-meta v0.123.16
+[1m[92m  Downloaded[0m cranelift-frontend v0.123.16
+[1m[92m  Downloaded[0m cranelift-isle v0.123.16
+[1m[92m  Downloaded[0m lexical-util v1.0.7
+[1m[92m  Downloaded[0m parking v2.2.1
+[1m[92m  Downloaded[0m rustc-hash v2.1.3
+[1m[92m  Downloaded[0m zerovec-derive v0.11.3
+[1m[92m  Downloaded[0m cc v1.2.66
+[1m[92m  Downloaded[0m crossbeam-channel v0.5.16
+[1m[92m  Downloaded[0m futures-core v0.3.32
+[1m[92m  Downloaded[0m zune-core v0.5.1
+[1m[92m  Downloaded[0m leb128fmt v0.1.0
+[1m[92m  Downloaded[0m profiling v1.0.18
+[1m[92m  Downloaded[0m cpal v0.15.3
+[1m[92m  Downloaded[0m wesl v0.6.0
+[1m[92m  Downloaded[0m zbus_macros v5.19.0
+[1m[92m  Downloaded[0m memfd v0.6.6
+[1m[92m  Downloaded[0m quork-proc v0.5.0
+[1m[92m  Downloaded[0m range-map v0.2.0
+[1m[92m  Downloaded[0m hex v0.4.3
+[1m[92m  Downloaded[0m potential_utf v0.1.5
+[1m[92m  Downloaded[0m fastrand v2.4.1
+[1m[92m  Downloaded[0m matchers v0.2.0
+[1m[92m  Downloaded[0m nonmax v0.5.5
+[1m[92m  Downloaded[0m num-conv v0.2.2
+[1m[92m  Downloaded[0m multiversion_no_op v1.0.0
+[1m[92m  Downloaded[0m proc-macro-error-attr2 v2.0.0
+[1m[92m  Downloaded[0m process-reader v0.1.0
+[1m[92m  Downloaded[0m rand_chacha v0.3.1
+[1m[92m  Downloaded[0m scopeguard v1.2.0
+[1m[92m  Downloaded[0m find-msvc-tools v0.1.9
+[1m[92m  Downloaded[0m futures-channel v0.3.32
+[1m[92m  Downloaded[0m futures-executor v0.3.32
+[1m[92m  Downloaded[0m process-backend v0.1.0
+[1m[92m  Downloaded[0m derive_more v2.1.1
+[1m[92m  Downloaded[0m pkg-config v0.3.32
+[1m[92m  Downloaded[0m prost-derive v0.13.5
+[1m[92m  Downloaded[0m rectangle-pack v0.4.2
+[1m[92m  Downloaded[0m tower-service v0.3.3
+[1m[92m  Downloaded[0m enumflags2_derive v0.7.12
+[1m[92m  Downloaded[0m num-derive v0.4.2
+[1m[92m  Downloaded[0m inventory v0.3.24
+[1m[92m  Downloaded[0m maybe-owned v0.3.4
+[1m[92m  Downloaded[0m mutants v0.0.3
+[1m[92m  Downloaded[0m rustc-hash v1.1.0
+[1m[92m  Downloaded[0m wasmtime-internal-versioned-export-macros v36.0.16
+[1m[92m  Downloaded[0m os_pipe v1.2.3
+[1m[92m  Downloaded[0m owned_ttf_parser v0.25.1
+[1m[92m  Downloaded[0m pulley-macros v36.0.16
+[1m[92m  Downloaded[0m renderdoc-sys v1.1.0
+[1m[92m  Downloaded[0m smart-default v0.7.1
+[1m[92m  Downloaded[0m tower-layer v0.3.3
+[1m[92m  Downloaded[0m rand_core v0.6.4
+[1m[92m  Downloaded[0m scoped-tls v1.0.1
+[1m[92m  Downloaded[0m time-core v0.1.9
+[1m[92m  Downloaded[0m hexasphere v19.0.0
+[1m[92m  Downloaded[0m ordered-stream v0.2.0
+[1m[92m  Downloaded[0m proc-macro-error2 v2.0.1
+[1m[92m  Downloaded[0m rand_core v0.10.1
+[1m[92m  Downloaded[0m rand_pcg v0.10.2
+[1m[92m  Downloaded[0m raw-window-handle v0.6.2
+[1m[92m  Downloaded[0m rustc_version v0.4.1
+[1m[92m  Downloaded[0m rustix-linux-procfs v0.1.1
+[1m[92m  Downloaded[0m wayland-csd-frame v0.3.0
+[1m[92m  Downloaded[0m derive_more-impl v2.1.1
+[1m[92m  Downloaded[0m minidumper v0.11.0
+[1m[92m  Downloaded[0m nu-ansi-term v0.50.3
+[1m[92m  Downloaded[0m presser v0.3.1
+[1m[92m  Downloaded[0m prost v0.13.5
+[1m[92m  Downloaded[0m quinn-udp v0.5.15
+[1m[92m  Downloaded[0m scroll_derive v0.12.1
+[1m[92m  Downloaded[0m utf8_iter v1.0.4
+[1m[92m  Downloaded[0m want v0.3.1
+[1m[92m  Downloaded[0m wat v1.260.0
+[1m[92m  Downloaded[0m xcursor v0.3.10
+[1m[92m  Downloaded[0m disqualified v1.0.0
+[1m[92m  Downloaded[0m id-arena v2.3.0
+[1m[92m  Downloaded[0m parking_lot v0.12.5
+[1m[92m  Downloaded[0m postcard v1.1.3
+[1m[92m  Downloaded[0m ppv-lite86 v0.2.21
+[1m[92m  Downloaded[0m quork v0.9.1
+[1m[92m  Downloaded[0m rustls-pki-types v1.15.0
+[1m[92m  Downloaded[0m scroll v0.12.0
+[1m[92m  Downloaded[0m idna_adapter v1.2.2
+[1m[92m  Downloaded[0m document-features v0.2.12
+[1m[92m  Downloaded[0m downcast-rs v1.2.1
+[1m[92m  Downloaded[0m lexical v7.0.5
+[1m[92m  Downloaded[0m memmap2 v0.9.11
+[1m[92m  Downloaded[0m event-listener-strategy v0.5.4
+[1m[92m  Downloaded[0m ordered-float v5.3.0
+[1m[92m  Downloaded[0m rustversion v1.0.23
+[1m[92m  Downloaded[0m variadics_please v2.0.0
+[1m[92m  Downloaded[0m vec_map v0.8.2
+[1m[92m  Downloaded[0m wasmtime-internal-winch v36.0.16
+[1m[92m  Downloaded[0m zcheapstr v1.1.0
+[1m[92m  Downloaded[0m zvariant_derive v5.15.0
+[1m[92m  Downloaded[0m downcast-rs v2.0.2
+[1m[92m  Downloaded[0m embedded-io v0.4.0
+[1m[92m  Downloaded[0m embedded-io v0.6.1
+[1m[92m  Downloaded[0m encase_derive_impl v0.12.0
+[1m[92m  Downloaded[0m ryu v1.0.23
+[1m[92m  Downloaded[0m time-macros v0.2.31
+[1m[92m  Downloaded[0m event-listener v5.4.1
+[1m[92m  Downloaded[0m failspot v0.2.0
+[1m[92m  Downloaded[0m lexical-write-integer v1.0.6
+[1m[92m  Downloaded[0m num-traits v0.2.19
+[1m[92m  Downloaded[0m target-lexicon v0.13.5
+[1m[92m  Downloaded[0m wasmtime-internal-unwinder v36.0.16
+[1m[92m  Downloaded[0m zune-jpeg v0.5.15
+[1m[92m  Downloaded[0m fallible-iterator v0.3.0
+[1m[92m  Downloaded[0m lalrpop-util v0.23.1
+[1m[92m  Downloaded[0m minidump v0.26.1
+[1m[92m  Downloaded[0m procfs-core v0.17.0
+[1m[92m  Downloaded[0m procfs-core v0.18.0
+[1m[92m  Downloaded[0m pulley-interpreter v36.0.16
+[1m[92m  Downloaded[0m quinn v0.11.11
+[1m[92m  Downloaded[0m rand v0.8.8
+[1m[92m  Downloaded[0m rand v0.10.2
+[1m[92m  Downloaded[0m rand_distr v0.6.0
+[1m[92m  Downloaded[0m ruzstd v0.8.3
+[1m[92m  Downloaded[0m sctk-adwaita v0.10.1
+[1m[92m  Downloaded[0m wasm-encoder v0.247.0
+[1m[92m  Downloaded[0m wasmtime-internal-asm-macros v36.0.16
+[1m[92m  Downloaded[0m wasmtime-internal-slab v36.0.16
+[1m[92m  Downloaded[0m wit-bindgen-rust-macro v0.57.1
+[1m[92m  Downloaded[0m encase_derive v0.12.0
+[1m[92m  Downloaded[0m getrandom v0.2.17
+[1m[92m  Downloaded[0m http-body v1.0.1
+[1m[92m  Downloaded[0m icu_normalizer_data v2.2.0
+[1m[92m  Downloaded[0m icu_properties v2.2.0
+[1m[92m  Downloaded[0m icu_provider v2.2.0
+[1m[92m  Downloaded[0m jobserver v0.1.35
+[1m[92m  Downloaded[0m lazy_static v1.5.0
+[1m[92m  Downloaded[0m lexical-core v1.0.6
+[1m[92m  Downloaded[0m libm v0.2.16
+[1m[92m  Downloaded[0m minidump-common v0.26.1
+[1m[92m  Downloaded[0m mio v1.2.1
+[1m[92m  Downloaded[0m nom v8.0.0
+[1m[92m  Downloaded[0m rodio v0.20.1
+[1m[92m  Downloaded[0m ron v0.12.2
+[1m[92m  Downloaded[0m rustls-webpki v0.103.13
+[1m[92m  Downloaded[0m wasmtime-wasi-io v36.0.16
+[1m[92m  Downloaded[0m zbus_names v4.3.4
+[1m[92m  Downloaded[0m zvariant v5.15.0
+[1m[92m  Downloaded[0m dpi v0.1.2
+[1m[92m  Downloaded[0m guillotiere v0.7.0
+[1m[92m  Downloaded[0m half v2.7.1
+[1m[92m  Downloaded[0m io-extras v0.18.4
+[1m[92m  Downloaded[0m io-lifetimes v2.0.4
+[1m[92m  Downloaded[0m leb128 v0.2.7
+[1m[92m  Downloaded[0m regalloc2 v0.12.2
+[1m[92m  Downloaded[0m regex v1.13.0
+[1m[92m  Downloaded[0m reqwest v0.12.28
+[1m[92m  Downloaded[0m spin v0.12.3
+[1m[92m  Downloaded[0m displaydoc v0.2.6
+[1m[92m  Downloaded[0m dlib v0.5.3
+[1m[92m  Downloaded[0m futures-sink v0.3.32
+[1m[92m  Downloaded[0m iana-time-zone v0.1.65
+[1m[92m  Downloaded[0m icu_properties_data v2.2.0
+[1m[92m  Downloaded[0m khronos-egl v6.0.0
+[1m[92m  Downloaded[0m ktx2 v0.5.0
+[1m[92m  Downloaded[0m moxcms v0.8.1
+[1m[92m  Downloaded[0m portable-atomic v1.13.1
+[1m[92m  Downloaded[0m quick-xml v0.39.4
+[1m[92m  Downloaded[0m quinn-proto v0.11.16
+[1m[92m  Downloaded[0m smol_str v0.2.2
+[1m[92m  Downloaded[0m system-interface v0.27.3
+[1m[92m  Downloaded[0m zeroize v1.9.0
+[1m[92m  Downloaded[0m zvariant_utils v4.2.0
+[1m[92m  Downloaded[0m futures v0.3.32
+[1m[92m  Downloaded[0m gilrs-core v0.6.8
+[1m[92m  Downloaded[0m hyper-rustls v0.27.9
+[1m[92m  Downloaded[0m lexical-parse-integer v1.0.6
+[1m[92m  Downloaded[0m nix v0.29.0
+[1m[92m  Downloaded[0m nix v0.31.3
+[1m[92m  Downloaded[0m object v0.37.3
+[1m[92m  Downloaded[0m redb v4.3.0
+[1m[92m  Downloaded[0m regex-syntax v0.8.11
+[1m[92m  Downloaded[0m rustix v0.38.44
+[1m[92m  Downloaded[0m rustls v0.23.41
+[1m[92m  Downloaded[0m tempfile v3.27.0
+[1m[92m  Downloaded[0m termcolor v1.4.1
+[1m[92m  Downloaded[0m thiserror v1.0.69
+[1m[92m  Downloaded[0m thread_local v1.1.9
+[1m[92m  Downloaded[0m typewit v1.15.2
+[1m[92m  Downloaded[0m wasi-preview1-component-adapter-provider v36.0.16
+[1m[92m  Downloaded[0m wasmtime-internal-component-util v36.0.16
+[1m[92m  Downloaded[0m wasmtime-internal-wit-bindgen v36.0.16
+[1m[92m  Downloaded[0m wayland-cursor v0.31.14
+[1m[92m  Downloaded[0m winit v0.30.13
+[1m[92m  Downloaded[0m x11rb-protocol v0.13.2
+[1m[92m  Downloaded[0m zerofrom-derive v0.1.7
+[1m[92m  Downloaded[0m gethostname v1.1.0
+[1m[92m  Downloaded[0m hybrid-array v0.4.15
+[1m[92m  Downloaded[0m regex-automata v0.4.15
+[1m[92m  Downloaded[0m serde_urlencoded v0.7.1
+[1m[92m  Downloaded[0m wasm-metadata v0.247.0
+[1m[92m  Downloaded[0m wiggle-macro v36.0.16
+[1m[92m  Downloaded[0m inout v0.2.4
+[1m[92m  Downloaded[0m ipnet v2.12.0
+[1m[92m  Downloaded[0m serde_repr v0.1.21
+[1m[92m  Downloaded[0m sha2-asm v0.6.4
+[1m[92m  Downloaded[0m synstructure v0.13.2
+[1m[92m  Downloaded[0m http-body-util v0.1.3
+[1m[92m  Downloaded[0m inotify-sys v0.1.8
+[1m[92m  Downloaded[0m untrusted v0.9.0
+[1m[92m  Downloaded[0m wiggle-generate v36.0.16
+[1m[92m  Downloaded[0m tinystr v0.8.3
+[1m[92m  Downloaded[0m libloading v0.8.9
+[1m[92m  Downloaded[0m wesl-macros v0.6.0
+[1m[92m  Downloaded[0m inotify v0.11.5
+[1m[92m  Downloaded[0m sharded-slab v0.1.7
+[1m[92m  Downloaded[0m aho-corasick v1.1.4
+[1m[92m  Downloaded[0m euclid v0.22.14
+[1m[92m  Downloaded[0m fixedbitset v0.5.7
+[1m[92m  Downloaded[0m gpu-allocator v0.28.0
+[1m[92m  Downloaded[0m semver v1.0.28
+[1m[92m  Downloaded[0m signal-hook-registry v1.4.8
+[1m[92m  Downloaded[0m wasmprinter v0.236.1
+[1m[92m  Downloaded[0m icu_locale_core v2.2.0
+[1m[92m  Downloaded[0m petgraph v0.8.3
+[1m[92m  Downloaded[0m slotmap v1.1.1
+[1m[92m  Downloaded[0m typeid v1.0.3
+[1m[92m  Downloaded[0m uuid v1.23.4
+[1m[92m  Downloaded[0m wasmtime-internal-jit-icache-coherence v36.0.16
+[1m[92m  Downloaded[0m wiggle v36.0.16
+[1m[92m  Downloaded[0m futures-macro v0.3.32
+[1m[92m  Downloaded[0m glow v0.17.0
+[1m[92m  Downloaded[0m hashbrown v0.15.5
+[1m[92m  Downloaded[0m httparse v1.10.1
+[1m[92m  Downloaded[0m pxfm v0.1.30
+[1m[92m  Downloaded[0m tree_magic_mini v3.2.2
+[1m[92m  Downloaded[0m try-lock v0.2.5
+[1m[92m  Downloaded[0m ttf-parser v0.25.1
+[1m[92m  Downloaded[0m unicode-xid v0.2.6
+[1m[92m  Downloaded[0m wasmparser v0.236.1
+[1m[92m  Downloaded[0m wasmtime-internal-jit-debug v36.0.16
+[1m[92m  Downloaded[0m url v2.5.8
+[1m[92m  Downloaded[0m discord-presence v3.2.0
+[1m[92m  Downloaded[0m encase v0.12.0
+[1m[92m  Downloaded[0m glob v0.3.4
+[1m[92m  Downloaded[0m wasmtime-internal-math v36.0.16
+[1m[92m  Downloaded[0m wasmparser v0.247.0
+[1m[92m  Downloaded[0m wasmparser v0.260.0
+[1m[92m  Downloaded[0m wasmtime-internal-fiber v36.0.16
+[1m[92m  Downloaded[0m image v0.25.10
+[1m[92m  Downloaded[0m tracing-log v0.2.0
+[1m[92m  Downloaded[0m libudev-sys v0.1.4
+[1m[92m  Downloaded[0m futures-lite v2.6.1
+[1m[92m  Downloaded[0m stable_deref_trait v1.2.1
+[1m[92m  Downloaded[0m yoke v0.8.3
+[1m[92m  Downloaded[0m tiny-skia-path v0.11.4
+[1m[92m  Downloaded[0m webpki-roots v1.0.8
+[1m[92m  Downloaded[0m getrandom v0.3.4
+[1m[92m  Downloaded[0m tracing-subscriber v0.3.23
+[1m[92m  Downloaded[0m icu_collections v2.2.0
+[1m[92m  Downloaded[0m wasmtime-internal-component-macro v36.0.16
+[1m[92m  Downloaded[0m endi v1.1.1
+[1m[92m  Downloaded[0m ring v0.17.14
+[1m[92m  Downloaded[0m wit-bindgen-rust v0.57.1
+[1m[92m  Downloaded[0m stackfuture v0.3.1
+[1m[92m  Downloaded[0m tokio v1.52.3
+[1m[92m  Downloaded[0m xkbcommon-dl v0.4.2
+[1m[92m  Downloaded[0m simdutf8 v0.1.5
+[1m[92m  Downloaded[0m x11rb v0.13.2
+[1m[92m  Downloaded[0m spirv v0.4.0+sdk-1.4.341.0
+[1m[92m  Downloaded[0m sync_wrapper v1.0.2
+[1m[92m  Downloaded[0m writeable v0.6.3
+[1m[92m  Downloaded[0m futures-util v0.3.32
+[1m[92m  Downloaded[0m toml_datetime v1.1.1+spec-1.1.0
+[1m[92m  Downloaded[0m uds v0.4.2
+[1m[92m  Downloaded[0m winch-codegen v36.0.16
+[1m[92m  Downloaded[0m error-graph v0.1.1
+[1m[92m  Downloaded[0m form_urlencoded v1.2.2
+[1m[92m  Downloaded[0m futures-io v0.3.32
+[1m[92m  Downloaded[0m lock_api v0.4.14
+[1m[92m  Downloaded[0m logos v0.16.1
+[1m[92m  Downloaded[0m tokio-util v0.7.18
+[1m[92m  Downloaded[0m twox-hash v2.1.4
+[1m[92m  Downloaded[0m wayland-backend v0.3.15
+[1m[92m  Downloaded[0m wayland-scanner v0.31.10
+[1m[92m  Downloaded[0m wayland-sys v0.31.11
+[1m[92m  Downloaded[0m weezl v0.1.12
+[1m[92m  Downloaded[0m wit-parser v0.236.1
+[1m[92m  Downloaded[0m wit-parser v0.247.0
+[1m[92m  Downloaded[0m zbus v5.19.0
+[1m[92m  Downloaded[0m zerotrie v0.2.4
+[1m[92m  Downloaded[0m chrono v0.4.45
+[1m[92m  Downloaded[0m enumflags2 v0.7.12
+[1m[92m  Downloaded[0m erased-serde v0.4.10
+[1m[92m  Downloaded[0m fs-set-times v0.20.3
+[1m[92m  Downloaded[0m hashbrown v0.16.1
+[1m[92m  Downloaded[0m icu_normalizer v2.2.0
+[1m[92m  Downloaded[0m lexical-write-float v1.0.6
+[1m[92m  Downloaded[0m litemap v0.8.2
+[1m[92m  Downloaded[0m log v0.4.33
+[1m[92m  Downloaded[0m slab v0.4.12
+[1m[92m  Downloaded[0m socket2 v0.6.4
+[1m[92m  Downloaded[0m thiserror-impl v1.0.69
+[1m[92m  Downloaded[0m tokio-macros v2.7.0
+[1m[92m  Downloaded[0m tower v0.5.3
+[1m[92m  Downloaded[0m wasm-encoder v0.236.1
+[1m[92m  Downloaded[0m wast v35.0.2
+[1m[92m  Downloaded[0m wayland-protocols-wlr v0.3.12
+[1m[92m  Downloaded[0m web-time v1.1.0
+[1m[92m  Downloaded[0m wit-bindgen v0.57.1
+[1m[92m  Downloaded[0m fnv v1.0.7
+[1m[92m  Downloaded[0m gif v0.14.2
+[1m[92m  Downloaded[0m hyper-util v0.1.20
+[1m[92m  Downloaded[0m wasm-encoder v0.260.0
+[1m[92m  Downloaded[0m wit-bindgen-core v0.57.1
+[1m[92m  Downloaded[0m wl-clipboard-rs v0.9.4
+[1m[92m  Downloaded[0m foldhash v0.1.5
+[1m[92m  Downloaded[0m foldhash v0.2.0
+[1m[92m  Downloaded[0m futures-task v0.3.32
+[1m[92m  Downloaded[0m getrandom v0.4.3
+[1m[92m  Downloaded[0m http v1.4.2
+[1m[92m  Downloaded[0m itertools v0.15.0
+[1m[92m  Downloaded[0m static_assertions v1.1.0
+[1m[92m  Downloaded[0m toml v1.1.3+spec-1.1.0
+[1m[92m  Downloaded[0m wesl-core v0.1.0
+[1m[92m  Downloaded[0m wgsl-parse v0.6.0
+[1m[92m  Downloaded[0m x11-dl v2.21.0
+[1m[92m  Downloaded[0m zerovec v0.11.6
+[1m[92m  Downloaded[0m idna v1.1.0
+[1m[92m  Downloaded[0m smithay-client-toolkit v0.19.2
+[1m[92m  Downloaded[0m strict-num v0.1.1
+[1m[92m  Downloaded[0m tower-http v0.6.11
+[1m[92m  Downloaded[0m tracing-error v0.2.1
+[1m[92m  Downloaded[0m unsynn v0.3.0
+[1m[92m  Downloaded[0m zerocopy-derive v0.8.54
+[1m[92m  Downloaded[0m zerofrom v0.1.8
+[1m[92m  Downloaded[0m gilrs v0.11.2
+[1m[92m  Downloaded[0m shlex v2.0.1
+[1m[92m  Downloaded[0m subtle v2.6.1
+[1m[92m  Downloaded[0m unicode-segmentation v1.13.3
+[1m[92m  Downloaded[0m lexical-parse-float v1.0.6
+[1m[92m  Downloaded[0m wast v260.0.0
+[1m[92m  Downloaded[0m wayland-protocols v0.32.13
+[1m[92m  Downloaded[0m hyper v1.10.1
+[1m[92m  Downloaded[0m itertools v0.14.0
+[1m[92m  Downloaded[0m goblin v0.9.3
+[1m[92m  Downloaded[0m wasmtime-environ v36.0.16
+[1m[92m  Downloaded[0m toml_edit v0.25.12+spec-1.1.0
+[1m[92m  Downloaded[0m time v0.3.53
+[1m[92m  Downloaded[0m tiny-skia v0.11.4
+[1m[92m  Downloaded[0m tokio-rustls v0.26.4
+[1m[92m  Downloaded[0m wasmtime-internal-cranelift v36.0.16
+[1m[92m  Downloaded[0m wasmtime-wasi v36.0.16
+[1m[92m  Downloaded[0m unicode-width v0.2.2
+[1m[92m  Downloaded[0m ash v0.38.0+1.3.281
+[1m[92m  Downloaded[0m wit-component v0.247.0
+[1m[92m  Downloaded[0m zerocopy v0.8.54
+[1m[92m  Downloaded[0m gimli v0.32.3
+[1m[92m  Downloaded[0m syn v3.0.6
+[1m[92m  Downloaded[0m xkeysym v0.2.1
+[1m[92m  Downloaded[0m encoding_rs v0.8.42
+[1m[92m  Downloaded[0m wasmtime v36.0.16
+[1m[92m  Downloaded[0m cranelift-codegen v0.123.16
+[1m[92m  Downloaded[0m linux-raw-sys v0.4.15
+[1m[92m  Downloaded[0m xxhash-rust v0.8.17
+[1m[92m   Compiling[0m quote v1.0.46
+[1m[92m   Compiling[0m unicode-ident v1.0.24
+[1m[92m   Compiling[0m serde_core v1.0.228
+[1m[92m   Compiling[0m proc-macro2 v1.0.106
+[1m[92m    Checking[0m cfg-if v1.0.4
+[1m[92m   Compiling[0m serde v1.0.228
+[1m[92m   Compiling[0m libc v0.2.186
+[1m[92m   Compiling[0m syn v2.0.118
+[1m[92m    Checking[0m bitflags v2.13.0
+[1m[92m    Checking[0m log v0.4.33
+[1m[92m   Compiling[0m libm v0.2.16
+[1m[92m    Checking[0m pin-project-lite v0.2.17
+[1m[92m    Checking[0m once_cell v1.21.4
+[1m[92m   Compiling[0m autocfg v1.5.1
+[1m[92m    Checking[0m foldhash v0.2.0
+[1m[92m    Checking[0m equivalent v1.0.2
+[1m[92m    Checking[0m memchr v2.8.3
+[1m[92m    Checking[0m hashbrown v0.17.1
+[1m[92m   Compiling[0m num-traits v0.2.19
+[1m[92m    Checking[0m indexmap v2.14.0
+[1m[92m   Compiling[0m rustix v1.1.4
+[1m[92m    Checking[0m linux-raw-sys v0.12.1
+[1m[92m    Checking[0m crossbeam-utils v0.8.22
+[1m[92m    Checking[0m futures-core v0.3.32
+[1m[92m    Checking[0m futures-io v0.3.32
+[1m[92m    Checking[0m allocator-api2 v0.2.21
+[1m[92m   Compiling[0m getrandom v0.4.3
+[1m[92m   Compiling[0m encase_derive_impl v0.12.0
+[1m[92m    Checking[0m slab v0.4.12
+[1m[92m    Checking[0m typewit v1.15.2
+[1m[92m    Checking[0m const_panic v0.2.15
+[1m[92m    Checking[0m rand_core v0.10.1
+[1m[92m    Checking[0m rand v0.10.2
+[1m[92m   Compiling[0m unicode-xid v0.2.6
+[1m[92m    Checking[0m approx v0.5.1
+[1m[92m   Compiling[0m find-msvc-tools v0.1.9
+[1m[92m   Compiling[0m shlex v2.0.1
+[1m[92m   Compiling[0m cc v1.2.66
+[1m[92m    Checking[0m uuid v1.23.4
+[1m[92m    Checking[0m tracing-core v0.1.36
+[1m[92m   Compiling[0m cfg_aliases v0.2.2
+[1m[92m   Compiling[0m anyhow v1.0.103
+[1m[92m    Checking[0m hashbrown v0.16.1
+[1m[92m    Checking[0m either v1.16.0
+[1m[92m   Compiling[0m winnow v1.0.3
+[1m[92m    Checking[0m crc32fast v1.5.0
+[1m[92m    Checking[0m itoa v1.0.18
+[1m[92m   Compiling[0m toml_datetime v1.1.1+spec-1.1.0
+[1m[92m    Checking[0m fastrand v2.4.1
+[1m[92m    Checking[0m futures-sink v0.3.32
+[1m[92m    Checking[0m simd-adler32 v0.3.9
+[1m[92m    Checking[0m adler2 v2.0.1
+[1m[92m    Checking[0m miniz_oxide v0.8.9
+[1m[92m   Compiling[0m toml_parser v1.1.2+spec-1.1.0
+[1m[92m    Checking[0m futures-channel v0.3.32
+[1m[92m   Compiling[0m toml_edit v0.25.12+spec-1.1.0
+[1m[92m   Compiling[0m serde_json v1.0.150
+[1m[92m    Checking[0m zlib-rs v0.6.7
+[1m[92m    Checking[0m parking v2.2.1
+[1m[92m    Checking[0m zmij v1.0.21
+[1m[92m    Checking[0m rustc-hash v1.1.0
+[1m[92m    Checking[0m futures-task v0.3.32
+[1m[92m    Checking[0m typenum v1.20.1
+[1m[92m    Checking[0m flate2 v1.1.9
+[1m[92m    Checking[0m concurrent-queue v2.5.0
+[1m[92m    Checking[0m arrayvec v0.7.8
+[1m[92m   Compiling[0m zerocopy v0.8.54
+[1m[92m    Checking[0m fdeflate v0.3.7
+[1m[92m   Compiling[0m pkg-config v0.3.32
+[1m[92m    Checking[0m png v0.18.1
+[1m[92m    Checking[0m event-listener v5.4.1
+[1m[92m    Checking[0m futures-lite v2.6.1
+[1m[92m    Checking[0m aho-corasick v1.1.4
+[1m[92m    Checking[0m regex-syntax v0.8.11
+[1m[92m    Checking[0m event-listener-strategy v0.5.4
+[1m[92m    Checking[0m generic-array v0.14.7
+[1m[92m    Checking[0m atomic-waker v1.1.2
+[1m[92m    Checking[0m async-channel v2.5.0
+[1m[92m    Checking[0m block-buffer v0.10.4
+[1m[92m    Checking[0m crypto-common v0.1.7
+[1m[92m    Checking[0m digest v0.10.7
+[1m[92m    Checking[0m raw-window-handle v0.6.2
+[1m[92m    Checking[0m cpufeatures v0.2.17
+[1m[92m    Checking[0m sha2 v0.10.9
+[1m[92m    Checking[0m bytes v1.12.1
+[1m[92m   Compiling[0m bevy_macro_utils v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m regex-automata v0.4.15
+[1m[92m    Checking[0m static_assertions v1.1.0
+[1m[92m    Checking[0m bumpalo v3.20.3
+[1m[92m    Checking[0m zune-core v0.5.1
+[1m[92m    Checking[0m color_quant v1.1.0
+[1m[92m    Checking[0m weezl v0.1.12
+[1m[92m   Compiling[0m semver v1.0.28
+[1m[92m    Checking[0m pxfm v0.1.30
+[1m[92m    Checking[0m gif v0.14.2
+[1m[92m    Checking[0m zune-jpeg v0.5.15
+[1m[92m    Checking[0m byteorder-lite v0.1.0
+[1m[92m    Checking[0m crossbeam-epoch v0.9.20
+[1m[92m    Checking[0m thread_local v1.1.9
+[1m[92m    Checking[0m moxcms v0.8.1
+[1m[92m    Checking[0m async-task v4.7.1
+[1m[92m    Checking[0m block-transform v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/block-transform)
+[1m[92m   Compiling[0m unicode-segmentation v1.13.3
+[1m[92m    Checking[0m byteorder v1.5.0
+[1m[92m   Compiling[0m convert_case v0.10.0
+[1m[92m    Checking[0m crossbeam-deque v0.8.7
+[1m[92m    Checking[0m libloading v0.8.9
+[1m[92m    Checking[0m protocol-ids v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/protocol-ids)
+[1m[92m    Checking[0m unicode-width v0.2.2
+[1m[92m    Checking[0m typed-path v0.12.3
+[1m[92m    Checking[0m rayon-core v1.13.0
+[1m[92m    Checking[0m zip v7.2.0
+[1m[92m   Compiling[0m nix v0.31.3
+[1m[92m   Compiling[0m id-arena v2.3.0
+[1m[92m   Compiling[0m typeid v1.0.3
+[1m[92m    Checking[0m rayon v1.12.0
+[1m[92m    Checking[0m crossbeam-channel v0.5.16
+[1m[92m   Compiling[0m io-lifetimes v2.0.4
+[1m[92m    Checking[0m tinyvec_macros v0.1.1
+[1m[92m    Checking[0m spin v0.12.3
+[1m[92m    Checking[0m tinyvec v1.11.0
+[1m[92m    Checking[0m ogg v0.8.0
+[1m[92m    Checking[0m async-executor v1.14.0
+[1m[92m    Checking[0m socket2 v0.6.4
+[1m[92m    Checking[0m mio v1.2.1
+[1m[92m    Checking[0m ipnet v2.12.0
+[1m[92m   Compiling[0m rustc-hash v2.1.3
+[1m[92m   Compiling[0m erased-serde v0.4.10
+[1m[92m   Compiling[0m mutants v0.0.3
+[1m[92m    Checking[0m ttf-parser v0.21.1
+[1m[92m   Compiling[0m unsynn v0.3.0
+[1m[92m    Checking[0m lewton v0.10.2
+[1m[92m    Checking[0m polling v3.11.0
+[1m[92m   Compiling[0m synstructure v0.13.2
+[1m[92m    Checking[0m fontdue v0.9.3
+[1m[92m    Checking[0m env-compat v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/env-compat)
+[1m[92m   Compiling[0m io-extras v0.18.4
+[1m[92m    Checking[0m disqualified v1.0.0
+[1m[92m    Checking[0m termcolor v1.4.1
+[1m[92m    Checking[0m dlib v0.5.3
+[1m[92m   Compiling[0m wayland-sys v0.31.11
+[1m[92m   Compiling[0m serde_derive v1.0.228
+[1m[92m   Compiling[0m thiserror-impl v2.0.18
+[1m[92m   Compiling[0m bytemuck_derive v1.10.2
+[1m[92m   Compiling[0m encase_derive v0.12.0
+[1m[92m   Compiling[0m tracing-attributes v0.1.31
+[1m[92m    Checking[0m bytemuck v1.25.0
+[1m[92m   Compiling[0m futures-macro v0.3.32
+[1m[92m    Checking[0m thiserror v2.0.18
+[1m[92m    Checking[0m encase v0.12.0
+[1m[92m    Checking[0m glam v0.33.12
+[1m[92m    Checking[0m smallvec v1.15.2
+[1m[92m    Checking[0m naga-types v30.0.1 (https://github.com/cinnabar-mc/wgpu?rev=4741c39da699b31c1cae7aa53be8c62172593bec#4741c39d)
+[1m[92m   Compiling[0m zerocopy-derive v0.8.54
+[1m[92m    Checking[0m futures-util v0.3.32
+[1m[92m    Checking[0m wgpu-types v30.0.1 (https://github.com/cinnabar-mc/wgpu?rev=4741c39da699b31c1cae7aa53be8c62172593bec#4741c39d)
+[1m[92m    Checking[0m image v0.25.10
+[1m[92m    Checking[0m tracing v0.1.44
+[1m[92m    Checking[0m smol_str v0.2.2
+[1m[92m   Compiling[0m derive_more-impl v2.1.1
+[1m[92m    Checking[0m bevy_platform v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m   Compiling[0m tokio-macros v2.7.0
+[1m[92m    Checking[0m bevy_utils v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m assets v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/assets)
+[1m[92m    Checking[0m tokio v1.52.3
+[1m[92m   Compiling[0m variadics_please v2.0.0
+[1m[92m   Compiling[0m assert_type_match v0.1.1
+[1m[92m   Compiling[0m bevy_reflect_derive v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m half v2.7.1
+[1m[92m   Compiling[0m syn v3.0.6
+[1m[92m    Checking[0m ambient-authority v0.0.2
+[1m[92m    Checking[0m fixedbitset v0.5.7
+[1m[92m    Checking[0m inventory v0.3.24
+[1m[92m    Checking[0m bevy_ptr v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m cpufeatures v0.3.0
+[1m[92m   Compiling[0m cap-primitives v3.4.6
+[1m[92m    Checking[0m downcast-rs v2.0.2
+[1m[92m   Compiling[0m zerofrom-derive v0.1.7
+[1m[92m    Checking[0m derive_more v2.1.1
+[1m[92m    Checking[0m fs-set-times v0.20.3
+[1m[92m    Checking[0m ctrlc v3.5.2
+[1m[92m   Compiling[0m wasmparser v0.247.0
+[1m[92m    Checking[0m bevy_reflect v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m rustix-linux-procfs v0.1.1
+[1m[92m    Checking[0m maybe-owned v0.3.4
+[1m[92m    Checking[0m zerofrom v0.1.8
+[1m[92m   Compiling[0m yoke-derive v0.8.2
+[1m[92m    Checking[0m stable_deref_trait v1.2.1
+[1m[92m    Checking[0m scopeguard v1.2.0
+[1m[92m    Checking[0m percent-encoding v2.3.2
+[1m[92m   Compiling[0m prettyplease v0.2.37
+[1m[92m   Compiling[0m cap-std v3.4.6
+[1m[92m    Checking[0m zeroize v1.9.0
+[1m[92m   Compiling[0m slotmap v1.1.1
+[1m[92m    Checking[0m simulation-clock v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/simulation-clock)
+[1m[92m   Compiling[0m leb128fmt v0.1.0
+[1m[92m    Checking[0m foldhash v0.1.5
+[1m[92m    Checking[0m hashbrown v0.15.5
+[1m[92m   Compiling[0m wasm-encoder v0.247.0
+[1m[92m   Compiling[0m wit-parser v0.247.0
+[1m[92m   Compiling[0m zerovec-derive v0.11.3
+[1m[92m    Checking[0m yoke v0.8.3
+[1m[92m   Compiling[0m bevy_ecs_macro_logic v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m crossbeam-queue v0.3.13
+[1m[92m    Checking[0m nonmax v0.5.5
+[1m[92m    Checking[0m render-api v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/render-api)
+[1m[92m    Checking[0m base64 v0.22.1
+[1m[92m    Checking[0m bevy_tasks v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m zerovec v0.11.6
+[1m[92m   Compiling[0m wasm-metadata v0.247.0
+[1m[92m    Checking[0m futures-executor v0.3.32
+[1m[92m   Compiling[0m displaydoc v0.2.6
+[1m[92m   Compiling[0m async-io v2.6.0
+[1m[92m   Compiling[0m cap-fs-ext v3.4.6
+[1m[92m    Checking[0m web-time v1.1.0
+[1m[92m   Compiling[0m wit-bindgen-rust v0.57.1
+[1m[92m    Checking[0m xxhash-rust v0.8.17
+[1m[92m    Checking[0m futures v0.3.32
+[1m[92m   Compiling[0m wit-component v0.247.0
+[1m[92m   Compiling[0m bevy_ecs_macros v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m   Compiling[0m wit-bindgen-core v0.57.1
+[1m[92m   Compiling[0m bevy_derive v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m   Compiling[0m naga v30.0.1 (https://github.com/cinnabar-mc/wgpu?rev=4741c39da699b31c1cae7aa53be8c62172593bec#4741c39d)
+[1m[92m    Checking[0m bit-vec v0.9.1
+[1m[92m    Checking[0m arrayref v0.3.9
+[1m[92m    Checking[0m bit-set v0.10.0
+[1m[92m    Checking[0m bevy_ecs v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m pp-rs v0.2.1
+[1m[92m    Checking[0m codespan-reporting v0.13.1
+[1m[92m    Checking[0m regex v1.13.0
+[1m[92m    Checking[0m piper v0.2.5
+[1m[92m    Checking[0m async-lock v3.4.2
+[1m[92m    Checking[0m getrandom v0.2.17
+[1m[92m    Checking[0m spirv v0.4.0+sdk-1.4.341.0
+[1m[92m    Checking[0m bevy_app v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m blocking v1.6.2
+[1m[92m    Checking[0m tinystr v0.8.3
+[1m[92m    Checking[0m tokio-util v0.7.18
+[1m[92m   Compiling[0m parking_lot_core v0.9.12
+[1m[92m    Checking[0m writeable v0.6.3
+[1m[92m    Checking[0m litemap v0.8.2
+[1m[92m    Checking[0m icu_locale_core v2.2.0
+[1m[92m    Checking[0m bridge v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/bridge)
+[1m[92m    Checking[0m bedrock-protocol-contract-1-26-60 v0.1.0 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/protocol/vendor/bedrock-protocol-1-26-60)
+[1m[92m    Checking[0m zerotrie v0.2.4
+[1m[92m    Checking[0m potential_utf v0.1.5
+[1m[92m    Checking[0m world v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/world)
+[1m[92m    Checking[0m async-broadcast v0.7.2
+[1m[92m   Compiling[0m wayland-backend v0.3.15
+[1m[92m   Compiling[0m icu_properties_data v2.2.0
+[1m[92m   Compiling[0m wit-bindgen-rust-macro v0.57.1
+[1m[92m   Compiling[0m icu_normalizer_data v2.2.0
+[1m[92m    Checking[0m utf8_iter v1.0.4
+[1m[92m    Checking[0m icu_provider v2.2.0
+[1m[92m    Checking[0m icu_collections v2.2.0
+[1m[92m    Checking[0m lock_api v0.4.14
+[1m[92m    Checking[0m bevy_math v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m pack-json v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/pack-json)
+[1m[92m   Compiling[0m ring v0.17.14
+[1m[92m   Compiling[0m macro-string v0.2.0
+[1m[92m   Compiling[0m wit-bindgen v0.57.1
+[1m[92m    Checking[0m downcast-rs v1.2.1
+[1m[92m    Checking[0m scoped-tls v1.0.1
+[1m[92m   Compiling[0m thiserror v1.0.69
+[1m[92m    Checking[0m protocol v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/protocol)
+[1m[92m    Checking[0m parking_lot v0.12.5
+[1m[92m   Compiling[0m thiserror-impl v1.0.69
+[1m[92m    Checking[0m itertools v0.14.0
+[1m[92m   Compiling[0m quick-xml v0.39.4
+[1m[92m   Compiling[0m wayland-client v0.31.14
+[1m[92m   Compiling[0m wayland-scanner v0.31.10
+[1m[92m    Checking[0m icu_normalizer v2.2.0
+[1m[92m    Checking[0m icu_properties v2.2.0
+[1m[92m    Checking[0m cosmetics v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/cosmetics)
+[1m[92m    Checking[0m untrusted v0.9.0
+[1m[92m    Checking[0m idna_adapter v1.2.2
+[1m[92m    Checking[0m mod-api v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/mod-api)
+[1m[92m    Checking[0m bevy_time v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m form_urlencoded v1.2.2
+[1m[92m   Compiling[0m blake3 v1.8.5
+[1m[92m    Checking[0m idna v1.1.0
+[1m[92m    Checking[0m const-fnv1a-hash v1.1.0
+[1m[92m    Checking[0m constant_time_eq v0.4.2
+[1m[92m   Compiling[0m rustix v0.38.44
+[1m[92m    Checking[0m bevy_diagnostic v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m url v2.5.8
+[1m[92m    Checking[0m async-fs v2.2.0
+[1m[92m    Checking[0m ron v0.12.2
+[1m[92m   Compiling[0m bevy_asset_macros v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m stackfuture v0.3.1
+[1m[92m    Checking[0m linux-raw-sys v0.4.15
+[1m[92m   Compiling[0m ash v0.38.0+1.3.281
+[1m[92m    Checking[0m lazy_static v1.5.0
+[1m[92m    Checking[0m lexical-util v1.0.7
+[1m[92m    Checking[0m atomicow v1.2.0
+[1m[92m    Checking[0m sharded-slab v0.1.7
+[1m[92m    Checking[0m wayland-protocols v0.32.13
+[1m[92m    Checking[0m render-model v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/render-model)
+[1m[92m    Checking[0m bevy_asset v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m matchers v0.2.0
+[1m[92m    Checking[0m hybrid-array v0.4.15
+[1m[92m    Checking[0m tracing-log v0.2.0
+[1m[92m    Checking[0m memmap2 v0.9.11
+[1m[92m   Compiling[0m khronos-egl v6.0.0
+[1m[92m    Checking[0m nu-ansi-term v0.50.3
+[1m[92m    Checking[0m const_soft_float v0.1.4
+[1m[92m    Checking[0m tracing-subscriber v0.3.23
+[1m[92m    Checking[0m constgebra v0.1.4
+[1m[92m   Compiling[0m proc-macro-crate v3.5.0
+[1m[92m   Compiling[0m wgpu-hal v30.0.1 (https://github.com/cinnabar-mc/wgpu?rev=4741c39da699b31c1cae7aa53be8c62172593bec#4741c39d)
+[1m[92m    Checking[0m rand_distr v0.6.0
+[1m[92m    Checking[0m presser v0.3.1
+[1m[92m    Checking[0m bevy_shape v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m wayland-protocols-wlr v0.3.12
+[1m[92m    Checking[0m hexasphere v19.0.0
+[1m[92m    Checking[0m crypto-common v0.2.2
+[1m[92m    Checking[0m inout v0.2.4
+[1m[92m    Checking[0m lexical-parse-integer v1.0.6
+[1m[92m    Checking[0m lexical-write-integer v1.0.6
+[1m[92m    Checking[0m bevy_curve v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m gpu-allocator v0.28.0
+[1m[92m    Checking[0m wgpu-naga-bridge v30.0.1 (https://github.com/cinnabar-mc/wgpu?rev=4741c39da699b31c1cae7aa53be8c62172593bec#4741c39d)
+[1m[92m    Checking[0m bevy_input v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m bevy_transform v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m zip-footer v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/zip-footer)
+[1m[92m   Compiling[0m bevy_encase_derive v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m http v1.4.2
+[1m[92m    Checking[0m ordered-float v5.3.0
+[1m[92m    Checking[0m euclid v0.22.14
+[1m[92m    Checking[0m serde_spanned v1.1.1
+[1m[92m    Checking[0m twox-hash v2.1.4
+[1m[92m   Compiling[0m fnv v1.0.7
+[1m[92m    Checking[0m toml_writer v1.1.2+spec-1.1.0
+[1m[92m    Checking[0m renderdoc-sys v1.1.0
+[1m[92m    Checking[0m profiling v1.0.18
+[1m[92m   Compiling[0m getrandom v0.3.4
+[1m[92m    Checking[0m glow v0.17.0
+[1m[92m    Checking[0m guillotiere v0.7.0
+[1m[92m   Compiling[0m logos-codegen v0.16.1
+[1m[92m    Checking[0m bevy_mesh v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m ruzstd v0.8.3
+[1m[92m    Checking[0m http-body v1.0.1
+[1m[92m    Checking[0m bevy_color v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m lexical-write-float v1.0.6
+[1m[92m    Checking[0m lexical-parse-float v1.0.6
+[1m[92m    Checking[0m cipher v0.5.2
+[1m[92m    Checking[0m rustls-pki-types v1.15.0
+[1m[92m   Compiling[0m wgpu-core v30.0.1 (https://github.com/cinnabar-mc/wgpu?rev=4741c39da699b31c1cae7aa53be8c62172593bec#4741c39d)
+[1m[92m    Checking[0m ktx2 v0.5.0
+[1m[92m    Checking[0m semantic-input v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/input)
+[1m[92m    Checking[0m rectangle-pack v0.4.2
+[1m[92m   Compiling[0m httparse v1.10.1
+[1m[92m   Compiling[0m lalrpop-util v0.23.1
+[1m[92m    Checking[0m cpubits v0.1.1
+[1m[92m    Checking[0m anstyle v1.0.14
+[1m[92m   Compiling[0m litrs v1.0.0
+[1m[92m    Checking[0m aes v0.9.3
+[1m[92m    Checking[0m bevy_image v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m   Compiling[0m document-features v0.2.12
+[1m[92m    Checking[0m calloop v0.13.0
+[1m[92m    Checking[0m lexical-core v1.0.6
+[1m[92m    Checking[0m wgpu-core-deps-windows-linux-android v30.0.1 (https://github.com/cinnabar-mc/wgpu?rev=4741c39da699b31c1cae7aa53be8c62172593bec#4741c39d)
+[1m[92m    Checking[0m bevy_window v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m java-resource-pack v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/java-resource-pack)
+[1m[92m    Checking[0m json-ui v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/json-ui)
+[1m[92m    Checking[0m itertools v0.15.0
+[1m[92m   Compiling[0m wgpu v30.0.1 (https://github.com/cinnabar-mc/wgpu?rev=4741c39da699b31c1cae7aa53be8c62172593bec#4741c39d)
+[1m[92m    Checking[0m gethostname v1.1.0
+[1m[92m    Checking[0m ttf-parser v0.25.1
+[1m[92m    Checking[0m deranged v0.5.8
+[1m[92m   Compiling[0m smithay-client-toolkit v0.19.2
+[1m[92m    Checking[0m powerfmt v0.2.0
+[1m[92m    Checking[0m cursor-icon v1.2.0
+[1m[92m   Compiling[0m rustls v0.23.41
+[1m[92m    Checking[0m utf8parse v0.2.2
+[1m[92m    Checking[0m tower-service v0.3.3
+[1m[92m    Checking[0m num-conv v0.2.2
+[1m[92m    Checking[0m x11rb-protocol v0.13.2
+[1m[92m    Checking[0m strict-num v0.1.1
+[1m[92m    Checking[0m as-raw-xcb-connection v1.0.1
+[1m[92m    Checking[0m try-lock v0.2.5
+[1m[92m    Checking[0m xkeysym v0.2.1
+[1m[92m    Checking[0m ciborium-io v0.2.2
+[1m[92m   Compiling[0m inotify-sys v0.1.8
+[1m[92m    Checking[0m xcursor v0.3.10
+[1m[92m    Checking[0m time-core v0.1.9
+[1m[92m    Checking[0m wayland-cursor v0.31.14
+[1m[92m    Checking[0m ciborium-ll v0.2.2
+[1m[92m    Checking[0m time v0.3.53
+[1m[92m    Checking[0m want v0.3.1
+[1m[92m    Checking[0m tiny-skia-path v0.11.4
+[1m[92m    Checking[0m owned_ttf_parser v0.25.1
+[1m[92m    Checking[0m anstyle-parse v1.0.0
+[1m[92m    Checking[0m wayland-csd-frame v0.3.0
+[1m[92m    Checking[0m ui v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/ui)
+[1m[92m   Compiling[0m logos-derive v0.16.1
+[1m[92m    Checking[0m logos v0.16.1
+[1m[92m    Checking[0m wgsl-types v0.6.0
+[1m[92m    Checking[0m bevy_camera v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m resource-pack v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/resource-pack)
+[1m[92m    Checking[0m lexical v7.0.5
+[1m[92m    Checking[0m calloop-wayland-source v0.3.0
+[1m[92m    Checking[0m annotate-snippets v0.12.16
+[1m[92m    Checking[0m rustls-webpki v0.103.13
+[1m[92m   Compiling[0m enumflags2_derive v0.7.12
+[1m[92m   Compiling[0m libudev-sys v0.1.4
+[1m[92m   Compiling[0m x11-dl v2.21.0
+[1m[92m    Checking[0m tempfile v3.27.0
+[1m[92m   Compiling[0m ahash v0.8.12
+[1m[92m    Checking[0m ab_glyph_rasterizer v0.1.10
+[1m[92m    Checking[0m colorchoice v1.0.5
+[1m[92m    Checking[0m anstyle-query v1.1.5
+[1m[92m    Checking[0m is_terminal_polyfill v1.70.2
+[1m[92m    Checking[0m subtle v2.6.1
+[1m[92m    Checking[0m anstream v1.0.0
+[1m[92m    Checking[0m x11rb v0.13.2
+[1m[92m    Checking[0m ab_glyph v0.2.32
+[1m[92m    Checking[0m toml v1.1.3+spec-1.1.0
+[1m[92m   Compiling[0m wesl-macros v0.6.0
+[1m[92m    Checking[0m wgsl-parse v0.6.0
+[1m[92m    Checking[0m hyper v1.10.1
+[1m[92m    Checking[0m tiny-skia v0.11.4
+[1m[92m    Checking[0m ciborium v0.2.2
+[1m[92m    Checking[0m bevy_log v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m pp-rs v0.2.1 (https://github.com/cinnabar-mc/glslpp-rs?rev=949f1178cd660d3bcd1ec70181a10cf70e4b95b6#949f1178)
+[1m[92m   Compiling[0m zvariant_utils v4.2.0
+[1m[92m   Compiling[0m num-derive v0.4.2
+[1m[92m   Compiling[0m winit v0.30.13
+[1m[92m    Checking[0m sync_wrapper v1.0.2
+[1m[92m    Checking[0m tower-layer v0.3.3
+[1m[92m    Checking[0m wesl-core v0.1.0
+[1m[92m    Checking[0m glob v0.3.4
+[1m[92m    Checking[0m tower v0.5.3
+[1m[92m    Checking[0m wesl v0.6.0
+[1m[92m    Checking[0m shaderpack v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/shaderpack)
+[1m[92m    Checking[0m sctk-adwaita v0.10.1
+[1m[92m    Checking[0m inotify v0.11.5
+[1m[92m    Checking[0m hyper-util v0.1.20
+[1m[92m    Checking[0m tokio-rustls v0.26.4
+[1m[92m    Checking[0m update-manifest v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/update-manifest)
+[1m[92m    Checking[0m xkbcommon-dl v0.4.2
+[1m[92m    Checking[0m webpki-roots v1.0.8
+[1m[92m    Checking[0m wayland-protocols-plasma v0.3.12
+[1m[92m   Compiling[0m async-trait v0.1.92
+[1m[92m   Compiling[0m scroll_derive v0.12.1
+[1m[92m   Compiling[0m bevy_extract_macros v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m   Compiling[0m zvariant_derive v5.15.0
+[1m[92m    Checking[0m dpi v0.1.2
+[1m[92m    Checking[0m vec_map v0.8.2
+[1m[92m    Checking[0m ryu v1.0.23
+[1m[92m   Compiling[0m cranelift-srcgen v0.123.16
+[1m[92m    Checking[0m hex v0.4.3
+[1m[92m   Compiling[0m gilrs v0.11.2
+[1m[92m   Compiling[0m cranelift-assembler-x64-meta v0.123.16
+[1m[92m    Checking[0m serde_urlencoded v0.7.1
+[1m[92m    Checking[0m gilrs-core v0.6.8
+[1m[92m    Checking[0m scroll v0.12.0
+[1m[92m    Checking[0m bevy_shader v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m hyper-rustls v0.27.9
+[1m[92m    Checking[0m tower-http v0.6.11
+[1m[92m    Checking[0m http-body-util v0.1.3
+[1m[92m    Checking[0m actor-animation v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/actor-animation)
+[1m[92m    Checking[0m inventory v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/inventory)
+[1m[92m   Compiling[0m bevy_material_macros v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m client-world v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/client-world)
+[1m[92m    Checking[0m reqwest v0.12.28
+[1m[92m    Checking[0m bevy_material v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m bevy_extract v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m   Compiling[0m bevy_render_macros v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m launcher v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/launcher)
+[1m[92m   Compiling[0m enumflags2 v0.7.12
+[1m[92m    Checking[0m offset-allocator v0.2.0
+[1m[92m   Compiling[0m zcheapstr v1.1.0
+[1m[92m   Compiling[0m smart-default v0.7.1
+[1m[92m   Compiling[0m pulley-macros v36.0.16
+[1m[92m    Checking[0m weak-table v0.4.0
+[1m[92m    Checking[0m debugid v0.8.0
+[1m[92m    Checking[0m range-map v0.2.0
+[1m[92m    Checking[0m errno v0.3.14
+[1m[92m   Compiling[0m endi v1.1.1
+[1m[92m   Compiling[0m zvariant v5.15.0
+[1m[92m    Checking[0m signal-hook-registry v1.4.8
+[1m[92m    Checking[0m minidump-common v0.26.1
+[1m[92m    Checking[0m server-experience v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/server-experience)
+[1m[92m    Checking[0m bevy_light v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m meshing v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/meshing)
+[1m[92m    Checking[0m process-reader v0.1.0
+[1m[92m    Checking[0m cranelift-bitset v0.123.16
+[1m[92m    Checking[0m accesskit v0.24.1
+[1m[92m    Checking[0m crash-context v0.8.0
+[1m[92m   Compiling[0m minidump-writer v0.13.0 (https://github.com/cinnabar-mc/minidump-writer?rev=389d34092fb3323f2253010615eda402212e534f#389d3409)
+[1m[92m   Compiling[0m cranelift-isle v0.123.16
+[1m[92m    Checking[0m plain v0.2.3
+[1m[92m    Checking[0m goblin v0.9.3
+[1m[92m   Compiling[0m pulley-interpreter v36.0.16
+[1m[92m    Checking[0m process-backend v0.1.0
+[1m[92m   Compiling[0m zbus_names v4.3.4
+[1m[92m    Checking[0m async-signal v0.2.14
+[1m[92m    Checking[0m procfs-core v0.18.0
+[1m[92m    Checking[0m crash-report v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/crash-report)
+[1m[92m    Checking[0m error-graph v0.1.1
+[1m[92m   Compiling[0m target-lexicon v0.13.5
+[1m[92m   Compiling[0m rustversion v1.0.23
+[1m[92m    Checking[0m bevy_render v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m failspot v0.2.0
+[1m[92m   Compiling[0m cranelift-codegen-shared v0.123.16
+[1m[92m   Compiling[0m cranelift-codegen-meta v0.123.16
+[1m[92m   Compiling[0m zbus_macros v5.19.0
+[1m[92m    Checking[0m async-process v2.5.0
+[1m[92m    Checking[0m bevy_core_pipeline v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m accesskit_winit v0.33.2
+[1m[92m    Checking[0m bevy_a11y v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m cranelift-entity v0.123.16
+[1m[92m   Compiling[0m cranelift-assembler-x64 v0.123.16
+[1m[92m    Checking[0m bevy_input_focus v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m   Compiling[0m serde_repr v0.1.21
+[1m[92m   Compiling[0m async-recursion v1.2.0
+[1m[92m    Checking[0m ordered-stream v0.2.0
+[1m[92m    Checking[0m uds v0.4.2
+[1m[92m    Checking[0m minidumper v0.11.0
+[1m[92m    Checking[0m bevy_winit v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m   Compiling[0m cranelift-codegen v0.123.16
+[1m[92m    Checking[0m bevy_anti_alias v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m bevy_post_process v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m crash-handler v0.8.1
+[1m[92m    Checking[0m bevy_gilrs v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m update-installer v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/update-installer)
+[1m[92m    Checking[0m far-terrain v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/far-terrain)
+[1m[92m    Checking[0m cobs v0.3.0
+[1m[92m   Compiling[0m wasmtime-internal-versioned-export-macros v36.0.16
+[1m[92m    Checking[0m gimli v0.32.3
+[1m[92m    Checking[0m wasmtime-internal-math v36.0.16
+[1m[92m    Checking[0m arbitrary v1.4.2
+[1m[92m    Checking[0m regalloc2 v0.12.2
+[1m[92m    Checking[0m cranelift-control v0.123.16
+[1m[92m    Checking[0m postcard v1.1.3
+[1m[92m    Checking[0m bevy_internal v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m    Checking[0m zbus v5.19.0
+[1m[92m    Checking[0m cranelift-bforest v0.123.16
+[1m[92m    Checking[0m player-state v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/player-state)
+[1m[92m    Checking[0m ui-engine v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/ui-engine)
+[1m[92m    Checking[0m petgraph v0.8.3
+[1m[92m    Checking[0m nom v8.0.0
+[1m[92m   Compiling[0m wasmparser v0.236.1
+[1m[92m   Compiling[0m object v0.37.3
+[1m[92m    Checking[0m bevy v0.20.0 (https://github.com/cinnabar-mc/bevy?rev=e3a562a1c31399d6ab50fae50d463042e04a568b#e3a562a1)
+[1m[92m   Compiling[0m encoding_rs v0.8.42
+[1m[92m    Checking[0m particles v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/particles)
+[1m[92m    Checking[0m tree_magic_mini v3.2.2
+[1m[92m   Compiling[0m nix v0.29.0
+[1m[92m    Checking[0m launcher-host v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/launcher-host)
+[1m[92m   Compiling[0m proc-macro-error-attr2 v2.0.0
+[1m[92m    Checking[0m os_pipe v1.2.3
+[1m[92m   Compiling[0m wasm-encoder v0.236.1
+[1m[92m   Compiling[0m proc-macro-error2 v2.0.1
+[1m[92m    Checking[0m wl-clipboard-rs v0.9.4
+[1m[92m    Checking[0m chunk-pipeline v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/chunk-pipeline)
+[1m[92m    Checking[0m mod-render v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/mod-render)
+[1m[92m   Compiling[0m alsa-sys v0.3.1
+[1m[92m   Compiling[0m paste v1.0.15
+[1m[92m    Checking[0m core_detect v1.0.0
+[1m[92m   Compiling[0m multiversion_no_op v1.0.0
+[1m[92m    Checking[0m simdutf8 v0.1.5
+[1m[92m   Compiling[0m wit-parser v0.236.1
+[1m[92m    Checking[0m wasmprinter v0.236.1
+[1m[92m   Compiling[0m quork-proc v0.5.0
+[1m[92m    Checking[0m arboard v3.6.1
+[1m[92m    Checking[0m mod-ui v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/mod-ui)
+[1m[92m    Checking[0m oreui v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/oreui)
+[1m[92m    Checking[0m ui-screens v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/ui-screens)
+[1m[92m   Compiling[0m wasmtime-internal-fiber v36.0.16
+[1m[92m    Checking[0m wasm-encoder v0.260.0
+[1m[92m    Checking[0m wasmtime-internal-component-util v36.0.16
+[1m[92m   Compiling[0m leb128 v0.2.7
+[1m[92m   Compiling[0m wasmtime-internal-component-macro v36.0.16
+[1m[92m   Compiling[0m wasmtime-internal-unwinder v36.0.16
+[1m[92m   Compiling[0m wast v35.0.2
+[1m[92m    Checking[0m wast v260.0.0
+[1m[92m    Checking[0m wasmtime-environ v36.0.16
+[1m[92m    Checking[0m quork v0.9.1
+[1m[92m    Checking[0m client-ui v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/client-ui)
+[1m[92m    Checking[0m cranelift-native v0.123.16
+[1m[92m    Checking[0m cranelift-frontend v0.123.16
+[1m[92m   Compiling[0m wasmtime-internal-wit-bindgen v36.0.16
+[1m[92m   Compiling[0m wasmtime v36.0.16
+[1m[92m    Checking[0m tracing-error v0.2.1
+[1m[92m    Checking[0m wasmtime-internal-asm-macros v36.0.16
+[1m[92m   Compiling[0m cpal v0.15.3
+[1m[92m   Compiling[0m witx v0.9.1
+[1m[92m    Checking[0m discord-presence v3.2.0
+[1m[92m    Checking[0m diagnostics v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/diagnostics)
+[1m[92m    Checking[0m alsa v0.9.1
+[1m[92m    Checking[0m wasmtime-internal-cranelift v36.0.16
+[1m[92m    Checking[0m wat v1.260.0
+[1m[92m    Checking[0m render-scene v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/render-scene)
+[1m[92m    Checking[0m rand_core v0.6.4
+[1m[92m    Checking[0m ppv-lite86 v0.2.21
+[1m[92m    Checking[0m wasmtime-internal-jit-icache-coherence v36.0.16
+[1m[92m    Checking[0m memfd v0.6.6
+[1m[92m   Compiling[0m wiggle-macro v36.0.16
+[1m[92m    Checking[0m wasmtime-internal-slab v36.0.16
+[1m[92m    Checking[0m dasp_sample v0.11.0
+[1m[92m    Checking[0m rand_chacha v0.3.1
+[1m[92m    Checking[0m rich-presence v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/rich-presence)
+[1m[92m   Compiling[0m wiggle-generate v36.0.16
+[1m[92m    Checking[0m pack-compile-input v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/pack-compiler/input)
+[1m[92m    Checking[0m sim v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/sim)
+[1m[92m    Checking[0m iana-time-zone v0.1.65
+[1m[92m   Compiling[0m system-interface v0.27.3
+[1m[92m    Checking[0m client-state v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/client-state)
+[1m[92m    Checking[0m rand v0.8.8
+[1m[92m   Compiling[0m experience-sdk v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/experience-sdk)
+[1m[92m    Checking[0m toml_datetime v0.7.5+spec-1.1.0
+[1m[92m    Checking[0m winnow v0.7.15
+[1m[92m   Compiling[0m prost-derive v0.13.5
+[1m[92m    Checking[0m toml v0.9.12+spec-1.1.0
+[1m[92m    Checking[0m cap-rand v3.4.6
+[1m[92m    Checking[0m cap-time-ext v3.4.6
+[1m[92m    Checking[0m pack-entity-compiler v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/pack-compiler/entity)
+[1m[92m    Checking[0m rodio v0.20.1
+[1m[92m    Checking[0m cap-net-ext v3.4.6
+[1m[92m   Compiling[0m experience-macros v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/experience-macros)
+[1m[92m   Compiling[0m redb v4.3.0
+[1m[92m    Checking[0m client-audio v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/client-audio)
+[1m[92m    Checking[0m pack-runtime v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/pack-runtime)
+[1m[92m    Checking[0m client-presentation v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/client-presentation)
+[1m[92m    Checking[0m chrono v0.4.45
+[1m[92m    Checking[0m bootstrap-ui v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/bootstrap-ui)
+[1m[92m    Checking[0m client-session v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/client-session)
+[1m[92m    Checking[0m procfs-core v0.17.0
+[1m[92m    Checking[0m wasi-preview1-component-adapter-provider v36.0.16
+[1m[92m    Checking[0m prost v0.13.5
+[1m[92m    Checking[0m gameplay v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/gameplay)
+[1m[92m    Checking[0m minidump v0.26.1
+[1m[92m    Checking[0m render v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/render)
+[1m[92m    Checking[0m wiggle v36.0.16
+[1m[92m    Checking[0m wasmtime-wasi-io v36.0.16
+[1m[92m    Checking[0m arc-swap v1.9.3
+[1m[92m    Checking[0m client-interaction v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/client-interaction)
+[1m[92m    Checking[0m wasmtime-wasi v36.0.16
+[1m[92m    Checking[0m crash-monitor v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/crash-monitor)
+[1m[92m    Checking[0m acceptance v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/acceptance)
+[1m[92m    Checking[0m client-shell v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/client-shell)
+[1m[92m    Checking[0m first-run v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/first-run)
+[1m[92m    Checking[0m pack-compiler v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/pack-compiler)
+[1m[92m    Checking[0m client-voice v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/client-voice)
+[1m[92m    Checking[0m mod-host v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/mod-host)
+[1m[92m    Checking[0m client-extensions v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/client-extensions)
+[1m[92m    Checking[0m client-runtime v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/crates/client-runtime)
+[1m[92m    Checking[0m cinnabar v0.1.31 (/home/runner/work/cinnabar-voichat/cinnabar-voichat/app)
+[1m[92m    Finished[0m `dev` profile [optimized + debuginfo] target(s) in 7m 24s
+[1m[33mwarning[0m: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+[1m[92mnote[0m: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`

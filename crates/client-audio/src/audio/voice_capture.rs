@@ -65,6 +65,15 @@ impl<T> MicrophoneCatalog<T> {
         self.descriptors()
     }
 
+    /// Invalidates every previously issued token and removes all retained handles.
+    ///
+    /// Call this when the backend detects device removal, host reset, or worker shutdown.
+    /// A later refresh creates a new generation; stale UI selections cannot resolve.
+    pub fn invalidate(&mut self) {
+        self.generation = self.generation.wrapping_add(1);
+        self.entries.clear();
+    }
+
     /// Returns current presentation-only descriptors.
     #[must_use]
     pub fn descriptors(&self) -> Vec<MicrophoneDevice> {
@@ -243,6 +252,27 @@ mod tests {
         assert_eq!(
             catalog.resolve_selection(&MicrophoneSelection::Device(old[0].id.clone())),
             Err(MicrophoneSelectionError::DeviceUnavailable)
+        );
+    }
+
+    #[test]
+    fn invalidating_catalog_rejects_old_tokens_and_removes_handles() {
+        let mut catalog = MicrophoneCatalog::default();
+        let devices = catalog.refresh([("USB Microphone".to_owned(), true, 10_u32)]);
+        let generation = catalog.generation();
+
+        catalog.invalidate();
+
+        assert!(catalog.generation() > generation);
+        assert!(catalog.descriptors().is_empty());
+        assert_eq!(catalog.resolve(&devices[0].id), None);
+        assert_eq!(
+            catalog.resolve_selection(&MicrophoneSelection::Device(devices[0].id.clone())),
+            Err(MicrophoneSelectionError::DeviceUnavailable)
+        );
+        assert_eq!(
+            catalog.resolve_selection(&MicrophoneSelection::SystemDefault),
+            Err(MicrophoneSelectionError::NoDefaultDevice)
         );
     }
 

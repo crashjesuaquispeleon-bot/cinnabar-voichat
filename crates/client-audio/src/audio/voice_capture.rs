@@ -24,7 +24,11 @@ pub struct MicrophoneDevice {
 /// The native backend should create and resolve this catalog on the same worker that
 /// owns its CPAL host and devices. The generic handle is never exposed through the
 /// descriptor API. Refreshing the catalog invalidates every earlier ID.
+static NEXT_CATALOG_ID: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(1);
+
 pub struct MicrophoneCatalog<T> {
+    catalog_id: u64,
     generation: u64,
     entries: Vec<(MicrophoneDevice, T)>,
 }
@@ -32,6 +36,7 @@ pub struct MicrophoneCatalog<T> {
 impl<T> Default for MicrophoneCatalog<T> {
     fn default() -> Self {
         Self {
+            catalog_id: NEXT_CATALOG_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             generation: 0,
             entries: Vec::new(),
         }
@@ -51,7 +56,7 @@ impl<T> MicrophoneCatalog<T> {
             .enumerate()
             .map(|(index, (name, is_default, handle))| {
                 let descriptor = MicrophoneDevice {
-                    id: format!("mic-{}-{index}", self.generation),
+                    id: format!("mic-{}-{}-{index}", self.catalog_id, self.generation),
                     name,
                     is_default,
                 };
@@ -164,6 +169,18 @@ mod tests {
         assert!(catalog.generation() > 1);
         assert!(catalog.resolve(&old[0].id).is_none());
         assert_eq!(catalog.resolve(&new[0].id), Some(&20));
+    }
+
+    #[test]
+    fn catalog_ids_are_scoped_to_the_catalog_instance() {
+        let mut first = MicrophoneCatalog::default();
+        let mut second = MicrophoneCatalog::default();
+        let first_devices = first.refresh([("Same device".to_owned(), true, 1_u32)]);
+        let second_devices = second.refresh([("Same device".to_owned(), true, 2_u32)]);
+
+        assert_ne!(first_devices[0].id, second_devices[0].id);
+        assert!(first.resolve(&second_devices[0].id).is_none());
+        assert!(second.resolve(&first_devices[0].id).is_none());
     }
 
     #[test]

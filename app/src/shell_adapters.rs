@@ -3,6 +3,11 @@ use crate::runtime::{network::resource_packs::PackApplication, world::ClientWorl
 use bevy::prelude::*;
 use client_runtime::{blob_cache::ClientBlobCacheOwner, network::NetworkHandle};
 use client_shell::ui_resources::UiRuntimeResource;
+use client_audio::audio::{
+    voice_capture::{MicrophoneSelection, MicrophoneWorkerEvent},
+    voice_controller::VoiceCaptureController,
+};
+use launcher::menu::view::MicrophoneSelectionRequest;
 use client_shell::{
     menu::{LauncherCoreSlot, MenuRuntime, launcher_account},
     player_skin::LocalPlayerSkin,
@@ -21,7 +26,7 @@ pub(crate) fn drive_menu_services(
     mut local_worlds: Option<ResMut<client_shell::local_worlds::LocalWorlds>>,
     audio_settings: Option<ResMut<client_audio::audio::AudioSettings>>,
     mut voice_controller:
-        Option<ResMut<client_audio::audio::voice_controller::VoiceCaptureController>>,
+        Option<ResMut<VoiceCaptureController>>,
     settings: Option<ResMut<client_state::RuntimeSettings>>,
     antialiasing: Option<Res<client_presentation::camera::antialiasing::CameraAntiAliasingSupport>>,
     mut local_skin: Option<ResMut<LocalPlayerSkin>>,
@@ -91,7 +96,7 @@ fn drive_microphone_settings(
     // Worker events carry only presentation tokens. A new snapshot invalidates the old list.
     for event in controller.poll_microphone_events() {
         match event {
-            client_audio::audio::voice_capture::MicrophoneWorkerEvent::Devices(devices) => {
+            MicrophoneWorkerEvent::Devices(devices) => {
                 menu.publish_microphone_devices(
                     devices
                         .into_iter()
@@ -142,8 +147,8 @@ fn drive_microphone_settings(
 
     if let Some(request) = menu.take_microphone_selection_request() {
         let selection = match request {
-            launcher::menu::view::MicrophoneSelectionRequest::SystemDefault => {
-                client_audio::audio::voice_capture::MicrophoneSelection::SystemDefault
+            MicrophoneSelectionRequest::SystemDefault => {
+                MicrophoneSelection::SystemDefault
             }
             launcher::menu::view::MicrophoneSelectionRequest::Device(id) => {
                 client_audio::audio::voice_capture::MicrophoneSelection::Device(id)

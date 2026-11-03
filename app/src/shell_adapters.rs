@@ -81,6 +81,13 @@ fn drive_microphone_settings(
         return;
     };
 
+    // A stopped capture worker invalidates every UI token from its prior catalog.
+    if !controller.supports_input_device_selection() && menu.has_microphone_devices() {
+        menu.clear_microphone_devices(
+            "Enable Voice Chat in an active multiplayer session to refresh microphone devices.",
+        );
+    }
+
     // Worker events carry only presentation tokens. A new snapshot invalidates the old list.
     for event in controller.poll_microphone_events() {
         match event {

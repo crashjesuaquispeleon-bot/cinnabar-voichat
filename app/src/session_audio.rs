@@ -212,15 +212,19 @@ mod voice_settings_tests {
         apply_voice_chat_settings(&mut policy, &settings);
         let mut last_saved_mute = None;
         apply_saved_voice_mute(&mut policy, settings.muted, &mut last_saved_mute);
+        policy.set_push_to_talk_held(false);
         policy.set_push_to_talk_held(true);
         assert!(policy.transmission_permitted());
 
         toggle_quick_voice_mute(&mut policy);
+        policy.set_push_to_talk_held(true);
         assert!(!policy.transmission_permitted());
         toggle_quick_voice_mute(&mut policy);
+        policy.set_push_to_talk_held(true);
         assert!(!policy.transmission_permitted());
 
-        // A fresh PTT held phase is required after unmuting.
+        // A physical release and a new PTT press are required after unmuting.
+        policy.set_push_to_talk_held(false);
         policy.set_push_to_talk_held(true);
         assert!(policy.transmission_permitted());
     }
@@ -249,6 +253,7 @@ mod voice_settings_tests {
             },
         );
         assert!(!policy.transmission_permitted());
+        policy.set_push_to_talk_held(false);
         policy.set_push_to_talk_held(true);
         assert!(policy.transmission_permitted());
 

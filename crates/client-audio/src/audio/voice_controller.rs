@@ -117,8 +117,8 @@ impl VoiceCaptureController {
                 self.try_open(policy);
             }
             let accepting = policy.transmission_permitted();
-        self.queue.set_accepting(accepting);
-        self.monitor_queue.set_accepting(accepting);
+            self.queue.set_accepting(accepting);
+            self.monitor_queue.set_accepting(accepting);
             self.last_capture_permitted = should_open && self.is_running();
             return;
         }
@@ -171,6 +171,7 @@ impl VoiceCaptureController {
 
     fn force_stop(&mut self) {
         self.queue.set_accepting(false);
+        self.monitor_queue.set_accepting(false);
         if let Some(mut stream) = self.stream.take() {
             stream.stop();
             self.stop_count = self.stop_count.saturating_add(1);
@@ -336,16 +337,19 @@ mod tests {
         controller.sync_with_policy(&mut policy);
         assert!(controller.is_running());
         assert!(!controller.queue().is_accepting());
+        assert!(!controller.monitor_queue().is_accepting());
 
         policy.set_push_to_talk_held(true);
         controller.sync_with_policy(&mut policy);
         assert!(controller.is_running());
         assert!(controller.queue().is_accepting());
+        assert!(controller.monitor_queue().is_accepting());
 
         policy.set_push_to_talk_held(false);
         controller.sync_with_policy(&mut policy);
         assert!(controller.is_running());
         assert!(!controller.queue().is_accepting());
+        assert!(!controller.monitor_queue().is_accepting());
     }
 
     #[test]

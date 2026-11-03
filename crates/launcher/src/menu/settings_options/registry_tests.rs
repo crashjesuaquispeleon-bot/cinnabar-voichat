@@ -91,6 +91,18 @@ fn section_rows_keep_order_and_shared_controls_from_the_registry() {
 }
 
 #[test]
+fn voice_input_sensitivity_is_bounded_to_zero_through_two_hundred_percent() {
+    let mut settings = SettingsOptions::default();
+    assert_eq!(settings.value(SettingId::VoiceInputSensitivity), 100);
+
+    assert!(settings.set(SettingId::VoiceInputSensitivity.index(), 250));
+    assert_eq!(settings.value(SettingId::VoiceInputSensitivity), 200);
+
+    assert!(settings.set(SettingId::VoiceInputSensitivity.index(), -25));
+    assert_eq!(settings.value(SettingId::VoiceInputSensitivity), 0);
+}
+
+#[test]
 fn every_reset_changes_only_its_registered_members_and_keeps_bindings() {
     for group in [
         SettingsGroup::Video,

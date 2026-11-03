@@ -2,6 +2,7 @@
 use bevy::prelude::*;
 use client_audio::audio_ingress::SequencedAudioEvent;
 use client_audio::session_audio::{SessionAudio, SessionAudioCatalog};
+use client_audio::audio::{voice_controller::VoiceCaptureController, voice_input::VoiceInputPolicy};
 
 /// Borrows current owner facts and forwards them at the existing system boundary.
 #[allow(clippy::too_many_arguments)]
@@ -13,7 +14,24 @@ pub(crate) fn drain_sequenced_audio_into_session(
     #[cfg(feature = "acceptance")] mut wire_messages: MessageReader<SequencedAudioEvent>,
     #[cfg(feature = "acceptance")] mut wire: Option<ResMut<acceptance::audio_wire::WireEvidence>>,
     session: ResMut<SessionAudio>,
+    mut voice_policy: ResMut<VoiceInputPolicy>,
+    mut voice_controller: ResMut<VoiceCaptureController>,
+    mut voice_session: Local<Option<(u64, u64)>>,
 ) {
+    // Bind microphone lifetime to the exact local WorldStream lifetime and the
+    // session generation. A transfer/reconnect can replace the stream without
+    // leaving a frame in which the old microphone queue remains usable.
+    let current_voice_session = client_world.stream.as_ref().map(|stream| {
+        (
+            clock.session_generation(),
+            stream.authority().actor_session_id(),
+        )
+    });
+    if current_voice_session != *voice_session {
+        voice_controller.reset_for_session_change();
+        voice_policy.set_session_active(current_voice_session.is_some());
+        *voice_session = current_voice_session;
+    }
     #[cfg(feature = "acceptance")]
     if let Some(wire) = wire.as_mut() {
         let stream_id = client_world

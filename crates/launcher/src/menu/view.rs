@@ -422,6 +422,15 @@ pub enum MicrophoneSelectionRequest {
     Device(String),
 }
 
+/// Best-effort local status of the operating system's microphone permission.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MicrophonePermissionStatus {
+    #[default]
+    Unknown,
+    Granted,
+    Denied,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct MenuView {
     /// Verified update notice and the available release-channel choices.
@@ -530,6 +539,7 @@ pub struct MenuView {
     pub microphone_devices_revision: u64,
     pub selected_microphone_id: Option<String>,
     pub microphone_message: Option<String>,
+    pub microphone_permission_status: MicrophonePermissionStatus,
     pub storage: std::sync::Arc<super::settings_storage::StorageView>,
     pub language_choices: std::sync::Arc<[(String, String)]>,
     pub feeds: MenuFeeds,
@@ -808,6 +818,7 @@ impl MenuView {
                 "Enable Voice Chat in a multiplayer session before refreshing microphone devices."
                     .to_owned(),
             ),
+            microphone_permission_status: MicrophonePermissionStatus::Unknown,
             storage: Default::default(),
             language_choices: Default::default(),
             feeds: Default::default(),

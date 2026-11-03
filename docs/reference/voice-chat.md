@@ -248,3 +248,10 @@ The next device-selection implementation must use a catalog/command boundary own
 - Native qualification verifies device changes and unplug/replug behavior on Windows, macOS, and Linux. Mock tests alone do not establish OS behavior.
 
 This is an implementation contract, not a claim that selection is already available. The current CPAL path still opens the system default device, and the current discovery list must not be wired to settings until the worker-owned catalog and selected-handle open path exist.
+
+## Explicit microphone preference resolver (2026-11-03)
+
+The platform-independent catalog now exposes `MicrophoneSelection` with two explicit choices: `SystemDefault` and `Device(opaque_token)`. `MicrophoneCatalog::resolve_selection` resolves a selected token only in the current catalog generation and returns a borrowed handle, so the caller can keep native handle ownership local to the catalog's backend worker. It rejects missing/stale tokens and refuses a missing or ambiguous default instead of guessing. Tests cover duplicate display names, stale tokens after refresh, explicit system-default resolution against the current snapshot, and missing/ambiguous default states.
+
+**This is the selection-policy primitive, not yet end-to-end CPAL device switching.** The current `CpalVoiceCaptureOpener` still opens the OS default device independently and its owner thread does not yet expose catalog refresh or select-device commands. The native CPAL discovery adapter still drops device handles. Do not expose this as a functioning microphone selector or persist its tokens until enumeration, token issuance, selection and stream opening are integrated on the same CPAL owner thread. Runtime unplug handling and UI/settings wiring remain pending.
+

@@ -204,3 +204,16 @@ The Stage-2 gate was rechecked against the current Go integration code before se
 **Stage-2 implementation remains blocked on service ownership, not on the local microphone prototype.** Before adding network code, the service operator must identify (1) the trusted account identity available to native Cinnabar clients, (2) the authoritative server-side partida/session identifier and its lifecycle, (3) the API that can mint and revoke a short-lived room admission token bound to both identities, and (4) the deployed media-router/SFU endpoint and operational owner. The client must never send an arbitrary room ID and treat it as authorization, nor use local `actor_session_id` / `session_generation` values as backend proof.
 
 Until those contracts are supplied, keep Stage 2 unchecked. Do not add a client-only room implementation, trust a user-supplied room name, send audio through the Bedrock relay, or introduce an unowned SFU deployment. Safe parallel work remains Stage-1 hardening: loopback/mute/disconnect/exit acceptance tests, device-selection and permission UX, and Windows/macOS/Linux qualification.
+
+## Microphone discovery boundary audit (2026-11-03)
+
+The current native discovery and capture adapters are intentionally not a selectable-device implementation:
+
+- `CpalMicrophoneBackend` enumerates input devices and returns display names plus opaque `cpal-snapshot-{index}` identifiers. Those identifiers are valid only for that enumeration snapshot; they are not stable hardware IDs and must not be persisted or sent to a service.
+- `CpalVoiceCaptureOpener` independently asks CPAL for `default_input_device()`. It does not accept a selected descriptor or reopen a device by the discovery identifier.
+- The discovery adapter drops the CPAL device handles after enumeration. Re-enumerating later and treating the same numeric index as the same device would be unsafe because device order and availability can change.
+- Default-device detection currently compares human-readable names. Names are not guaranteed unique, so this is presentation metadata rather than a reliable device identity.
+
+**Do not wire the snapshot identifier directly into persisted audio settings or claim that the settings select a microphone.** A real selection implementation needs one backend-owned selection contract that binds a fresh enumeration snapshot to the corresponding CPAL device handle, handles disappearance/re-enumeration, and opens the selected handle on the capture owner thread. Persisted preferences should use a backend-supported stable identity where available and fall back explicitly to the OS default when the device is missing. Device handles and native identifiers must remain local and must never become network identity or room authorization.
+
+Until that contract and platform behavior are tested, keep the UI selection marked as pending and continue to use the OS default input device.

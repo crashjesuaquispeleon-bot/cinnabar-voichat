@@ -336,10 +336,12 @@ where
             let mut active_id: Option<String> = None;
             loop {
                 if active_id.is_some() && !backend.is_running() {
+                    let unavailable_id = active_id.take();
                     backend.stop();
-                    active_id = None;
                     catalog.invalidate();
-                    if event_tx.send(MicrophoneWorkerEvent::DeviceUnavailable { device_id: None }).is_err() {
+                    if event_tx.send(MicrophoneWorkerEvent::DeviceUnavailable {
+                        device_id: unavailable_id,
+                    }).is_err() {
                         break;
                     }
                 }
@@ -386,6 +388,7 @@ where
                                     }
                                 }
                                 Err(error) => {
+                                    backend.stop();
                                     if event_tx.send(MicrophoneWorkerEvent::BackendError(error)).is_err() {
                                         break;
                                     }
@@ -559,6 +562,76 @@ mod tests {
         assert_eq!(catalog.resolve(&old[0].id), Some(&10));
         assert!(catalog.refresh(std::iter::empty()).is_empty());
         assert!(catalog.resolve(&old[0].id).is_none());
+    }
+
+    #[test]
+    fn owner_worker_refreshes_and_selects_exact_current_device() {
+        use std::cell::Cell;
+        use std::rc::Rc;
+
+        struct LocalOnlyBackend {
+            starts: Rc<Cell<u32>>,
+            running: bool,
+        }
+
+        impl MicrophoneWorkerBackend for LocalOnlyBackend {
+            type Device = u32;
+
+            fn enumerate(&mut self) -> Result<Vec<(String, bool, Self::Device)>, String> {
+                Ok(vec![
+                    ("USB Mic".to_owned(), true, 11),
+                    ("USB Mic".to_owned(), false, 22),
+                ])
+            }
+
+            fn stop(&mut self) {
+                self.running = false;
+            }
+
+            fn start(&mut self, _device: &Self::Device) -> Result<(), String> {
+                self.starts.set(self.starts.get() + 1);
+                self.running = true;
+                Ok(())
+            }
+
+            fn is_running(&self) -> bool {
+                self.running
+            }
+        }
+
+        let starts = Rc::new(Cell::new(0));
+        let worker_starts = Rc::clone(&starts);
+        let worker = spawn_microphone_worker(move || LocalOnlyBackend {
+            starts: worker_starts,
+            running: false,
+        })
+        .unwrap();
+
+        worker.send(MicrophoneWorkerCommand::Refresh).unwrap();
+        let MicrophoneWorkerEvent::Devices(devices) = worker.recv_timeout(std::time::Duration::from_secs(2)).unwrap() else {
+            panic!("expected refreshed device list");
+        };
+        assert_eq!(devices.len(), 2);
+        assert_ne!(devices[0].id, devices[1].id);
+
+        worker.send(MicrophoneWorkerCommand::Select(MicrophoneSelection::Device(
+            devices[1].id.clone(),
+        ))).unwrap();
+        assert_eq!(
+            worker.recv_timeout(std::time::Duration::from_secs(2)).unwrap(),
+            MicrophoneWorkerEvent::Selected { device_id: devices[1].id.clone() }
+        );
+
+        worker.send(MicrophoneWorkerCommand::Select(MicrophoneSelection::Device(
+            "stale-token".to_owned(),
+        ))).unwrap();
+        assert_eq!(
+            worker.recv_timeout(std::time::Duration::from_secs(2)).unwrap(),
+            MicrophoneWorkerEvent::SelectionRejected(MicrophoneSelectionError::DeviceUnavailable)
+        );
+
+        worker.shutdown();
+        assert_eq!(starts.get(), 1);
     }
 
     #[test]

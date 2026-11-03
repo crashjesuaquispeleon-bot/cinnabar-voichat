@@ -59,6 +59,7 @@ pub use settings::{
     MAX_FOV_DEGREES, MAX_RENDER_SCALE_PERCENT, MIN_FOV_DEGREES, MIN_RENDER_DISTANCE_CHUNKS,
     MIN_RENDER_SCALE_PERCENT, MOTION_BLUR_REFERENCE_FPS, MotionBlurQuality, RenderDistanceDefaults,
     RenderDistanceDevice, RenderMode, SmaaMode, UserSettings, VideoSettings, ViewBobbing,
+    VoiceActivationMode, VoiceChatSettings,
 };
 pub use text::{
     BedrockColor, ColorDescriptor, FONT_ASCENT_TEXELS, FONT_DESIGN_PIXEL_TEXELS, FONT_INK_TEXELS,

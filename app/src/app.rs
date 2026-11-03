@@ -160,10 +160,12 @@ pub(crate) fn configure_client_production_frame_systems(app: &mut App) {
         .add_systems(
             Update,
             crate::session_audio::drain_sequenced_audio_into_session
+                .after(ClientFrameSet::SemanticFinalize)
                 .after(reconcile_world_stream_before_physics)
                 .after(drive_session)
                 .after(follow_server_transfer)
-                .after(recover_session_failure),
+                .after(recover_session_failure)
+                .before(client_audio::audio::voice_controller::sync_voice_capture_with_policy),
         )
 
         .add_systems(

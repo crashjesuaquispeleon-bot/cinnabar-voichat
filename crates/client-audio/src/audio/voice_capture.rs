@@ -181,7 +181,8 @@ pub enum MicrophoneSelection {
 /// native CPAL handles must never cross this boundary.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MicrophoneWorkerCommand {
-    /// Enumerate inputs and publish a fresh generation-scoped snapshot.
+    /// Enumerate inputs and publish a fresh generation-scoped snapshot without
+    /// interrupting an already active capture stream.
     Refresh,
     /// Stop the active stream and open exactly this current-snapshot selection.
     /// A stale token is an error; it must never trigger an implicit default fallback.
@@ -360,8 +361,9 @@ where
                 }
                 match command_rx.recv_timeout(std::time::Duration::from_millis(50)) {
                     Ok(MicrophoneWorkerCommand::Refresh) => {
-                        backend.stop();
-                        active_id = None;
+                        // Discovery is independent of stream lifetime. Replacing the
+                        // catalog invalidates old UI tokens, but an active CPAL stream
+                        // remains owned and running until the user selects another input.
                         match backend.enumerate() {
                             Ok(devices) => {
                                 let descriptors = catalog.refresh(devices);
@@ -786,11 +788,26 @@ mod tests {
         assert_eq!(starts.load(Ordering::Relaxed), 2);
         assert!(running.load(Ordering::Acquire));
 
-        // An old/unknown token is rejected without stopping the selected microphone.
+        // Refreshing the list must not interrupt the live stream, even though it
+        // issues new generation-scoped IDs for subsequent user selections.
+        let stops_before_refresh = stops.load(Ordering::Relaxed);
+        worker.send(MicrophoneWorkerCommand::Refresh).unwrap();
+        let MicrophoneWorkerEvent::Devices(refreshed_devices) = worker
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .unwrap()
+        else {
+            panic!("expected the refreshed microphone snapshot");
+        };
+        assert_ne!(devices[1].id, refreshed_devices[1].id);
+        assert_eq!(stops.load(Ordering::Relaxed), stops_before_refresh);
+        assert_eq!(selected.load(Ordering::Acquire), 2);
+        assert!(running.load(Ordering::Acquire));
+
+        // A token from the previous snapshot is rejected without stopping the active mic.
         worker
-            .send(MicrophoneWorkerCommand::Select(
-                MicrophoneSelection::Device("stale-token".to_owned()),
-            ))
+            .send(MicrophoneWorkerCommand::Select(MicrophoneSelection::Device(
+                devices[1].id.clone(),
+            )))
             .unwrap();
         assert_eq!(
             worker
@@ -799,6 +816,7 @@ mod tests {
             MicrophoneWorkerEvent::SelectionRejected(MicrophoneSelectionError::DeviceUnavailable)
         );
         assert_eq!(selected.load(Ordering::Acquire), 2);
+        assert_eq!(stops.load(Ordering::Relaxed), stops_before_refresh);
         assert!(running.load(Ordering::Acquire));
 
         worker.shutdown();

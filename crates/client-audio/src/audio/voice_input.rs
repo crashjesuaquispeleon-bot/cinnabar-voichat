@@ -1,8 +1,9 @@
 //! Privacy and lifecycle policy for local voice capture.
 //!
-//! This module deliberately owns no device handle or worker thread. Platform capture is
-//! connected only after its permission and shutdown behavior are implemented at the
-//! desktop edge; this policy is the single gate that edge must consult.
+//! This module deliberately owns no device handle or worker thread. The native CPAL
+//! owner worker consults this policy through the controller before opening or retaining
+//! capture; transmission has a separate gate so Push to Talk can keep the device open
+//! without retaining PCM while the action is released.
 
 use bevy::prelude::Resource;
 

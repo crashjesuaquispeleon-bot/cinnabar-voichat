@@ -8,9 +8,12 @@ use super::voice_input::{MicrophonePermission, VoiceInputPolicy};
 use super::voice_pcm::BoundedPcmQueue;
 use super::voice_permission::{outcome_from_error, outcome_from_success, permission_after_outcome};
 use super::voice_stream::{
-    MockVoiceCaptureOpener, SharedPcmQueue, VoiceCaptureError, VoiceCaptureOpener,
-    VoiceCaptureQueues, VoiceCaptureStream,
+    SharedPcmQueue, VoiceCaptureOpener, VoiceCaptureQueues, VoiceCaptureStream,
 };
+#[cfg(any(test, target_arch = "wasm32"))]
+use super::voice_stream::MockVoiceCaptureOpener;
+#[cfg(test)]
+use super::voice_stream::VoiceCaptureError;
 use bevy::prelude::{ResMut, Resource};
 use std::{
     sync::{Arc, Mutex},
@@ -147,7 +150,7 @@ impl VoiceCaptureController {
         if !self.is_running()
             && self
                 .next_open_attempt
-                .map_or(true, |deadline| now >= deadline)
+                .is_none_or(|deadline| now >= deadline)
         {
             self.try_open(policy, now);
         }

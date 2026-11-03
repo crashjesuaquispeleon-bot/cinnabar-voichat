@@ -79,9 +79,7 @@ pub trait VoiceCaptureStream: Send {
     }
 
     /// Returns one pending local device event without blocking.
-    fn try_recv_input_event(
-        &mut self,
-    ) -> Option<super::voice_capture::MicrophoneWorkerEvent> {
+    fn try_recv_input_event(&mut self) -> Option<super::voice_capture::MicrophoneWorkerEvent> {
         None
     }
 }
@@ -364,10 +362,7 @@ struct CpalMicrophoneWorkerBackend {
 #[cfg(not(target_arch = "wasm32"))]
 impl CpalMicrophoneWorkerBackend {
     /// Called only from the worker factory, so the host is born on its owner thread.
-    fn new(
-        queues: VoiceCaptureQueues,
-        running: Arc<std::sync::atomic::AtomicBool>,
-    ) -> Self {
+    fn new(queues: VoiceCaptureQueues, running: Arc<std::sync::atomic::AtomicBool>) -> Self {
         Self {
             host: rodio::cpal::default_host(),
             queues,
@@ -565,7 +560,9 @@ impl VoiceCaptureStream for CpalVoiceCaptureHandle {
         self.worker
             .as_ref()
             .ok_or_else(|| "microphone owner worker has stopped".to_owned())?
-            .send(super::voice_capture::MicrophoneWorkerCommand::Select(selection))
+            .send(super::voice_capture::MicrophoneWorkerCommand::Select(
+                selection,
+            ))
             .map_err(|error| error.to_string())
     }
 
@@ -590,8 +587,8 @@ impl VoiceCaptureOpener for CpalVoiceCaptureOpener {
         queues: VoiceCaptureQueues,
     ) -> Result<Box<dyn VoiceCaptureStream>, VoiceCaptureError> {
         use super::voice_capture::{
-            spawn_microphone_worker, MicrophoneSelection, MicrophoneSelectionError,
-            MicrophoneWorkerCommand, MicrophoneWorkerEvent,
+            MicrophoneSelection, MicrophoneSelectionError, MicrophoneWorkerCommand,
+            MicrophoneWorkerEvent, spawn_microphone_worker,
         };
         use std::sync::atomic::AtomicBool;
         use std::time::Duration;
@@ -631,7 +628,9 @@ impl VoiceCaptureOpener for CpalVoiceCaptureOpener {
         }
 
         worker
-            .send(MicrophoneWorkerCommand::Select(MicrophoneSelection::SystemDefault))
+            .send(MicrophoneWorkerCommand::Select(
+                MicrophoneSelection::SystemDefault,
+            ))
             .map_err(|error| VoiceCaptureError::Other(error.to_string()))?;
 
         match worker.recv_timeout(Duration::from_secs(10)) {

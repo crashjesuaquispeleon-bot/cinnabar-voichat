@@ -76,6 +76,7 @@ pub(crate) fn drain_sequenced_audio_into_session(
     // disabled by default; capture still requires OS permission and a live game session.
     let voice_settings = &settings.user_settings_update().1.voice_chat;
     apply_voice_chat_settings(&mut voice_policy, voice_settings);
+    voice_controller.set_input_sensitivity_percent(voice_settings.input_sensitivity_percent);
     apply_saved_voice_mute(
         &mut voice_policy,
         voice_settings.muted,
@@ -138,6 +139,7 @@ mod voice_settings_tests {
             enabled: true,
             muted: false,
             activation_mode: ui::VoiceActivationMode::OpenMicrophone,
+        input_sensitivity_percent: 100,
         };
         apply_voice_chat_settings(&mut policy, &open_mic);
         policy.set_permission(client_audio::audio::voice_input::MicrophonePermission::Granted);
@@ -158,6 +160,7 @@ mod voice_settings_tests {
             enabled: true,
             muted: false,
             activation_mode: ui::VoiceActivationMode::OpenMicrophone,
+        input_sensitivity_percent: 100,
         };
         apply_voice_chat_settings(&mut policy, &unmuted);
         apply_saved_voice_mute(&mut policy, unmuted.muted, &mut last_saved_mute);
@@ -181,6 +184,7 @@ mod voice_settings_tests {
             enabled: true,
             muted: false,
             activation_mode: ui::VoiceActivationMode::OpenMicrophone,
+        input_sensitivity_percent: 100,
         };
         apply_voice_chat_settings(&mut policy, &settings);
         apply_saved_voice_mute(&mut policy, settings.muted, &mut last_saved_mute);
@@ -233,6 +237,7 @@ mod voice_settings_tests {
             enabled: true,
             muted: false,
             activation_mode: ui::VoiceActivationMode::PushToTalk,
+        input_sensitivity_percent: 100,
         };
         apply_voice_chat_settings(&mut policy, &settings);
         let mut last_saved_mute = None;
@@ -265,6 +270,7 @@ mod voice_settings_tests {
                 enabled: true,
                 muted: false,
                 activation_mode: ui::VoiceActivationMode::OpenMicrophone,
+            input_sensitivity_percent: 100,
             },
         );
         assert!(policy.transmission_permitted());
@@ -275,6 +281,7 @@ mod voice_settings_tests {
                 enabled: true,
                 muted: false,
                 activation_mode: ui::VoiceActivationMode::PushToTalk,
+            input_sensitivity_percent: 100,
             },
         );
         assert!(!policy.transmission_permitted());

@@ -175,6 +175,12 @@ pub enum MenuAction {
     SettingsFullscreen(bool),
     SettingsStorage(settings_storage::StorageAction),
     SettingsSupport(settings_support::SupportAction),
+    /// Refreshes the local microphone catalog on the native device-owner thread.
+    SettingsMicrophoneRefresh,
+    /// Explicitly switches capture back to the operating-system default input.
+    SettingsMicrophoneUseSystemDefault,
+    /// Selects a row from one exact presentation snapshot; stale revisions are rejected.
+    SettingsMicrophoneSelect(u16, u64),
     SettingsOption(u16, i32),
     /// Applies one graphics preset without changing personal video preferences.
     SettingsVideoPreset(settings_options::video_presets::VideoPreset),

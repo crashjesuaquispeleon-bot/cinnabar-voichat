@@ -126,6 +126,18 @@ fn audio(content: &mut Content<'_, '_>) -> Result<(), PaintError> {
         "Microphone Input",
         "Choose which local input device Voice Chat uses. Device choices are temporary and are not saved.",
     )?;
+    let permission_description = match content.view.microphone_permission_status {
+        launcher::menu::view::MicrophonePermissionStatus::Unknown => {
+            "Not checked yet. Enable Voice Chat in a multiplayer session to let the operating system check access."
+        }
+        launcher::menu::view::MicrophonePermissionStatus::Granted => {
+            "Granted. The operating system allows microphone capture."
+        }
+        launcher::menu::view::MicrophonePermissionStatus::Denied => {
+            "Denied. Allow microphone access in your operating system's privacy settings before retrying."
+        }
+    };
+    content.label_text("Microphone permission", permission_description)?;
     super::services::action_row_text(
         content,
         "Available microphones",

@@ -75,10 +75,13 @@ pub(crate) fn drive_menu_services(
 /// Routes presentation-only microphone actions and worker events without blocking the menu.
 fn drive_microphone_settings(
     menu: &mut MenuRuntime,
-    controller: Option<ResMut<VoiceCaptureController>>,
+    mut controller: Option<ResMut<VoiceCaptureController>>,
     mut voice_policy: Option<ResMut<VoiceInputPolicy>>,
 ) {
     if menu.take_microphone_permission_retry_request() {
+        if let Some(controller) = controller.as_deref_mut() {
+            controller.retry_permission_probe();
+        }
         if let Some(policy) = voice_policy.as_deref_mut() {
             // A fresh open attempt is allowed only if voice remains enabled in a live session.
             policy.set_permission(MicrophonePermission::Unknown);

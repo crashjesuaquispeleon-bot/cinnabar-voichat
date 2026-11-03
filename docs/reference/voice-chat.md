@@ -5,7 +5,7 @@
 The first release is a Cinnabar-client-only voice feature.
 
 - **Room mode:** global voice. Every Cinnabar client admitted to the same voice room can hear every other unmuted participant; there is no distance attenuation or proximity filter.
-- **Room scope:** a room is associated with one active Minecraft server session. "Global" does not mean one room shared across unrelated servers or every Cinnabar user online.
+- **Room scope (confirmed by the user):** players can communicate only when they are in the same active Minecraft multiplayer session/partida. The voice room is bound to that exact joined session; players in different servers or different partidas cannot hear each other. "Global" means everyone in that one session can hear everyone else, regardless of in-game distance.
 - **Client compatibility:** Cinnabar only. Vanilla Bedrock and Java clients are out of scope.
 - **Microphone modes:** open microphone and Push to Talk (PTT), selectable in settings. The default mode and PTT key are not yet selected.
 - **User controls:** local mute, microphone permission/status, input/output device selection, input sensitivity and per-user receive volume are candidate controls; their UI placement is not yet designed.
@@ -50,7 +50,7 @@ A server-routed SFU is the leading option to evaluate for global rooms. A full-m
 
 ### Stage 0 — Architecture and service discovery (current)
 
-- [x] Confirm product choices: global room, Cinnabar clients only, open mic + PTT.
+- [x] Confirm product choices: global voice within the same active Minecraft session, Cinnabar clients only, open mic + PTT.
 - [x] Inspect current client playback, bridge framing and browser relay ownership at a high level.
 - [ ] Identify the authoritative Cinnabar account/session identity and the service that can authorize a room for the same joined Minecraft server.
 - [ ] Determine whether a maintained voice SFU/service already exists in the wider Cinnabar deployment; if not, document the required service and operational owner.
@@ -77,6 +77,14 @@ A server-routed SFU is the leading option to evaluate for global rooms. A full-m
 - [ ] Qualify Windows, macOS and Linux capture/playback and device switching.
 - [ ] Measure CPU, memory, bandwidth, end-to-end latency and queue drops at representative room sizes.
 - [ ] Document server deployment, configuration, privacy behavior and troubleshooting.
+
+## Confirmed session-isolation behavior
+
+- A voice room belongs to one exact active multiplayer session, not merely to a server address or a global Cinnabar account pool.
+- All admitted Cinnabar players in that same partida can talk regardless of distance.
+- A player joining another server/session must leave the previous room before joining the new one.
+- Disconnecting, changing account, changing world/server session or losing authorization must stop capture/transmission and discard old-session audio.
+- The backend must derive/validate the room membership from trusted session state; clients must not choose arbitrary room IDs.
 
 ## Open decisions
 

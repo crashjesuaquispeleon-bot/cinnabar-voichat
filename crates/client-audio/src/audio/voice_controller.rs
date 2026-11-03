@@ -128,9 +128,11 @@ impl VoiceCaptureController {
         } else {
             self.force_stop();
         }
-        // Only retain samples while the current activation mode permits transmission.
-        // PTT keeps the device open but the callback queue is closed until the key is held.
-        self.queue.set_accepting(policy.transmission_permitted());
+        // Keep both destinations in lockstep. The monitor has its own queue so its
+        // playback consumer cannot steal frames from the future network sender.
+        let accepting = policy.transmission_permitted();
+        self.queue.set_accepting(accepting);
+        self.monitor_queue.set_accepting(accepting);
         self.last_capture_permitted = should_open && self.is_running();
     }
 
@@ -352,7 +354,7 @@ mod tests {
         impl VoiceCaptureOpener for FailingOpener {
             fn open_default(
                 &self,
-                _queue: SharedPcmQueue,
+                _queues: VoiceCaptureQueues,
             ) -> Result<Box<dyn VoiceCaptureStream>, VoiceCaptureError> {
                 Err(VoiceCaptureError::NoDevice)
             }

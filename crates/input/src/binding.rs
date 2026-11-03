@@ -305,6 +305,8 @@ fn default_bindings() -> Vec<ActionBinding> {
     bind(&mut bindings, Attack, Gameplay, MouseButton(1));
     bind(&mut bindings, Use, Gameplay, MouseButton(2));
     bind(&mut bindings, PickItem, Gameplay, MouseButton(3));
+    // Default only; users can remap this action through the ordinary controls settings.
+    bind(&mut bindings, PushToTalk, Gameplay, KeyboardUsage(0x19));
     for (action, axis) in [
         (LookRight, XPositive),
         (LookLeft, XNegative),

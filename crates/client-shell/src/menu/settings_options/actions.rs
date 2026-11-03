@@ -28,6 +28,11 @@ impl MenuRuntime {
                 self.microphone_message =
                     Some("Switching to the system default microphone…".to_owned());
             }
+            MenuAction::SettingsMicrophoneRetryPermission => {
+                self.microphone_permission_retry_requested = true;
+                self.microphone_message =
+                    Some("Retrying microphone permission check…".to_owned());
+            }
             MenuAction::SettingsMicrophoneSelect(index, revision) => {
                 if revision != self.microphone_devices_revision {
                     self.microphone_message = Some(
@@ -307,6 +312,18 @@ mod microphone_settings_tests {
         assert_eq!(
             view.microphone_message.as_deref(),
             Some("The active microphone disconnected.")
+        );
+    }
+
+    #[test]
+    fn permission_retry_is_an_explicit_one_shot_request() {
+        let mut menu = menu();
+        menu.activate_from_input(MenuAction::SettingsMicrophoneRetryPermission);
+        assert!(menu.take_microphone_permission_retry_request());
+        assert!(!menu.take_microphone_permission_retry_request());
+        assert_eq!(
+            menu.view().microphone_message.as_deref(),
+            Some("Retrying microphone permission check…")
         );
     }
 

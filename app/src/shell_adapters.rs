@@ -74,7 +74,7 @@ pub(crate) fn drive_menu_services(
 /// Routes presentation-only microphone actions and worker events without blocking the menu.
 fn drive_microphone_settings(
     menu: &mut MenuRuntime,
-    controller: Option<ResMut<client_audio::audio::voice_controller::VoiceCaptureController>>,
+    controller: Option<ResMut<VoiceCaptureController>>,
 ) {
     let Some(mut controller) = controller else {
         if menu.take_microphone_refresh_request() {
@@ -108,27 +108,27 @@ fn drive_microphone_settings(
                         .collect(),
                 );
             }
-            client_audio::audio::voice_capture::MicrophoneWorkerEvent::Selected { device_id } => {
+            MicrophoneWorkerEvent::Selected { device_id } => {
                 menu.mark_microphone_selected(device_id);
             }
-            client_audio::audio::voice_capture::MicrophoneWorkerEvent::SelectionRejected(error) => {
+            MicrophoneWorkerEvent::SelectionRejected(error) => {
                 menu.clear_microphone_devices(format!(
                     "The microphone selection was rejected: {error:?}. Refresh the list and try again."
                 ));
             }
-            client_audio::audio::voice_capture::MicrophoneWorkerEvent::DeviceUnavailable {
+            MicrophoneWorkerEvent::DeviceUnavailable {
                 ..
             } => {
                 menu.clear_microphone_devices(
                     "The active microphone disconnected. Refresh the list to choose another input.",
                 );
             }
-            client_audio::audio::voice_capture::MicrophoneWorkerEvent::BackendError(error) => {
+            MicrophoneWorkerEvent::BackendError(error) => {
                 menu.clear_microphone_devices(format!(
                     "Microphone device error: {error}. Refresh the list before choosing another input."
                 ));
             }
-            client_audio::audio::voice_capture::MicrophoneWorkerEvent::Stopped => {
+            MicrophoneWorkerEvent::Stopped => {
                 menu.clear_microphone_devices(
                     "The microphone worker stopped. Enable Voice Chat in a multiplayer session to scan again.",
                 );
@@ -150,8 +150,8 @@ fn drive_microphone_settings(
             MicrophoneSelectionRequest::SystemDefault => {
                 MicrophoneSelection::SystemDefault
             }
-            launcher::menu::view::MicrophoneSelectionRequest::Device(id) => {
-                client_audio::audio::voice_capture::MicrophoneSelection::Device(id)
+            MicrophoneSelectionRequest::Device(id) => {
+                MicrophoneSelection::Device(id)
             }
         };
         if let Err(error) = controller.select_microphone_device(selection) {

@@ -177,6 +177,34 @@ mod tests {
     }
 
     #[test]
+    fn active_frame_is_discarded_when_policy_epoch_changes() {
+        let queue = Arc::new(BoundedPcmQueue::new(2));
+        queue.set_accepting(true);
+        let mut frame = PcmFrame::silence();
+        let mut samples = [0.0_f32; VOICE_FRAME_SAMPLES];
+        samples[0] = 0.75;
+        frame.copy_from_slice(&samples);
+        queue.push(frame);
+
+        let mut source = VoiceLoopbackSource::new(Arc::clone(&queue));
+        assert!((source.next().unwrap() - 0.75).abs() < 1e-6);
+        queue.set_accepting(false);
+        queue.set_accepting(true);
+        assert_eq!(source.next(), Some(0.0));
+    }
+
+    #[test]
+    fn monitor_mute_clears_only_its_private_queue() {
+        let queue = Arc::new(BoundedPcmQueue::new(2));
+        queue.set_accepting(true);
+        queue.push(PcmFrame::silence());
+        let mut source = VoiceLoopbackSource::new(Arc::clone(&queue));
+        source.mute_flag().store(true, Ordering::Release);
+        assert_eq!(source.next(), Some(0.0));
+        assert!(queue.is_empty());
+    }
+
+    #[test]
     fn monitor_mute_suppresses_output_without_popping_when_reenabled_after_clear() {
         let queue = Arc::new(BoundedPcmQueue::new(2));
         queue.set_accepting(true);

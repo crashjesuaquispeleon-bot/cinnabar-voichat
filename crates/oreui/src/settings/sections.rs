@@ -121,6 +121,57 @@ fn video(content: &mut Content<'_, '_>) -> Result<(), PaintError> {
 fn audio(content: &mut Content<'_, '_>) -> Result<(), PaintError> {
     content.heading("menu.audio.tab.title", "menu.audio.tab.description")?;
     options(content, SettingPanel::Audio)?;
+
+    content.heading(
+        "Microphone Input",
+        "Choose which local input device Voice Chat uses. Device choices are temporary and are not saved.",
+    )?;
+    super::services::action_row_text(
+        content,
+        "Available microphones",
+        "Scan the devices currently visible to the operating system.",
+        "Refresh",
+        Some(MenuAction::SettingsMicrophoneRefresh),
+    )?;
+
+    let default_selected = content.view.microphone_devices.iter().any(|device| {
+        device.is_default
+            && content.view.selected_microphone_id.as_deref() == Some(device.id.as_str())
+    });
+    super::services::action_row_text(
+        content,
+        "System default input",
+        "Let the operating system choose its current default microphone.",
+        if default_selected { "Selected" } else { "Use default" },
+        (!default_selected).then_some(MenuAction::SettingsMicrophoneUseSystemDefault),
+    )?;
+
+    for (index, device) in content.view.microphone_devices.iter().enumerate() {
+        let Ok(index) = u16::try_from(index) else {
+            continue;
+        };
+        let selected =
+            content.view.selected_microphone_id.as_deref() == Some(device.id.as_str());
+        let description = if device.is_default {
+            "System default device"
+        } else {
+            "Available input device"
+        };
+        super::services::action_row_text(
+            content,
+            &device.name,
+            description,
+            if selected { "Selected" } else { "Use" },
+            (!selected).then_some(MenuAction::SettingsMicrophoneSelect(
+                index,
+                content.view.microphone_devices_revision,
+            )),
+        )?;
+    }
+    if let Some(message) = content.view.microphone_message.as_deref() {
+        content.label_text("", message)?;
+    }
+
     reset(content, SettingsGroup::Audio, "options.sound.resetSettings")
 }
 

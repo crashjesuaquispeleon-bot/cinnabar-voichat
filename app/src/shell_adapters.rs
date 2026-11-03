@@ -29,7 +29,7 @@ pub(crate) fn drive_menu_services(
     mut local_worlds: Option<ResMut<client_shell::local_worlds::LocalWorlds>>,
     audio_settings: Option<ResMut<client_audio::audio::AudioSettings>>,
     mut voice_controller: Option<ResMut<VoiceCaptureController>>,
-    voice_policy: Option<Res<VoiceInputPolicy>>,
+    mut voice_policy: Option<ResMut<VoiceInputPolicy>>,
     settings: Option<ResMut<client_state::RuntimeSettings>>,
     antialiasing: Option<Res<client_presentation::camera::antialiasing::CameraAntiAliasingSupport>>,
     mut local_skin: Option<ResMut<LocalPlayerSkin>>,
@@ -78,11 +78,24 @@ pub(crate) fn drive_menu_services(
 fn drive_microphone_settings(
     menu: &mut MenuRuntime,
     controller: Option<ResMut<VoiceCaptureController>>,
-    voice_policy: Option<Res<VoiceInputPolicy>>,
+    mut voice_policy: Option<ResMut<VoiceInputPolicy>>,
 ) {
-    let permission = voice_policy.map_or(MicrophonePermission::Unknown, |policy| {
-        policy.permission()
-    });
+    if menu.take_microphone_permission_retry_request() {
+        if let Some(policy) = voice_policy.as_deref_mut() {
+            // A fresh open attempt is allowed only if voice remains enabled in a live session.
+            policy.set_permission(MicrophonePermission::Unknown);
+            menu.set_microphone_message(
+                "Permission check restarted. Enable Voice Chat in an active multiplayer session to prompt the OS again.",
+            );
+        } else {
+            menu.set_microphone_message("Microphone permission state is unavailable on this client.");
+        }
+    }
+
+    let permission = voice_policy.as_deref().map_or(
+        MicrophonePermission::Unknown,
+        |policy| policy.permission(),
+    );
     menu.set_microphone_permission_status(match permission {
         MicrophonePermission::Unknown => MicrophonePermissionStatus::Unknown,
         MicrophonePermission::Granted => MicrophonePermissionStatus::Granted,

@@ -104,12 +104,12 @@ References:
 - [x] Implement a dedicated owner-thread CPAL opener with a synchronous ready/error handshake and exact 48 kHz `f32` / `i16` negotiation.
 - [x] Rate-limit transient microphone open failures and unexpected runtime stream stops with bounded exponential backoff; clear stale PCM before reopening.
 - [x] Wire capture policy to the active `WorldStream` lifecycle; stop and clear on disconnect, transfer or stream-generation change.
-- [ ] Add OS permission UX/denial recovery, error presentation, an in-game quick-mute action and the dynamic microphone-device list. Sound settings persist enablement, local mute and activation mode; the controller exposes nonblocking refresh and exact selection APIs. Do not persist generation-scoped catalog tokens.
+- [ ] Add OS permission UX/denial recovery, error presentation and the dynamic microphone-device list. The in-game quick-mute action is now implemented and remappable. Sound settings persist enablement, local mute and activation mode; the controller exposes nonblocking refresh and exact selection APIs. Do not persist generation-scoped catalog tokens.
 - [x] Define mockable `VoiceCaptureOpener` / `VoiceCaptureStream` traits, fixed-frame accumulation, allocation-free conversion helpers, mock lifecycle tests, and the first native CPAL stream owner.
 - [x] Connect the remappable semantic PTT input and saved enablement/activation-mode settings to the policy.
 - [x] Add a bounded, thread-safe PCM frame queue with fixed internal format and explicit overflow accounting (no live capture producer yet).
 - [ ] Implement a bounded capture-to-playback loopback test and verify device shutdown on mute, disconnect and application exit.
-- [x] Add saved enablement, local mute and activation-mode controls to the existing Sound settings panel without changing game sound sliders.\n- [ ] Add the dynamic microphone-device selector, input sensitivity, permission status, error presentation and in-game quick-mute control.
+- [x] Add saved enablement, local mute and activation-mode controls to the existing Sound settings panel without changing game sound sliders.\n- [ ] Add the dynamic microphone-device selector, input sensitivity, permission status and error presentation.
 
 ### Stage 2 — Authenticated global rooms
 
@@ -170,7 +170,7 @@ The semantic input domain now includes `Action::PushToTalk` as a persistent held
 
 The app session-audio adapter reads only the finalized `SemanticInputSnapshot` phase for `Action::PushToTalk` and forwards its `held` value to `VoiceInputPolicy::set_push_to_talk_held()`. It runs after `ClientFrameSet::SemanticFinalize` and before `sync_voice_capture_with_policy`, so the controller observes the same frame's policy. Missing or cleared snapshots are neutral/released. The audio crate never reads Bevy keyboard state.
 
-Router and launcher tests cover PTT press/hold/release and remapping. Enablement, local mute and activation mode now appear in Sound settings and are propagated to the policy. OS permission UX, an in-game quick-mute control, device-selection UI, runtime loopback validation and network transport remain separate follow-up work.
+Router and launcher tests cover PTT press/hold/release and remapping. Enablement, local mute and activation mode now appear in Sound settings and are propagated to the policy. OS permission UX, device-selection UI, runtime loopback validation and network transport remain separate follow-up work. The in-game quick-mute action is implemented and remappable (default M).
 
 ## PTT-aware PCM privacy gate
 

@@ -104,13 +104,13 @@ References:
 - [x] Implement a dedicated owner-thread CPAL opener with a synchronous ready/error handshake and exact 48 kHz `f32` / `i16` negotiation.
 - [x] Rate-limit transient microphone open failures and unexpected runtime stream stops with bounded exponential backoff; clear stale PCM before reopening.
 - [x] Wire capture policy to the active `WorldStream` lifecycle; stop and clear on disconnect, transfer or stream-generation change.
-- [ ] Add OS permission UX/denial recovery, error presentation and the dynamic microphone-device list. The in-game quick-mute action is implemented and remappable. Sound settings persist enablement, local mute, activation mode and input sensitivity; the controller exposes nonblocking refresh and exact selection APIs. Do not persist generation-scoped catalog tokens.
+- [ ] Add dedicated OS permission UX, denial recovery and a permission-status presentation. The in-game quick-mute action is implemented and remappable. Sound settings persist enablement, local mute, activation mode and input sensitivity.
 - [x] Define mockable `VoiceCaptureOpener` / `VoiceCaptureStream` traits, fixed-frame accumulation, allocation-free conversion helpers, mock lifecycle tests, and the first native CPAL stream owner.
 - [x] Connect the remappable semantic PTT input and saved enablement/activation-mode settings to the policy.
 - [x] Add a bounded, thread-safe PCM frame queue with fixed internal format, explicit overflow accounting and a live policy-gated CPAL capture producer.
 - [x] Add a bounded mock capture-to-playback loopback test covering the existing mixer, independent transmit queue and disconnect cancellation; real-device shutdown still needs platform qualification.
 - [x] Add saved enablement, local mute, activation-mode and input-sensitivity controls to the existing Sound settings panel without changing game sound sliders.
-- [ ] Add the dynamic microphone-device selector, permission status and error presentation.
+- [x] Add a transient microphone-device selector to the Sound panel. It refreshes native devices through the CPAL owner worker, supports explicit system-default or exact-device selection, rejects stale menu revisions, and clears old rows on worker/device failure. Opaque device IDs remain local and are never persisted.
 
 ### Stage 2 — Authenticated global rooms
 
@@ -125,6 +125,10 @@ References:
 - [ ] Qualify Windows, macOS and Linux capture/playback and device switching.
 - [ ] Measure CPU, memory, bandwidth, end-to-end latency and queue drops at representative room sizes.
 - [ ] Document server deployment, configuration, privacy behavior and troubleshooting.
+
+## Microphone device selection
+
+The Sound panel's Microphone Input section has an explicit Refresh action, a System default action and one row for each device in the latest snapshot. The UI holds only presentation labels and opaque generation-scoped tokens; selections are routed to the native owner worker, which resolves the exact token on the same thread that owns CPAL handles. The menu includes its own snapshot revision so a delayed click from an older rendered list is rejected before it can become a worker request. A worker refresh invalidates prior tokens, and an unplug, enumeration failure or selection error clears the displayed rows so the player must refresh before choosing again. Device enumeration and switching are available only while the capture worker is active (Voice Chat enabled in a live multiplayer session); the system-default choice is disabled unless the refreshed catalog identifies exactly one default. The dedicated operating-system permission prompt, denial recovery and permission-status UX are still pending.
 
 ## Voice input sensitivity
 

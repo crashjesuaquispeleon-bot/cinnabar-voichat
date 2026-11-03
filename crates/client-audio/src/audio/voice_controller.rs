@@ -376,7 +376,6 @@ mod tests {
         assert!(controller.is_running());
     }
 
-
     #[test]
     fn push_to_talk_controls_pcm_queue_acceptance_without_closing_device() {
         let mut controller = test_controller();
@@ -417,7 +416,9 @@ mod tests {
 
         let attempts = Arc::new(AtomicU64::new(0));
         let mut controller =
-            VoiceCaptureController::with_opener(Box::new(CountingFailingOpener(Arc::clone(&attempts))));
+            VoiceCaptureController::with_opener(Box::new(CountingFailingOpener(
+                Arc::clone(&attempts),
+            )));
         let mut policy = permitted_policy();
         let start = std::time::Instant::now();
 

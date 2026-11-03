@@ -566,7 +566,9 @@ mod tests {
         struct AlreadyStoppedStream;
         impl VoiceCaptureStream for AlreadyStoppedStream {
             fn stop(&mut self) {}
-            fn is_running(&self) -> bool { false }
+            fn is_running(&self) -> bool {
+                false
+            }
         }
 
         struct AlreadyStoppedOpener(Arc<AtomicU64>);

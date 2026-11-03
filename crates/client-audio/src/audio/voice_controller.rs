@@ -154,7 +154,7 @@ impl VoiceCaptureController {
 
         // Keep both destinations in lockstep. The monitor has its own queue so its
         // playback consumer cannot steal frames from the future network sender.
-        let accepting = policy.transmission_permitted();
+        let accepting = self.is_running() && policy.transmission_permitted();
         self.queue.set_accepting(accepting);
         self.monitor_queue.set_accepting(accepting);
         self.last_capture_permitted = self.is_running();
@@ -469,6 +469,8 @@ mod tests {
         controller.sync_with_policy(&mut policy);
         assert!(!controller.is_running());
         assert_eq!(controller.last_error(), Some("no input device available"));
+        assert!(!controller.queue().is_accepting());
+        assert!(!controller.monitor_queue().is_accepting());
         // Transient failure keeps Granted so the user can retry after plugging a device.
         assert_eq!(policy.permission(), MicrophonePermission::Granted);
     }

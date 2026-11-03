@@ -81,7 +81,11 @@ fn section_rows_keep_order_and_shared_controls_from_the_registry() {
     assert_eq!(&audio_rows[..volume_rows.len()], volume_rows.as_slice());
     assert_eq!(
         &audio_rows[volume_rows.len()..],
-        &[SettingId::VoiceChatEnabled, SettingId::VoiceActivationMode]
+        &[
+            SettingId::VoiceChatEnabled,
+            SettingId::VoiceActivationMode,
+            SettingId::VoiceChatMuted,
+        ]
     );
 }
 

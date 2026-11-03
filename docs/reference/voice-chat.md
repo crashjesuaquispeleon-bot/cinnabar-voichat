@@ -153,3 +153,12 @@ References:
 - What is the room participant cap and what should happen when the cap is reached?
 
 Until the service and identity questions are answered, the media transport and room implementation remain intentionally incomplete. This document is an architecture proposal, not evidence that voice chat is already functional.
+
+
+## Push-to-talk semantic input
+
+The semantic input domain now includes `Action::PushToTalk` as a persistent held action (not a one-shot). It is exposed in the remappable controls registry as `key.pushToTalk`; its default keyboard assignment is V, and the binding is supplied through `ControlSettings` rather than polled by `client-audio`. Users can change or unbind it through the ordinary controls binding path.
+
+The app session-audio adapter reads only the finalized `SemanticInputSnapshot` phase for `Action::PushToTalk` and forwards its `held` value to `VoiceInputPolicy::set_push_to_talk_held()`. It runs after `ClientFrameSet::SemanticFinalize` and before `sync_voice_capture_with_policy`, so the controller observes the same frame's policy. Missing or cleared snapshots are neutral/released. The audio crate never reads Bevy keyboard state.
+
+A router integration test covers PTT press, continued hold, and release phases. OS microphone permission, PTT UI affordances, mute/settings UI, loopback and network transport remain separate follow-up work.

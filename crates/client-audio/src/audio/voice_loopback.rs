@@ -13,8 +13,8 @@ use super::voice_stream::SharedPcmQueue;
 use bevy::prelude::{NonSendMut, Res, ResMut, Resource};
 use rodio::Source;
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
     Arc,
+    atomic::{AtomicBool, Ordering},
 };
 use std::time::Duration;
 

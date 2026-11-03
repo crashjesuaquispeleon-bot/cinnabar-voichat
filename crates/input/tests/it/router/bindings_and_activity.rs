@@ -648,3 +648,52 @@ fn global_watermark_rules_cover_keyboard_controller_and_touch_sources() {
         touch,
     );
 }
+
+
+#[test]
+fn push_to_talk_is_a_persistent_remappable_held_action() {
+    let mut router = SemanticInputRouter::default();
+    router
+        .route(DeviceFrame {
+            keyboard_mouse: Some(KeyboardMouseFrame {
+                activity_sequence: 1,
+                keys: vec![0x19],
+                ..KeyboardMouseFrame::default()
+            }),
+            ..DeviceFrame::default()
+        })
+        .unwrap();
+    let pressed = router.finalize().unwrap();
+    let phase = pressed.phases[Action::PushToTalk as usize];
+    assert!(phase.pressed);
+    assert!(phase.held);
+    assert!(!phase.released);
+
+    router
+        .route(DeviceFrame {
+            keyboard_mouse: Some(KeyboardMouseFrame {
+                activity_sequence: 1,
+                keys: vec![0x19],
+                ..KeyboardMouseFrame::default()
+            }),
+            ..DeviceFrame::default()
+        })
+        .unwrap();
+    let held = router.finalize().unwrap().phases[Action::PushToTalk as usize];
+    assert!(!held.pressed);
+    assert!(held.held);
+    assert!(!held.released);
+
+    router
+        .route(DeviceFrame {
+            keyboard_mouse: Some(KeyboardMouseFrame {
+                activity_sequence: 2,
+                ..KeyboardMouseFrame::default()
+            }),
+            ..DeviceFrame::default()
+        })
+        .unwrap();
+    let released = router.finalize().unwrap().phases[Action::PushToTalk as usize];
+    assert!(!released.held);
+    assert!(released.released);
+}

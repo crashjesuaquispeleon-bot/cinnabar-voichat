@@ -11,6 +11,7 @@ use semantic_input::Action;
 /// Copies saved, local voice preferences into the capture policy.
 fn apply_voice_chat_settings(policy: &mut VoiceInputPolicy, settings: &ui::VoiceChatSettings) {
     policy.set_enabled(settings.enabled);
+    policy.set_muted(settings.muted);
     policy.set_mode(match settings.activation_mode {
         ui::VoiceActivationMode::OpenMicrophone => MicrophoneMode::OpenMicrophone,
         ui::VoiceActivationMode::PushToTalk => MicrophoneMode::PushToTalk,
@@ -112,6 +113,43 @@ mod voice_settings_tests {
 
         assert!(policy.enabled());
         assert_eq!(policy.mode(), MicrophoneMode::OpenMicrophone);
+        assert!(policy.transmission_permitted());
+    }
+
+    #[test]
+    fn local_mute_stops_open_microphone_without_disabling_voice() {
+        let mut policy = VoiceInputPolicy::default();
+        policy.set_permission(client_audio::audio::voice_input::MicrophonePermission::Granted);
+        policy.set_session_active(true);
+        apply_voice_chat_settings(
+            &mut policy,
+            &ui::VoiceChatSettings {
+                enabled: true,
+                muted: false,
+                activation_mode: ui::VoiceActivationMode::OpenMicrophone,
+            },
+        );
+        assert!(policy.transmission_permitted());
+
+        apply_voice_chat_settings(
+            &mut policy,
+            &ui::VoiceChatSettings {
+                enabled: true,
+                muted: true,
+                activation_mode: ui::VoiceActivationMode::OpenMicrophone,
+            },
+        );
+        assert!(policy.enabled());
+        assert!(!policy.transmission_permitted());
+
+        apply_voice_chat_settings(
+            &mut policy,
+            &ui::VoiceChatSettings {
+                enabled: true,
+                muted: false,
+                activation_mode: ui::VoiceActivationMode::OpenMicrophone,
+            },
+        );
         assert!(policy.transmission_permitted());
     }
 

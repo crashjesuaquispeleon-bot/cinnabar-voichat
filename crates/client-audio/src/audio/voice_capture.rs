@@ -29,6 +29,42 @@ pub trait MicrophoneBackend: Send + Sync {
     fn enumerate_input_devices(&self) -> anyhow::Result<Vec<MicrophoneDevice>>;
 }
 
+/// CPAL-backed local input-device discovery.
+///
+/// The adapter intentionally returns descriptors only. It does not retain CPAL device
+/// handles, open an input stream, request permission explicitly, or capture samples.
+/// IDs are indices scoped to this one enumeration result, not stable hardware IDs.
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CpalMicrophoneBackend;
+
+#[cfg(not(target_arch = "wasm32"))]
+impl MicrophoneBackend for CpalMicrophoneBackend {
+    fn enumerate_input_devices(&self) -> anyhow::Result<Vec<MicrophoneDevice>> {
+        use rodio::cpal::traits::{DeviceTrait, HostTrait};
+
+        let host = rodio::cpal::default_host();
+        let default_name = host
+            .default_input_device()
+            .and_then(|device| device.name().ok());
+        let devices = host.input_devices()?;
+
+        Ok(devices
+            .enumerate()
+            .map(|(index, device)| {
+                let name = device
+                    .name()
+                    .unwrap_or_else(|_| format!("Input device {}", index + 1));
+                MicrophoneDevice {
+                    id: format!("cpal-snapshot-{index}"),
+                    is_default: default_name.as_deref() == Some(name.as_str()),
+                    name,
+                }
+            })
+            .collect())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -67,5 +103,12 @@ mod tests {
     fn mock_backend_can_represent_no_available_microphones() {
         let backend = MockMicrophoneBackend { devices: vec![] };
         assert!(backend.enumerate_input_devices().unwrap().is_empty());
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn cpal_backend_is_safe_to_move_to_a_worker_thread() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<CpalMicrophoneBackend>();
     }
 }

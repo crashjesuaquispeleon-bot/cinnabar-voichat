@@ -20,6 +20,8 @@ pub enum VoiceActivationMode {
 pub struct VoiceChatSettings {
     /// Voice capture remains disabled until the player explicitly enables it.
     pub enabled: bool,
+    /// Mute captured voice locally without turning off the rest of Voice Chat.
+    pub muted: bool,
     /// Activation mode used after voice is enabled.
     pub activation_mode: VoiceActivationMode,
 }

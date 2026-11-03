@@ -249,6 +249,25 @@ mod tests {
         assert_eq!(q.dropped(), 4);
     }
 
+
+    #[test]
+    fn closed_gate_rejects_samples_and_old_epoch_frames() {
+        let q = BoundedPcmQueue::new(2);
+        assert!(!q.is_accepting());
+        q.push(PcmFrame::silence());
+        assert_eq!(q.suppressed(), 1);
+        assert!(q.is_empty());
+
+        q.set_accepting(true);
+        let mut in_flight = PcmFrame::silence();
+        in_flight.generation = q.generation.load(Ordering::Acquire);
+        q.set_accepting(false);
+        q.set_accepting(true);
+        // Simulate a callback that read the old epoch before disable, then enqueued late.
+        q.slots.push(in_flight).unwrap();
+        assert!(q.pop().is_none());
+    }
+
     #[test]
     fn clear_empties_without_resetting_counters() {
         let q = BoundedPcmQueue::new(2);

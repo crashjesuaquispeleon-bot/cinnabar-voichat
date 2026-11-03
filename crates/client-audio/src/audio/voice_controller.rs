@@ -832,8 +832,7 @@ mod tests {
 
     #[test]
     fn input_sensitivity_updates_transmit_and_monitor_queues_together() {
-        let controller =
-            VoiceCaptureController::with_opener(Box::new(MockVoiceCaptureOpener));
+        let controller = VoiceCaptureController::with_opener(Box::new(MockVoiceCaptureOpener));
         controller.set_input_sensitivity_percent(150);
         let queues = [controller.queue(), controller.monitor_queue()];
         let samples = [0.4_f32; 960];

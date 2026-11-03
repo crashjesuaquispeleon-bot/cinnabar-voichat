@@ -213,6 +213,7 @@ impl MenuRuntime {
             microphone_devices_revision: initial.microphone_devices_revision,
             selected_microphone_id: initial.selected_microphone_id,
             microphone_message: initial.microphone_message,
+            microphone_permission_status: initial.microphone_permission_status,
             microphone_refresh_requested: false,
             microphone_selection_requested: None,
             storage: initial.storage,

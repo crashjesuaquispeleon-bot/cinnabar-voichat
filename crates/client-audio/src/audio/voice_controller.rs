@@ -15,8 +15,8 @@ use std::sync::Arc;
 
 /// Owns the shared PCM queue and the optional running capture stream.
 ///
-/// Constructed at plugin init with a mock opener in tests; production can install
-/// [`super::voice_stream::CpalVoiceCaptureOpener`] before the first open.
+/// On native targets the default opener is CPAL; tests can inject
+/// [`MockVoiceCaptureOpener`] through [`VoiceCaptureController::with_opener`].
 #[derive(Resource)]
 pub struct VoiceCaptureController {
     queue: SharedPcmQueue,
@@ -30,7 +30,14 @@ pub struct VoiceCaptureController {
 
 impl Default for VoiceCaptureController {
     fn default() -> Self {
-        Self::with_opener(Box::new(MockVoiceCaptureOpener))
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            Self::with_opener(Box::new(super::voice_stream::CpalVoiceCaptureOpener))
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            Self::with_opener(Box::new(MockVoiceCaptureOpener))
+        }
     }
 }
 
@@ -152,9 +159,13 @@ mod tests {
         policy
     }
 
+    fn test_controller() -> VoiceCaptureController {
+        VoiceCaptureController::with_opener(Box::new(MockVoiceCaptureOpener))
+    }
+
     #[test]
     fn opens_when_capture_becomes_permitted() {
-        let mut controller = VoiceCaptureController::default();
+        let mut controller = test_controller();
         let policy = permitted_policy();
         assert!(!controller.is_running());
         controller.sync_with_policy(&policy);
@@ -164,12 +175,11 @@ mod tests {
 
     #[test]
     fn stops_and_clears_queue_when_session_ends() {
-        let mut controller = VoiceCaptureController::default();
+        let mut controller = test_controller();
         let mut policy = permitted_policy();
         controller.sync_with_policy(&policy);
         assert!(controller.is_running());
 
-        // Inject one frame through the mock by re-opening is not needed; just ensure stop clears.
         policy.set_session_active(false);
         controller.sync_with_policy(&policy);
         assert!(!controller.is_running());
@@ -179,7 +189,7 @@ mod tests {
 
     #[test]
     fn permission_loss_stops_capture() {
-        let mut controller = VoiceCaptureController::default();
+        let mut controller = test_controller();
         let mut policy = permitted_policy();
         controller.sync_with_policy(&policy);
         policy.set_permission(MicrophonePermission::Denied);
@@ -190,7 +200,7 @@ mod tests {
 
     #[test]
     fn disable_voice_stops_without_requiring_mode_change() {
-        let mut controller = VoiceCaptureController::default();
+        let mut controller = test_controller();
         let mut policy = permitted_policy();
         controller.sync_with_policy(&policy);
         policy.set_enabled(false);
@@ -200,7 +210,7 @@ mod tests {
 
     #[test]
     fn repeated_sync_while_permitted_does_not_reopen() {
-        let mut controller = VoiceCaptureController::default();
+        let mut controller = test_controller();
         let policy = permitted_policy();
         controller.sync_with_policy(&policy);
         controller.sync_with_policy(&policy);

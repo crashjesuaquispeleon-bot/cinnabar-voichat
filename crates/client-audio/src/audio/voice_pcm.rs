@@ -223,7 +223,6 @@ mod tests {
     fn overflow_drops_newest_and_counts() {
         let q = BoundedPcmQueue::new(2);
         q.set_accepting(true);
-        q.set_accepting(true);
         for i in 0..5 {
             let mut frame = PcmFrame::silence();
             frame.samples[0] = i as f32;
@@ -271,6 +270,7 @@ mod tests {
     #[test]
     fn clear_empties_without_resetting_counters() {
         let q = BoundedPcmQueue::new(2);
+        q.set_accepting(true);
         q.push(PcmFrame::silence());
         q.push(PcmFrame::silence());
         q.push(PcmFrame::silence());

@@ -366,6 +366,11 @@ func TestFriendHostVoiceBrokerMessages(t *testing.T) {
 	client := newTestClient(t, api, nil)
 	client.Configure(testConfig)
 	session := receive(t, api.sessions)
+	testwait.Eventually(t, testwait.DefaultTimeout, "an authenticated session", func() bool {
+		client.mu.Lock()
+		defer client.mu.Unlock()
+		return client.live != nil
+	})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

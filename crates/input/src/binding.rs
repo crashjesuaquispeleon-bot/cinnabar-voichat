@@ -430,7 +430,6 @@ fn default_bindings() -> Vec<ActionBinding> {
     bindings
 }
 
-
 #[cfg(test)]
 mod voice_touch_binding_tests {
     use super::*;

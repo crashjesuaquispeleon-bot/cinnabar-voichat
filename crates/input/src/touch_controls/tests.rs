@@ -167,16 +167,10 @@ fn an_ended_finger_frees_its_id_for_a_new_contact_in_the_same_frame() {
     assert_eq!(state.end(8), None);
 }
 
-
 #[test]
 fn voice_push_to_talk_contact_stays_held_until_the_finger_is_released() {
     let mut state = TouchControlState::default();
-    assert!(state.begin(
-        21,
-        [0.2, 0.8],
-        1,
-        Some(region(touch::VOICE_PTT)),
-    ));
+    assert!(state.begin(21, [0.2, 0.8], 1, Some(region(touch::VOICE_PTT))));
 
     let held = state.sample();
     assert_eq!(held.len(), 1);

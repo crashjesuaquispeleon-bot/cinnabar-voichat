@@ -91,7 +91,7 @@ const (
 	SessionWindowsEndpointName = "session.addr"
 	// VoiceMaxFrameLen: Maximum payload size on the dedicated local voice bridge.
 	VoiceMaxFrameLen = 1024
-	// VoiceFrameBytes: Voice media frame bytes: sequence plus 16 kHz mono PCM16 samples.
+	// VoiceFrameBytes: Uplink voice frame bytes: sequence plus 16 kHz mono PCM16 samples; downlink adds a 16-byte opaque source ID.
 	VoiceFrameBytes = 648
 	// VoiceIPCKindAudio: Local voice IPC uplink media frame.
 	VoiceIPCKindAudio = 1

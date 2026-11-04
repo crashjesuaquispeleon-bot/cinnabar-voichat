@@ -182,6 +182,7 @@ pub fn core_command_for_address(
         _ => address.to_owned(),
     };
     let mut command = Command::new(executable);
+    crate::voice_environment::configure_voice_environment(&mut command);
     command
         .arg("-control-status")
         .arg("-socket-dir")

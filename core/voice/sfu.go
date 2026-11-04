@@ -39,28 +39,28 @@ const (
 // Configure at least one STUN/TURN server for internet connectivity; TURN is required
 // for reliable connectivity across restrictive NATs and firewalls.
 type SFUConfig struct {
-	Admission VerifyConfig
-	ICEServers []webrtc.ICEServer
+	Admission       VerifyConfig
+	ICEServers      []webrtc.ICEServer
 	MaxParticipants int
-	UDPMux ice.UDPMux
+	UDPMux          ice.UDPMux
 }
 
 // SFU accepts WebRTC offers only with a verified Cinnabar room admission.
 type SFU struct {
-	admission VerifyConfig
+	admission  VerifyConfig
 	peerConfig webrtc.Configuration
-	api *webrtc.API
-	udpMux ice.UDPMux
-	registry *Registry
+	api        *webrtc.API
+	udpMux     ice.UDPMux
+	registry   *Registry
 
-	ctx context.Context
-	cancel context.CancelFunc
+	ctx        context.Context
+	cancel     context.CancelFunc
 	reaperDone chan struct{}
 
-	mu sync.RWMutex
+	mu     sync.RWMutex
 	closed bool
 	joinWG sync.WaitGroup
-	rooms map[string]*sfuRoom
+	rooms  map[string]*sfuRoom
 }
 
 type sfuRoom struct {

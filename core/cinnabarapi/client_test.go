@@ -361,6 +361,136 @@ func TestBackoffIsCappedAndJittered(t *testing.T) {
 	}
 }
 
+func TestFriendHostVoiceBrokerMessages(t *testing.T) {
+	api := newFakeAPI(t)
+	client := newTestClient(t, api, nil)
+	client.Configure(testConfig)
+	session := receive(t, api.sessions)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	type result struct {
+		room string
+		session string
+		err error
+	}
+	opened := make(chan result, 1)
+	go func() {
+		room, gameSession, err := client.OpenVoiceRoom(ctx)
+		opened <- result{room: room, session: gameSession, err: err}
+	}()
+	var open struct {
+		Type string `json:"type"`
+		RequestID string `json:"request_id"`
+	}
+	session.receive(t, &open)
+	if open.Type != typeVoiceHostOpen || !ValidUUID(open.RequestID) {
+		t.Fatalf("open request = %+v", open)
+	}
+	roomID, sessionID := "00112233-4455-6677-8899-aabbccddeeff", "10112233-4455-6677-8899-aabbccddeeff"
+	session.send(t, map[string]any{"type": typeVoiceRoom, "request_id": open.RequestID, "room_id": roomID, "session_id": sessionID})
+	openedResult := receive(t, opened)
+	if openedResult.err != nil || openedResult.room != roomID || openedResult.session != sessionID {
+		t.Fatalf("opened room = %+v", openedResult)
+	}
+
+	updated := make(chan error, 1)
+	go func() { updated <- client.UpdateVoiceMembers(ctx, []string{"2535400000000002"}) }()
+	var members struct {
+		Type string `json:"type"`
+		RequestID string `json:"request_id"`
+		Members []string `json:"members"`
+	}
+	session.receive(t, &members)
+	if members.Type != typeVoiceHostMembers || len(members.Members) != 1 || members.Members[0] != "2535400000000002" {
+		t.Fatalf("members request = %+v", members)
+	}
+	session.send(t, map[string]any{"type": typeVoiceMembersUpdated, "request_id": members.RequestID, "count": 2})
+	if err := receive(t, updated); err != nil {
+		t.Fatal(err)
+	}
+
+	tokenResult := make(chan struct {
+		token string
+		err error
+	}, 1)
+	go func() {
+		token, err := client.IssueVoiceAdmissionToken(ctx)
+		tokenResult <- struct { token string; err error }{token, err}
+	}()
+	var admissionRequest struct {
+		Type string `json:"type"`
+		RequestID string `json:"request_id"`
+	}
+	session.receive(t, &admissionRequest)
+	if admissionRequest.Type != typeVoiceAdmissionRequest {
+		t.Fatalf("admission request = %+v", admissionRequest)
+	}
+	session.send(t, map[string]any{
+		"type": typeVoiceAdmission, "request_id": admissionRequest.RequestID,
+		"token": "header.payload.signature", "expires_at": time.Now().Add(time.Minute).Unix(),
+	})
+	issued := receive(t, tokenResult)
+	if issued.err != nil || issued.token != "header.payload.signature" {
+		t.Fatalf("issued token = %+v", issued)
+	}
+
+	closed := make(chan error, 1)
+	go func() { closed <- client.CloseVoiceRoom(ctx) }()
+	var closeRequest struct {
+		Type string `json:"type"`
+		RequestID string `json:"request_id"`
+	}
+	session.receive(t, &closeRequest)
+	if closeRequest.Type != typeVoiceHostClose {
+		t.Fatalf("close request = %+v", closeRequest)
+	}
+	session.send(t, map[string]any{"type": typeVoiceClosed, "request_id": closeRequest.RequestID, "sfu_closed": true})
+	if err := receive(t, closed); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestVoiceHostOpenRetainsRequestIDUntilConfirmed(t *testing.T) {
+	api := newFakeAPI(t)
+	client := newTestClient(t, api, nil)
+	client.Configure(testConfig)
+	session := receive(t, api.sessions)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	first := make(chan error, 1)
+	go func() { _, _, err := client.OpenVoiceRoom(ctx); first <- err }()
+	var request struct {
+		Type string `json:"type"`
+		RequestID string `json:"request_id"`
+	}
+	session.receive(t, &request)
+	cancel()
+	if err := receive(t, first); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled open = %v", err)
+	}
+	retryCtx, retryCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer retryCancel()
+	second := make(chan error, 1)
+	go func() { _, _, err := client.OpenVoiceRoom(retryCtx); second <- err }()
+	var retry struct {
+		Type string `json:"type"`
+		RequestID string `json:"request_id"`
+	}
+	session.receive(t, &retry)
+	if retry.RequestID != request.RequestID {
+		t.Fatalf("retry request ID = %q, want %q", retry.RequestID, request.RequestID)
+	}
+	session.send(t, map[string]any{
+		"type": typeVoiceRoom, "request_id": retry.RequestID,
+		"room_id": "00112233-4455-6677-8899-aabbccddeeff",
+		"session_id": "10112233-4455-6677-8899-aabbccddeeff",
+	})
+	if err := receive(t, second); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestSocketURLUsesTheConnectRoute(t *testing.T) {
 	if got := socketURL("https://api.example/"); got != "wss://api.example/v1/connect" {
 		t.Fatal(got)

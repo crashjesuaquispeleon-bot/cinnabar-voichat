@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	mathrand "math/rand/v2"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/google/uuid"
 	"github.com/hashimthearab/rust-mcbe/core/internal/bridgecontract"
 )
 
@@ -27,6 +29,7 @@ const (
 	idleTimeout   = 2*pingInterval + 15*time.Second
 	writeTimeout  = 10 * time.Second
 	lookupTimeout = 10 * time.Second
+	voiceRequestTimeout = 10 * time.Second
 	maxFrameBytes = 64 << 10
 	minBackoff    = time.Second
 	maxBackoff    = time.Duration(bridgecontract.CinnabarAPIReconnectMaxMS) * time.Millisecond
@@ -41,6 +44,8 @@ var (
 	ErrRateLimited = errors.New("cinnabarapi: lookup rate limited")
 	// ErrInvalidLookup means a lookup had no identifiers, too many identifiers or a malformed one.
 	ErrInvalidLookup = errors.New("cinnabarapi: invalid lookup")
+	// ErrVoiceUnavailable means the API has no live room or cannot currently authorize voice.
+	ErrVoiceUnavailable = errors.New("cinnabarapi: voice admission unavailable")
 	errUnauthorized  = errors.New("cinnabarapi: unauthorized")
 )
 
@@ -86,14 +91,16 @@ type Client struct {
 	parameters parameters   // guarded by mu
 	budget     lookupBudget // guarded by mu
 
-	mu              sync.Mutex
-	config          Config
-	configured      bool
-	reconnect       context.CancelFunc // ends the current session; guarded by mu
-	loadoutRevision uint64
-	ownershipXUID   string
-	ownedCosmetics  []string
-	live            *session // authenticated session; guarded by mu
+	mu                 sync.Mutex
+	voiceOpenMu        sync.Mutex // serializes idempotent host-room opens
+	voiceOpenRequestID string     // retained until a server response confirms the open
+	config             Config
+	configured         bool
+	reconnect          context.CancelFunc // ends the current session; guarded by mu
+	loadoutRevision    uint64
+	ownershipXUID      string
+	ownedCosmetics     []string
+	live               *session // authenticated session; guarded by mu
 }
 
 // session is one authenticated connection.
@@ -119,6 +126,7 @@ type session struct {
 	visible         bool          // what the server holds; written only by the writer
 	nextID          uint32
 	pending         map[uint32]chan lookupReply // guarded by Client.mu
+	voicePending    map[string]chan voiceReply  // guarded by Client.mu
 	closed          chan struct{}
 	parameters      parameters
 }
@@ -132,6 +140,11 @@ type LookupResult struct {
 type lookupReply struct {
 	result LookupResult
 	err    error
+}
+
+type voiceReply struct {
+	message inbound
+	err     error
 }
 
 // New starts the client's lifetime under ctx.
@@ -232,6 +245,148 @@ func (c *Client) LookupLimit() int {
 
 // CacheTTLMS returns the current server's answer lifetime for the roster cache.
 func (c *Client) CacheTTLMS() int64 { c.mu.Lock(); defer c.mu.Unlock(); return c.parameters.CacheTTLMS }
+
+// OpenVoiceRoom asks the authenticated account to open its FriendHost room. The
+// request ID survives timeouts/reconnects until a server reply confirms the room,
+// so a retried call cannot accidentally rotate a room that was already created.
+func (c *Client) OpenVoiceRoom(ctx context.Context) (roomID, sessionID string, err error) {
+	c.voiceOpenMu.Lock()
+	defer c.voiceOpenMu.Unlock()
+	c.mu.Lock()
+	if c.voiceOpenRequestID == "" {
+		c.voiceOpenRequestID = uuid.NewString()
+	}
+	requestID := c.voiceOpenRequestID
+	c.mu.Unlock()
+	message := voiceHostOpenMessage{Type: typeVoiceHostOpen, RequestID: requestID}
+	reply, err := c.requestVoice(ctx, requestID, message)
+	if err != nil {
+		return "", "", err
+	}
+	if reply.Type != typeVoiceRoom || !ValidUUID(reply.RoomID) || !ValidUUID(reply.SessionID) {
+		return "", "", ErrVoiceUnavailable
+	}
+	c.mu.Lock()
+	if c.voiceOpenRequestID == requestID {
+		c.voiceOpenRequestID = ""
+	}
+	c.mu.Unlock()
+	return reply.RoomID, reply.SessionID, nil
+}
+
+// UpdateVoiceMembers replaces the guest roster of the currently opened FriendHost
+// room. The server adds the authenticated owner itself; this method never accepts
+// an owner, room ID, session ID or arbitrary membership claim from the caller.
+func (c *Client) UpdateVoiceMembers(ctx context.Context, members []string) error {
+	if len(members) > 63 {
+		return ErrVoiceUnavailable
+	}
+	seen := make(map[string]struct{}, len(members))
+	c.mu.Lock()
+	owner := c.ownershipXUID
+	c.mu.Unlock()
+	for _, xuid := range members {
+		if !ValidXUID(xuid) || xuid == owner {
+			return ErrVoiceUnavailable
+		}
+		if _, exists := seen[xuid]; exists {
+			return ErrVoiceUnavailable
+		}
+		seen[xuid] = struct{}{}
+	}
+	requestID := uuid.NewString()
+	reply, err := c.requestVoice(ctx, requestID, voiceHostMembersMessage{
+		Type: typeVoiceHostMembers, RequestID: requestID, Members: append([]string{}, members...),
+	})
+	if err != nil {
+		return err
+	}
+	if reply.Type != typeVoiceMembersUpdated {
+		return ErrVoiceUnavailable
+	}
+	return nil
+}
+
+// CloseVoiceRoom closes the exact room owned by this authenticated account.
+func (c *Client) CloseVoiceRoom(ctx context.Context) error {
+	requestID := uuid.NewString()
+	reply, err := c.requestVoice(ctx, requestID, voiceHostCloseMessage{Type: typeVoiceHostClose, RequestID: requestID})
+	if err != nil {
+		return err
+	}
+	if reply.Type != typeVoiceClosed || !reply.SFUClosed {
+		return ErrVoiceUnavailable
+	}
+	return nil
+}
+
+// IssueVoiceAdmissionToken requests a short-lived token for this authenticated
+// account's server-stored room membership; no identity or room claims are supplied.
+func (c *Client) IssueVoiceAdmissionToken(ctx context.Context) (string, error) {
+	requestID := uuid.NewString()
+	reply, err := c.requestVoice(ctx, requestID, voiceAdmissionRequestMessage{
+		Type: typeVoiceAdmissionRequest, RequestID: requestID,
+	})
+	if err != nil {
+		return "", err
+	}
+	if reply.Type != typeVoiceAdmission || reply.Token == "" || reply.ExpiresAt <= time.Now().Unix() {
+		return "", ErrVoiceUnavailable
+	}
+	return reply.Token, nil
+}
+
+func (c *Client) requestVoice(ctx context.Context, requestID string, message any) (inbound, error) {
+	if ctx == nil {
+		return inbound{}, ErrVoiceUnavailable
+	}
+	c.mu.Lock()
+	s := c.live
+	if s == nil {
+		c.mu.Unlock()
+		return inbound{}, ErrUnavailable
+	}
+	if _, exists := s.voicePending[requestID]; exists {
+		c.mu.Unlock()
+		return inbound{}, ErrVoiceUnavailable
+	}
+	reply := make(chan voiceReply, 1)
+	s.voicePending[requestID] = reply
+	c.mu.Unlock()
+	defer func() {
+		c.mu.Lock()
+		delete(s.voicePending, requestID)
+		c.mu.Unlock()
+	}()
+	payload, err := json.Marshal(message)
+	if err != nil {
+		return inbound{}, err
+	}
+	timer := time.NewTimer(voiceRequestTimeout)
+	defer timer.Stop()
+	select {
+	case s.out <- payload:
+	case <-s.closed:
+		return inbound{}, ErrUnavailable
+	case <-ctx.Done():
+		return inbound{}, ctx.Err()
+	case <-timer.C:
+		return inbound{}, ErrVoiceUnavailable
+	}
+	select {
+	case result := <-reply:
+		if result.err != nil {
+			return inbound{}, result.err
+		}
+		return result.message, nil
+	case <-s.closed:
+		return inbound{}, ErrUnavailable
+	case <-ctx.Done():
+		return inbound{}, ctx.Err()
+	case <-timer.C:
+		return inbound{}, ErrVoiceUnavailable
+	}
+}
 
 // lookup sends one negotiated batch on the session chosen by its caller.
 func (c *Client) lookup(ctx context.Context, s *session, xuids, uuids []string) (LookupResult, error) {
@@ -358,7 +513,9 @@ func (c *Client) session(ctx context.Context, config Config) (bool, string, erro
 		conn: conn, out: make(chan []byte, 8), dirty: make(chan struct{}, 1),
 		loadoutDirty: make(chan struct{}, 1), loadouts: make(map[string]bridgecontract.CinnabarRemoteLoadout),
 		emoteDirty: make(chan struct{}, 1), emotes: make(map[string]receivedEmote),
-		parameters: c.parameters, visible: config.Visible, pending: make(map[uint32]chan lookupReply), closed: make(chan struct{}),
+		parameters: c.parameters, visible: config.Visible,
+		pending: make(map[uint32]chan lookupReply), voicePending: make(map[string]chan voiceReply),
+		closed: make(chan struct{}),
 	}
 	c.mu.Lock()
 	s.ownershipXUID = c.ownershipXUID
@@ -384,6 +541,9 @@ func (c *Client) session(ctx context.Context, config Config) (bool, string, erro
 	close(s.closed)
 	for _, reply := range s.pending {
 		reply <- lookupReply{err: ErrUnavailable}
+	}
+	for _, reply := range s.voicePending {
+		reply <- voiceReply{err: ErrUnavailable}
 	}
 	c.mu.Unlock()
 	return true, "session", err
@@ -490,6 +650,10 @@ func (c *Client) read(ctx context.Context, s *session) error {
 		case typeLookupResult:
 			c.logger.Debug("Cinnabar API lookup result received", "found", len(msg.Cinnabar), "found_uuids", len(msg.CinnabarUUIDs))
 			c.answer(s, msg.ID, lookupReply{result: LookupResult{Cinnabar: msg.Cinnabar, CinnabarUUIDs: msg.CinnabarUUIDs}})
+		case typeVoiceRoom, typeVoiceMembersUpdated, typeVoiceClosed, typeVoiceAdmission:
+			c.answerVoice(s, msg.RequestID, voiceReply{message: msg})
+		case typeVoiceError:
+			c.answerVoice(s, msg.RequestID, voiceReply{err: fmt.Errorf("%w: %s", ErrVoiceUnavailable, msg.Code)})
 		case typeError:
 			err := ErrUnavailable
 			if msg.Code == codeRateLimited {
@@ -562,6 +726,19 @@ func (c *Client) answer(s *session, id *uint32, reply lookupReply) {
 	c.mu.Lock()
 	pending := s.pending[*id]
 	delete(s.pending, *id)
+	c.mu.Unlock()
+	if pending != nil {
+		pending <- reply
+	}
+}
+
+func (c *Client) answerVoice(s *session, requestID string, reply voiceReply) {
+	if requestID == "" {
+		return
+	}
+	c.mu.Lock()
+	pending := s.voicePending[requestID]
+	delete(s.voicePending, requestID)
 	c.mu.Unlock()
 	if pending != nil {
 		pending <- reply

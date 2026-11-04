@@ -349,7 +349,7 @@ func (r *Registry) CloseSession(roomID, sessionID string) []Participant {
 	}
 	out := make([]Participant, 0, len(room.members))
 	for xuid, admission := range room.members {
-		out = append(out, Participant{Subject: admission.Subject, XUID: xuid, ExpiresAt: admission.ExpiresAt})
+		out = append(out, Participant{RoomID: roomID, TokenID: admission.TokenID, Subject: admission.Subject, XUID: xuid, ExpiresAt: admission.ExpiresAt})
 		delete(r.tokenToRoom, admission.TokenID)
 	}
 	delete(r.rooms, roomID)

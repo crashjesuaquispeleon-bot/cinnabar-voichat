@@ -35,6 +35,24 @@ public final class CinnabarActivity extends NativeActivity {
         decor.getViewTreeObserver().addOnGlobalLayoutListener(() ->
                 updateKeyboardGeometry(decor, decor.getRootWindowInsets()));
         decor.requestApplyInsets();
+        // Ask only after the activity has a window. Denial is non-fatal: Cinnabar itself
+        // remains usable, while CPAL must fail closed until Android grants RECORD_AUDIO.
+        decor.post(this::requestVoiceMicrophonePermission);
+    }
+
+    private void requestVoiceMicrophonePermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M
+                || checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Cinnabar Voice Chat — Alpha")
+                .setMessage("Microphone access is optional. Grant it only if you want to use voice chat. "
+                        + "Cinnabar does not record room audio to disk.")
+                .setPositiveButton("Allow microphone", (dialog, which) ->
+                        requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 0x434E))
+                .setNegativeButton("Not now", null)
+                .show();
     }
 
     @Override protected void onResume() {

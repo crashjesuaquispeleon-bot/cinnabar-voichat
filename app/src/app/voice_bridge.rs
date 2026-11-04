@@ -51,7 +51,7 @@ pub(crate) struct VoiceBridgeRuntime {
 struct ActiveBridge {
     socket_dir: PathBuf,
     desired: tokio::sync::watch::Sender<BridgeDesired>,
-    thread: JoinHandle<()>,
+    thread: Option<JoinHandle<()>>,
 }
 
 impl Drop for ActiveBridge {
@@ -110,7 +110,7 @@ pub(crate) fn drive_voice_bridge(
     let finished = runtime
         .active
         .as_ref()
-        .is_some_and(|active| active.thread.is_finished());
+        .is_some_and(|active| active.thread.as_ref().is_some_and(JoinHandle::is_finished));
     let changed_binding = runtime.active.as_ref().is_some_and(|active| {
         active.socket_dir != socket_dir || active.desired.borrow().session != desired.session
     });
@@ -120,7 +120,9 @@ pub(crate) fn drive_voice_bridge(
             // local session. Never retain an old partida's receive path.
             active.desired.send_replace(BridgeDesired::STOPPED);
             if finished {
-                let _ = active.thread.join();
+                if let Some(thread) = active.thread.take() {
+                    let _ = thread.join();
+                }
             }
         }
         runtime.retry_at = Some(Instant::now() + BRIDGE_RETRY_DELAY);
@@ -178,7 +180,7 @@ pub(crate) fn drive_voice_bridge(
             runtime.active = Some(ActiveBridge {
                 socket_dir,
                 desired: desired_tx,
-                thread,
+                thread: Some(thread),
             });
             runtime.retry_at = None;
         }

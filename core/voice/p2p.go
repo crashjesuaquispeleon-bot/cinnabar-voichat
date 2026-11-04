@@ -30,6 +30,7 @@ type P2PPeer struct {
 	closeOnce sync.Once
 	transmitAllowed atomic.Bool
 	lastSequence atomic.Uint64
+	lastSentSequence atomic.Uint64
 	droppedFrames atomic.Uint64
 }
 
@@ -105,9 +106,15 @@ func (peer *P2PPeer) WaitReady(ctx context.Context) error {
 
 func (peer *P2PPeer) SetTransmitAllowed(allowed bool) { peer.transmitAllowed.Store(allowed) }
 
+func (peer *P2PPeer) acceptSentSequence(sequence uint64) bool {
+	for { last := peer.lastSentSequence.Load(); if sequence <= last { return false }; if peer.lastSentSequence.CompareAndSwap(last, sequence) { return true } }
+}
+
 func (peer *P2PPeer) SendFrame(frame []byte) error {
 	if !peer.transmitAllowed.Load() { return ErrVoiceTransmitDisabled }
 	if len(frame) != voiceFrameBytes { return ErrVoiceFrameInvalid }
+	sequence, ok := voiceFrameSequence(frame, peer.lastSentSequence.Load())
+	if !ok || !peer.acceptSentSequence(sequence) { return ErrVoiceFrameInvalid }
 	select { case <-peer.done: return ErrVoiceClientClosed; default: }
 	peer.mu.Lock(); channel, closed := peer.channel, peer.closed; peer.mu.Unlock()
 	if closed || channel == nil || channel.ReadyState() != webrtc.DataChannelStateOpen { return ErrP2PNotReady }

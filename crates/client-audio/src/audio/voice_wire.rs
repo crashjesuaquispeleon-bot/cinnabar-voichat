@@ -87,8 +87,10 @@ mod tests {
         assert_eq!(&payload[..8], &0x0102_0304_0506_0708_u64.to_be_bytes());
         assert!(
             payload[8..]
-                .chunks_exact(2)
-                .all(|bytes| { i16::from_le_bytes([bytes[0], bytes[1]]) == 16_384 })
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .all(|bytes| i16::from_le_bytes(*bytes) == 16_384)
         );
     }
 
@@ -120,10 +122,12 @@ mod tests {
         let _ = encoder.encode(&frame, 1);
         let payload = encoder.encode(&frame, 2);
         let pcm: Vec<i16> = payload[8..]
-            .chunks_exact(2)
-            .map(|bytes| i16::from_le_bytes([bytes[0], bytes[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|bytes| i16::from_le_bytes(*bytes))
             .collect();
-        assert!(pcm.iter().any(|sample| *sample == i16::MAX));
-        assert!(pcm.iter().all(|sample| *sample >= i16::MIN));
+        assert!(pcm.contains(&i16::MAX));
+        assert!(!pcm.contains(&i16::MIN));
     }
 }

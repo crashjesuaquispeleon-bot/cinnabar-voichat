@@ -59,6 +59,7 @@ type SFU struct {
 
 	mu sync.RWMutex
 	closed bool
+	joinWG sync.WaitGroup
 	rooms map[string]*sfuRoom
 }
 
@@ -262,15 +263,18 @@ func (s *SFU) join(
 	offer webrtc.SessionDescription,
 	closeSignal func() error,
 ) (*sfuPeer, *webrtc.SessionDescription, error) {
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return nil, nil, errors.New("voice: SFU is closed")
+	}
+	s.joinWG.Add(1)
+	s.mu.Unlock()
+	defer s.joinWG.Done()
+
 	admission, err := VerifyAdmission(token, s.admission, time.Now())
 	if err != nil {
 		return nil, nil, err
-	}
-	s.mu.RLock()
-	closed := s.closed
-	s.mu.RUnlock()
-	if closed {
-		return nil, nil, errors.New("voice: SFU is closed")
 	}
 	if err := s.registry.Join(admission, time.Now()); err != nil {
 		return nil, nil, err
@@ -660,6 +664,16 @@ func (s *SFU) Close() {
 
 		s.cancel()
 		<-s.reaperDone
+		s.joinWG.Wait()
+
+		s.mu.RLock()
+		var peers []*sfuPeer
+		for _, room := range s.rooms {
+			for _, peer := range room.peers {
+				peers = append(peers, peer)
+			}
+		}
+		s.mu.RUnlock()
 		for _, peer := range peers {
 			peer.close()
 		}

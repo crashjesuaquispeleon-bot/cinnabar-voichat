@@ -410,7 +410,10 @@ func runWithResourcePackCacheFactory(
 			selector.Set("")
 			statusStore.ClearTransfer()
 		}}
-		if account != nil {
+		if shouldRunFriendHosting(opts.upstream, account != nil, localWorlds != nil) {
+			// The account core owns local BDS openings and the authoritative FriendHost
+			// roster. An authenticated upstream/game core has its own API socket for
+			// voice signaling, but must not open a competing room for this XUID.
 			hosting := &friendHosting{account: account, worlds: localWorlds, log: logger, voiceBroker: api}
 			hostingCtx, stopHosting := context.WithCancel(ctx)
 			hostingDone := make(chan struct{})

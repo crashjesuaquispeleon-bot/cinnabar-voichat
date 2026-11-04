@@ -4,8 +4,8 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
-	"testing"
 	"strings"
+	"testing"
 )
 
 func validVoiceSFUEnvironment() map[string]string {

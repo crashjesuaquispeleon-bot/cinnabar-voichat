@@ -151,7 +151,6 @@ After=network-online.target
 [Service]
 Type=simple
 User=cinnabar-voice
-SupplementaryGroups=ssl-cert
 EnvironmentFile=/etc/cinnabar/voice-sfu.env
 ExecStart=/usr/local/bin/cinnabar-voice-sfu
 Restart=on-failure

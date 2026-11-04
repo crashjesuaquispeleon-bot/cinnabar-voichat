@@ -109,8 +109,8 @@ Crea `/etc/cinnabar/voice-sfu.env` con permisos 600 y propietario root. Sustituy
 
 ~~~ini
 CINNABAR_VOICE_LISTEN_ADDR=0.0.0.0:8443
-CINNABAR_VOICE_TLS_CERT_FILE=/etc/letsencrypt/live/voice.tu-dominio.example/fullchain.pem
-CINNABAR_VOICE_TLS_KEY_FILE=/etc/letsencrypt/live/voice.tu-dominio.example/privkey.pem
+CINNABAR_VOICE_TLS_CERT_FILE=/etc/cinnabar/tls/fullchain.pem
+CINNABAR_VOICE_TLS_KEY_FILE=/etc/cinnabar/tls/privkey.pem
 CINNABAR_VOICE_ISSUER=https://api.cinnabar.gg/voice
 CINNABAR_VOICE_AUDIENCE=cinnabar-voice-sfu
 CINNABAR_VOICE_BROKER_PUBLIC_KEY=BASE64_CLAVE_PUBLICA_ED25519
@@ -129,8 +129,13 @@ Crea el usuario de servicio y concede solo lectura del certificado al grupo de c
 
 ~~~sh
 sudo useradd --system --no-create-home --shell /usr/sbin/nologin cinnabar-voice
-sudo usermod -aG ssl-cert cinnabar-voice
-sudo install -d -o root -g root -m 0700 /etc/cinnabar
+# Parent is traversable but not listable; TLS files are readable only by this service group.
+sudo install -d -o root -g root -m 0711 /etc/cinnabar
+sudo install -d -o root -g cinnabar-voice -m 0750 /etc/cinnabar/tls
+sudo install -o root -g cinnabar-voice -m 0640 \\
+  /etc/letsencrypt/live/voice.tu-dominio.example/fullchain.pem /etc/cinnabar/tls/fullchain.pem
+sudo install -o root -g cinnabar-voice -m 0640 \\
+  /etc/letsencrypt/live/voice.tu-dominio.example/privkey.pem /etc/cinnabar/tls/privkey.pem
 sudo chown root:root /etc/cinnabar/voice-sfu.env
 sudo chmod 0600 /etc/cinnabar/voice-sfu.env
 ~~~
@@ -162,6 +167,21 @@ LockPersonality=true
 
 [Install]
 WantedBy=multi-user.target
+~~~
+
+Crea el hook de renovación para actualizar las copias protegidas y reiniciar el proceso que carga TLS al arrancar:
+
+~~~sh
+sudo install -d -o root -g root -m 0755 /etc/letsencrypt/renewal-hooks/deploy
+sudo tee /etc/letsencrypt/renewal-hooks/deploy/reload-cinnabar-voice-sfu >/dev/null <<'EOF'
+#!/bin/sh
+set -eu
+CERT=/etc/letsencrypt/live/voice.tu-dominio.example
+install -o root -g cinnabar-voice -m 0640 "$CERT/fullchain.pem" /etc/cinnabar/tls/fullchain.pem
+install -o root -g cinnabar-voice -m 0640 "$CERT/privkey.pem" /etc/cinnabar/tls/privkey.pem
+systemctl restart cinnabar-voice-sfu.service
+EOF
+sudo chmod 0755 /etc/letsencrypt/renewal-hooks/deploy/reload-cinnabar-voice-sfu
 ~~~
 
 Activa el servicio:

@@ -208,3 +208,26 @@ func TestFriendHostingWithdrawsSinglePlayerWorlds(t *testing.T) {
 		}
 	})
 }
+
+func TestFriendHostingRunsOnlyInTheAccountCoreThatOwnsLocalWorlds(t *testing.T) {
+	tests := []struct {
+		name            string
+		upstream        string
+		hasAccount      bool
+		hasLocalWorlds  bool
+		want            bool
+	}{
+		{name: "account core owns local worlds", hasAccount: true, hasLocalWorlds: true, want: true},
+		{name: "authenticated game core only signals voice", upstream: "example.test:19132", hasAccount: true, hasLocalWorlds: true},
+		{name: "offline account cannot host", hasLocalWorlds: true},
+		{name: "no local-world service cannot host", hasAccount: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := shouldRunFriendHosting(test.upstream, test.hasAccount, test.hasLocalWorlds); got != test.want {
+				t.Fatalf("shouldRunFriendHosting(%q, %t, %t) = %t, want %t",
+					test.upstream, test.hasAccount, test.hasLocalWorlds, got, test.want)
+			}
+		})
+	}
+}

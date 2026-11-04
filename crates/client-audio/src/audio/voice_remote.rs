@@ -155,7 +155,10 @@ impl VoiceRemotePlayback {
     /// an idle source is removed from this snapshot after the five-second expiry window.
     pub fn active_participants(&self) -> Vec<RemoteVoiceParticipant> {
         let now = Instant::now();
-        let sources = self.sources.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let sources = self
+            .sources
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         sources
             .iter()
             .filter_map(|source| {
@@ -215,7 +218,10 @@ impl VoiceRemotePlayback {
         sequence: u64,
     ) -> Result<usize, RemoteVoiceFrameError> {
         let now = Instant::now();
-        let mut sources = self.sources.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut sources = self
+            .sources
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         // Recheck the policy after taking the source-state lock. If a session teardown
         // began while this network callback was waiting, do not repopulate a source slot
         // after update_queue_gate cleared the previous session's participant snapshot.

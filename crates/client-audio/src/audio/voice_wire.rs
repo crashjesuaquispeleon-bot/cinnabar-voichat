@@ -4,7 +4,7 @@
 //! is a big-endian sequence number followed by 20 ms of 16 kHz mono PCM16 audio.
 //! Opus/RTP remains a later bandwidth and quality stage.
 
-use super::voice_pcm::PcmFrame;
+use super::voice_pcm::{PcmFrame, VOICE_FRAME_SAMPLES};
 
 pub const VOICE_WIRE_SAMPLE_RATE: usize = 16_000;
 pub const VOICE_WIRE_FRAME_SAMPLES: usize = 320;
@@ -76,8 +76,6 @@ impl Pcm16VoiceFrameEncoder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::audio::voice_pcm::VOICE_FRAME_SAMPLES;
-
     #[test]
     fn wire_payload_has_sequence_and_exact_20ms_pcm_shape() {
         let mut frame = PcmFrame::silence();

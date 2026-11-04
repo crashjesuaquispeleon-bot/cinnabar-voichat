@@ -130,7 +130,6 @@ const PHYSICS_REGISTRY_GENERATION_GUIDANCE: &str =
 pub(crate) mod authority;
 mod executor;
 #[cfg(not(target_arch = "wasm32"))]
-#[path = "voice_bridge.rs"]
 mod voice_bridge;
 use crate::game_frame::configure_client_frame_schedule;
 use authority::configure_client_authority_systems;

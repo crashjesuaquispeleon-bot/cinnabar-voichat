@@ -59,7 +59,7 @@ The Rust IPC client and the Go SFU/bridge layers now exist, but the Go core star
 - `client-runtime::NetworkHandle` owns the local core endpoint only while a joined session is live and exposes shutdown/retirement paths. It is a possible place to observe lifecycle transitions, not a voice-media transport.
 - These identifiers are process-local lifecycle signals. A backend must receive a separately authenticated binding from a trusted Cinnabar service; it must never accept `actor_session_id`, `session_generation`, or a client-selected room name as proof of membership.
 
-A server-routed SFU is the leading option to evaluate for global rooms. A full-mesh peer topology scales poorly as participant count grows. Do not select or implement an SFU, codec, or transport until the existing Cinnabar service/API ownership and deployment model have been inspected and an operator-controlled endpoint is identified. The Pion dependency in `core/go.mod` is only a dependency fact, not proof that Pion is the correct or currently available service boundary.
+The earlier initial-inspection recommendation was to evaluate an operator-owned SFU before selecting a transport. As of 2026-11-04, the repository has a Pion WebRTC SFU implementation and a standalone TLS process at `core/cmd/voice-sfu`; this is deployable code, not an operated endpoint. A full-mesh topology remains out of scope. The Pion dependency alone was not proof of a service boundary; the new SFU code still requires a trusted broker issuer, deployed WSS/ICE configuration, and production integration.
 
 ## Architectural constraints
 

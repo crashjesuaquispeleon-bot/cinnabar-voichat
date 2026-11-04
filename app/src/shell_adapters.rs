@@ -1,6 +1,7 @@
 //! Drives account, world and settings services from the menu.
 use crate::runtime::{network::resource_packs::PackApplication, world::ClientWorld};
 use bevy::prelude::*;
+use bevy::ecs::system::SystemParam;
 use client_audio::audio::{
     voice_capture::{MicrophoneSelection, MicrophoneWorkerEvent},
     voice_controller::VoiceCaptureController,
@@ -33,7 +34,7 @@ pub(crate) fn drive_menu_services(
     launcher: Option<ResMut<LauncherCoreSlot>>,
     launcher_account: Option<ResMut<launcher_account::LauncherAccount>>,
     mut local_worlds: Option<ResMut<client_shell::local_worlds::LocalWorlds>>,
-    mut voice: MenuVoiceSettings,
+    voice: MenuVoiceSettings,
     settings: Option<ResMut<client_state::RuntimeSettings>>,
     antialiasing: Option<Res<client_presentation::camera::antialiasing::CameraAntiAliasingSupport>>,
     mut local_skin: Option<ResMut<LocalPlayerSkin>>,

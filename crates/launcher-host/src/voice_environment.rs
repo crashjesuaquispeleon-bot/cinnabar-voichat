@@ -36,12 +36,10 @@ fn apply_voice_environment(
 fn public_wss_endpoint(value: Option<&str>) -> Option<&str> {
     let value = value.map(str::trim).filter(|value| !value.is_empty())?;
     let authority = value.strip_prefix("wss://")?.split('/').next()?;
-    let safe_authority = !authority.is_empty()
-        && !authority.contains('@')
-        && !authority.contains('\\');
-    let safe_url = !value.contains('?')
-        && !value.contains('#')
-        && !value.chars().any(char::is_whitespace);
+    let safe_authority =
+        !authority.is_empty() && !authority.contains('@') && !authority.contains('\\');
+    let safe_url =
+        !value.contains('?') && !value.contains('#') && !value.chars().any(char::is_whitespace);
     (safe_authority && safe_url).then_some(value)
 }
 
@@ -55,8 +53,7 @@ fn safe_public_stun_url(value: &str) -> bool {
     };
     !authority.is_empty()
         && !authority.chars().any(|character| {
-            character.is_whitespace()
-                || matches!(character, '@' | '/' | '?' | '#' | '\\')
+            character.is_whitespace() || matches!(character, '@' | '/' | '?' | '#' | '\\')
         })
 }
 

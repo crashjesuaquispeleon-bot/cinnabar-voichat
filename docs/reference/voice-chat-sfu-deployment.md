@@ -216,14 +216,14 @@ No pegues ningún secreto aquí ni lo guardes en el repositorio. Si falta el sec
 
 ## Configuración de ambos clientes
 
-En el entorno del proceso nativo de cada cliente de prueba configura:
+Para que Go reciba estas variables tanto en Windows como en Android, el lanzador las incorpora al proceso hijo al compilar la Alpha. En el repositorio GitHub abre **Settings → Secrets and variables → Actions → Variables** y crea estas dos variables públicas:
 
-~~~ini
-CINNABAR_VOICE_WSS_ENDPOINT=wss://voice.tu-dominio.example:8443/v1/voice
-CINNABAR_VOICE_ICE_SERVERS=[{"urls":["stun:STUN_OPERADO_POR_TI:3478"]}]
-~~~
+- `CINNABAR_VOICE_WSS_ENDPOINT` = `wss://voice.tu-dominio.example:8443/v1/voice`
+- `CINNABAR_VOICE_ICE_SERVERS` = `[{"urls":["stun:STUN_OPERADO_POR_TI:3478"]}]`
 
-El WSS apunta al host SFU. La configuración ICE debe coincidir con la configuración operada para la prueba. No introduzcas room ID, session ID o XUID manualmente: el broker obtiene esos datos de la sesión autenticada y del roster FriendHost.
+Después ejecuta el workflow **Voice Chat Alpha Builds** para producir el instalador Windows y la APK Android con la misma configuración. Las variables pueden contener únicamente la URL WSS y configuración STUN pública. Para la primera prueba usa STUN sin usuario ni contraseña. El código del lanzador rechaza los valores ICE con URL TURN, nombre de usuario o credencial antes de incorporarlos a la compilación.
+
+**Nunca** guardes en esas variables una clave privada, el token administrativo SFU ni credenciales TURN; esos datos no deben compilarse dentro de los clientes. La entrega de credenciales TURN temporales para redes restrictivas queda pendiente de integrar con el broker. Si las variables no están definidas, la voz queda deshabilitada de forma segura. No introduzcas room ID, session ID o XUID manualmente: el broker obtiene esos datos de la sesión autenticada y del roster FriendHost.
 
 ## Comprobación previa
 

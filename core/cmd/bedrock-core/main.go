@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -30,7 +29,6 @@ import (
 	"github.com/hashimthearab/rust-mcbe/core/packcache"
 	"github.com/hashimthearab/rust-mcbe/core/proxy"
 	voicebridge "github.com/hashimthearab/rust-mcbe/core/voice"
-	"github.com/pion/webrtc/v4"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"golang.org/x/oauth2"
 )

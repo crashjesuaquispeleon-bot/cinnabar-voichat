@@ -9,7 +9,6 @@ impl Drop for super::MenuRuntime {
         self.stop_catalog();
     }
 }
-}
 
 /// Returns the current UNIX timestamp in seconds.
 pub(super) fn now_unix() -> u64 {

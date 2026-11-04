@@ -2,7 +2,6 @@
 use crate::runtime::{network::resource_packs::PackApplication, world::ClientWorld};
 use bevy::prelude::*;
 use client_audio::audio::{
-    AudioSettings,
     voice_capture::{MicrophoneSelection, MicrophoneWorkerEvent},
     voice_controller::VoiceCaptureController,
     voice_input::{MicrophoneMode, MicrophonePermission, VoiceInputPolicy},
@@ -14,14 +13,6 @@ use client_shell::{
     ui_resources::UiRuntimeResource,
 };
 use launcher::menu::view::{MicrophonePermissionStatus, MicrophoneSelectionRequest};
-
-#[derive(bevy::ecs::system::SystemParam)]
-pub(crate) struct MenuVoiceSettings<'w> {
-    audio_settings: Option<ResMut<'w, AudioSettings>>,
-    voice_controller: Option<ResMut<'w, VoiceCaptureController>>,
-    voice_policy: Option<ResMut<'w, VoiceInputPolicy>>,
-}
-
 /// Drives the launcher's own services: catalog, saves, settings, the account core and local worlds.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn drive_menu_services(
@@ -35,7 +26,9 @@ pub(crate) fn drive_menu_services(
     launcher: Option<ResMut<LauncherCoreSlot>>,
     launcher_account: Option<ResMut<launcher_account::LauncherAccount>>,
     mut local_worlds: Option<ResMut<client_shell::local_worlds::LocalWorlds>>,
-    voice: MenuVoiceSettings,
+    audio_settings: Option<ResMut<client_audio::audio::AudioSettings>>,
+    voice_controller: Option<ResMut<VoiceCaptureController>>,
+    voice_policy: Option<ResMut<VoiceInputPolicy>>,
     settings: Option<ResMut<client_state::RuntimeSettings>>,
     antialiasing: Option<Res<client_presentation::camera::antialiasing::CameraAntiAliasingSupport>>,
     mut local_skin: Option<ResMut<LocalPlayerSkin>>,
@@ -57,7 +50,7 @@ pub(crate) fn drive_menu_services(
     menu.poll_catalog(launcher_account.is_some());
     menu.poll_saves();
     menu.poll_accounts();
-    sync_audio_settings(&menu, voice.audio_settings);
+    sync_audio_settings(&menu, audio_settings);
     if let Some(support) = antialiasing {
         menu.sync_anti_aliasing_support(support.0);
     }
@@ -70,8 +63,8 @@ pub(crate) fn drive_menu_services(
             .is_some_and(|directory| bridge::voice_endpoint_path(&directory).exists());
     drive_microphone_settings(
         &mut menu,
-        voice.voice_controller,
-        voice.voice_policy,
+        voice_controller,
+        voice_policy,
         voice_session_available,
         keys.pressed(KeyCode::KeyV),
     );
@@ -253,6 +246,7 @@ fn drive_microphone_settings(
     }
 }
 
+use client_audio::audio::AudioSettings;
 /// Applies the saved sound values to the live mixer.
 pub(crate) fn sync_audio_settings(menu: &MenuRuntime, settings: Option<ResMut<AudioSettings>>) {
     let Some(mut settings) = settings else {

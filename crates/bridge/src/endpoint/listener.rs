@@ -1,7 +1,7 @@
 //! Owns a local session endpoint and its lease for an offline server.
 
 use super::{EndpointKind, PlatformStream};
-use crate::{BridgeError, FramedStream, MAX_FRAME_LEN};
+use crate::{BridgeError, FramedStream, MAX_FRAME_LEN, VOICE_MAX_FRAME_LEN};
 use std::{
     fs::{self, File, OpenOptions},
     io,
@@ -205,6 +205,32 @@ mod tests {
         assert_eq!(fs::read(&path).unwrap(), b"not an endpoint");
     }
 
+    #[tokio::test]
+    async fn voice_endpoint_has_its_own_lease_and_coexists_with_session() {
+        let root = tempfile::tempdir().unwrap();
+        let session = SessionListener::bind(root.path()).await.unwrap();
+        let voice = VoiceListener::bind(root.path()).await.unwrap();
+        let session_path = crate::session_endpoint_path(root.path());
+        let voice_path = crate::voice_endpoint_path(root.path());
+        assert!(session_path.exists());
+        assert!(voice_path.exists());
+        assert_ne!(session_path, voice_path);
+        assert!(VoiceListener::bind(root.path()).await.is_err());
+        drop(voice);
+        assert!(!voice_path.exists());
+        assert!(session_path.exists());
+        drop(session);
+    }
+
+    #[tokio::test]
+    async fn unrelated_voice_endpoint_file_is_never_replaced() {
+        let root = tempfile::tempdir().unwrap();
+        let path = crate::voice_endpoint_path(root.path());
+        fs::write(&path, b"not an endpoint").unwrap();
+        assert!(VoiceListener::bind(root.path()).await.is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"not an endpoint");
+    }
+
     #[cfg(unix)]
     #[tokio::test]
     async fn cleanup_keeps_replacements_and_stale_sockets_can_be_rebound() {
@@ -216,5 +242,83 @@ mod tests {
         fs::write(&path, b"replacement").unwrap();
         drop(listener);
         assert_eq!(fs::read(&path).unwrap(), b"replacement");
+    }
+}
+
+
+/// Dedicated listener for low-latency voice frames, isolated from game and control I/O.
+pub struct VoiceListener {
+    listener: Listener,
+    path: PathBuf,
+    publication: Publication,
+    _lease: File,
+}
+
+impl VoiceListener {
+    /// Publishes voice.sock / voice.addr under its own voice.lock lease.
+    pub async fn bind(directory: &Path) -> Result<Self, BridgeError> {
+        super::validate_socket_dir(directory)?;
+        fs::create_dir_all(directory)?;
+        let metadata = fs::symlink_metadata(directory)?;
+        if !metadata.is_dir() {
+            return Err(super::invalid_endpoint(directory, "not a directory"));
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::{MetadataExt, PermissionsExt};
+            if metadata.uid() != rustix::process::geteuid().as_raw() {
+                return Err(super::invalid_endpoint(
+                    directory,
+                    "directory is not owned by this user",
+                ));
+            }
+            fs::set_permissions(directory, fs::Permissions::from_mode(0o700))?;
+        }
+        let lock_path = directory.join(crate::contract::VOICE_LOCK_FILE_NAME);
+        if fs::symlink_metadata(&lock_path).is_ok_and(|m| !m.is_file()) {
+            return Err(super::invalid_endpoint(&lock_path, "lease is not a regular file"));
+        }
+        let mut options = OpenOptions::new();
+        options.read(true).write(true).create(true).truncate(false);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let lease = options.open(lock_path)?;
+        lease.try_lock().map_err(io::Error::other)?;
+        let path = super::endpoint_path(directory, EndpointKind::Voice);
+        prepare(&path).await?;
+        let (listener, publication) = publish(&path).await?;
+        Ok(Self {
+            listener,
+            path,
+            publication,
+            _lease: lease,
+        })
+    }
+
+    /// Accepts one bounded voice IPC connection.
+    pub async fn accept(&self) -> Result<FramedStream, BridgeError> {
+        let (stream, _) = self.listener.accept().await?;
+        #[cfg(windows)]
+        let stream = {
+            stream.set_nodelay(true)?;
+            PlatformStream::Tcp(stream)
+        };
+        #[cfg(unix)]
+        let stream = {
+            super::tune_unix_stream(&stream);
+            PlatformStream::Unix(stream)
+        };
+        Ok(FramedStream::with_max(stream, VOICE_MAX_FRAME_LEN))
+    }
+}
+
+impl Drop for VoiceListener {
+    fn drop(&mut self) {
+        if identity(&self.path).is_ok_and(|value| value == self.publication) {
+            let _ = fs::remove_file(&self.path);
+        }
     }
 }

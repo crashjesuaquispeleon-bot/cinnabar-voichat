@@ -21,7 +21,9 @@ pub use cinnabar_api::{
 pub mod contract;
 pub use contract::{
     AuthState, Backend, CinnabarRelease, ConnectStage, ConnectTarget, GameMode, Lifecycle,
-    MAX_FRAME_LEN, PackAcquisition, PackApplication, PackDownstreamOutcome, PackOffer, Transport,
+    MAX_FRAME_LEN, VOICE_FRAME_BYTES, VOICE_IPC_KIND_AUDIO, VOICE_IPC_KIND_CLOSE,
+    VOICE_IPC_KIND_REMOTE_AUDIO, VOICE_IPC_KIND_STATUS, VOICE_IPC_KIND_TRANSMIT,
+    VOICE_MAX_FRAME_LEN, PackAcquisition, PackApplication, PackDownstreamOutcome, PackOffer, Transport,
     WorldState,
 };
 #[cfg(not(target_arch = "wasm32"))]
@@ -53,6 +55,13 @@ pub async fn connect_session(socket_dir: &Path) -> anyhow::Result<(FramedReader,
     Ok(crate::framed::queued(stream, MAX_FRAME_LEN))
 }
 
+/// Connects to the isolated voice IPC endpoint with its 1 KiB frame limit.
+#[cfg(not(target_arch = "wasm32"))]
+pub async fn connect_voice(socket_dir: &Path) -> anyhow::Result<(FramedReader, FrameQueue)> {
+    let stream = endpoint::connect(socket_dir, endpoint::EndpointKind::Voice).await?;
+    Ok(crate::framed::queued(stream, VOICE_MAX_FRAME_LEN))
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 pub use account::{
     Events, FeaturedGame, FeaturedServer, Friend, Home, Inbox, LiveEvent, Message, MessageButton,
@@ -62,7 +71,7 @@ pub use account::{
     poll_events, profile, realm_membership, report_message_event, sign_out,
 };
 #[cfg(not(target_arch = "wasm32"))]
-pub use endpoint::listener::SessionListener;
+pub use endpoint::listener::{SessionListener, VoiceListener};
 pub use error::BridgeError;
 pub use framed::BridgeCodec;
 #[cfg(not(target_arch = "wasm32"))]
@@ -87,6 +96,13 @@ pub fn session_endpoint_path(socket_dir: &Path) -> std::path::PathBuf {
     endpoint::endpoint_path(socket_dir, endpoint::EndpointKind::Session)
 }
 
+/// Returns the dedicated voice endpoint used for local media frames.
+#[must_use]
+#[cfg(not(target_arch = "wasm32"))]
+pub fn voice_endpoint_path(socket_dir: &Path) -> std::path::PathBuf {
+    endpoint::endpoint_path(socket_dir, endpoint::EndpointKind::Voice)
+}
+
 /// Returns the platform control endpoint used for the logical socket directory.
 #[must_use]
 #[cfg(not(target_arch = "wasm32"))]
@@ -100,10 +116,11 @@ pub const CORE_START_TIMEOUT: std::time::Duration = std::time::Duration::from_se
 /// Returns every endpoint the core publishes in `socket_dir`, for cleanup after a lost core.
 #[must_use]
 #[cfg(not(target_arch = "wasm32"))]
-pub fn core_endpoint_paths(socket_dir: &Path) -> [PathBuf; 2] {
+pub fn core_endpoint_paths(socket_dir: &Path) -> [PathBuf; 3] {
     [
         session_endpoint_path(socket_dir),
         control_endpoint_path(socket_dir),
+        voice_endpoint_path(socket_dir),
     ]
 }
 

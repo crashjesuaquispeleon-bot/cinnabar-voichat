@@ -25,6 +25,8 @@ pub(crate) enum EndpointKind {
     Control,
     /// Carries session messages: the core-owned login's handoff and raw batches.
     Session,
+    /// Carries low-latency voice media and gate messages only.
+    Voice,
 }
 
 impl EndpointKind {
@@ -33,6 +35,7 @@ impl EndpointKind {
         match self {
             Self::Control => crate::contract::CONTROL_UNIX_ENDPOINT_NAME,
             Self::Session => crate::contract::SESSION_UNIX_ENDPOINT_NAME,
+            Self::Voice => crate::contract::VOICE_UNIX_ENDPOINT_NAME,
         }
     }
 
@@ -41,6 +44,7 @@ impl EndpointKind {
         match self {
             Self::Control => crate::contract::CONTROL_WINDOWS_ENDPOINT_NAME,
             Self::Session => crate::contract::SESSION_WINDOWS_ENDPOINT_NAME,
+            Self::Voice => crate::contract::VOICE_WINDOWS_ENDPOINT_NAME,
         }
     }
 }

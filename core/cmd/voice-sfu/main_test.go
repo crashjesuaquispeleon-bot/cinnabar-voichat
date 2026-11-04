@@ -4,8 +4,12 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 func validVoiceSFUEnvironment() map[string]string {
@@ -193,6 +197,64 @@ func TestSessionCloseHandlerRequiresBrokerControlTokenAndCanonicalIDs(t *testing
 	mux.ServeHTTP(response, request)
 	if response.Code != http.StatusNoContent || closed != 1 {
 		t.Fatalf("valid close response=%d closed=%d", response.Code, closed)
+	}
+	if response.Header().Get("Cache-Control") != "no-store" {
+		t.Fatal("admin response must not be cached")
+	}
+}
+
+func TestAdmissionRevokeHandlerRequiresBrokerControlTokenAndCanonicalIDs(t *testing.T) {
+	token := []byte("0123456789abcdef0123456789abcdef")
+	roomID, tokenID := uuid.NewString(), uuid.NewString()
+	revoked := 0
+	mux := http.NewServeMux()
+	mux.Handle("POST /v1/admin/rooms/{roomID}/admissions/{tokenID}/revoke",
+		admissionRevokeHandler(token, func(room, admission string) bool {
+			if room != roomID || admission != tokenID {
+				t.Fatalf("unexpected revoke binding room=%q token=%q", room, admission)
+			}
+			revoked++
+			return true
+		}))
+	path := "/v1/admin/rooms/" + roomID + "/admissions/" + tokenID + "/revoke"
+
+	request := httptest.NewRequest(http.MethodPost, path, nil)
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, request)
+	if response.Code != http.StatusUnauthorized || revoked != 0 {
+		t.Fatalf("missing token response=%d revoked=%d", response.Code, revoked)
+	}
+
+	request = httptest.NewRequest(http.MethodPost, "/v1/admin/rooms/not-a-uuid/admissions/"+tokenID+"/revoke", nil)
+	request.Header.Set("Authorization", "Bearer "+string(token))
+	response = httptest.NewRecorder()
+	mux.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest || revoked != 0 {
+		t.Fatalf("invalid room response=%d revoked=%d", response.Code, revoked)
+	}
+
+	request = httptest.NewRequest(http.MethodPost, "/v1/admin/rooms/"+roomID+"/admissions/not-a-uuid/revoke", nil)
+	request.Header.Set("Authorization", "Bearer "+string(token))
+	response = httptest.NewRecorder()
+	mux.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest || revoked != 0 {
+		t.Fatalf("invalid token ID response=%d revoked=%d", response.Code, revoked)
+	}
+
+	request = httptest.NewRequest(http.MethodPost, path, strings.NewReader("unexpected"))
+	request.Header.Set("Authorization", "Bearer "+string(token))
+	response = httptest.NewRecorder()
+	mux.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest || revoked != 0 {
+		t.Fatalf("body response=%d revoked=%d", response.Code, revoked)
+	}
+
+	request = httptest.NewRequest(http.MethodPost, path, nil)
+	request.Header.Set("Authorization", "Bearer "+string(token))
+	response = httptest.NewRecorder()
+	mux.ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent || revoked != 1 {
+		t.Fatalf("valid revoke response=%d revoked=%d", response.Code, revoked)
 	}
 	if response.Header().Get("Cache-Control") != "no-store" {
 		t.Fatal("admin response must not be cached")

@@ -12,7 +12,7 @@ The following environment variables are required:
 - `CINNABAR_VOICE_TLS_KEY_FILE`: matching TLS private-key file.
 - `CINNABAR_VOICE_ISSUER`: exact HTTPS issuer claim used by the broker.
 - `CINNABAR_VOICE_BROKER_PUBLIC_KEY`: base64-encoded 32-byte Ed25519 public key; never provide the private key here.
-- `CINNABAR_VOICE_CONTROL_TOKEN`: base64-encoded random 32-byte bearer secret used only by the trusted broker for room-session teardown and individual-admission revocation. Keep it in the deployment secret store and never distribute it to clients.
+- `CINNABAR_VOICE_CONTROL_TOKEN` **or** `CINNABAR_VOICE_CONTROL_TOKEN_FILE`: base64-encoded random 32-byte bearer secret used only by the trusted broker for room-session teardown and individual-admission revocation. Prefer the file option with systemd `LoadCredential`; do not expose it through `Environment=` or distribute it to clients.
 - `CINNABAR_VOICE_ICE_SERVERS`: JSON array of Pion ICE server objects with operator-managed STUN/TURN URLs and, for TURN, short-lived credentials.
 
 Optional variables:
@@ -33,7 +33,7 @@ export CINNABAR_VOICE_TLS_KEY_FILE='/run/secrets/voice.key'
 export CINNABAR_VOICE_ISSUER='https://api.cinnabar.gg/voice'
 export CINNABAR_VOICE_AUDIENCE='cinnabar-voice-sfu'
 export CINNABAR_VOICE_BROKER_PUBLIC_KEY='<base64 public key only>'
-export CINNABAR_VOICE_CONTROL_TOKEN='<base64 random 32-byte broker control secret>'
+export CINNABAR_VOICE_CONTROL_TOKEN='<base64 random 32-byte broker control secret>' # development only; prefer systemd LoadCredential
 export CINNABAR_VOICE_ICE_SERVERS='[{"urls":["turns:turn.example.net:5349"],"username":"<short-lived user>","credential":"<short-lived credential>"}]'
 export CINNABAR_VOICE_MAX_PARTICIPANTS='8'
 go run ./cmd/voice-sfu

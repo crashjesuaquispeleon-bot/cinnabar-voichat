@@ -200,7 +200,11 @@ pub fn core_command_for_address(
         command.arg("-upstream-client-cache");
     }
     if let Some(auth_cache) = auth_cache {
+        // The live game core owns the voice IPC endpoint. It therefore needs
+        // its own authenticated API socket for P2P peer-session lookup and
+        // signaling; the account core continues to own FriendHost room/roster.
         command.arg("-auth-cache").arg(auth_cache);
+        command.arg("-cinnabar-api");
     }
     command
 }
@@ -291,28 +295,30 @@ mod tests {
     }
 
     #[test]
-    fn direct_core_enables_private_control_with_or_without_optional_join_settings() {
+    fn authenticated_game_core_owns_an_api_socket_for_voice_signaling() {
         let layout = launcher::test_support::scratch("direct-core-control");
-        for configured in [false, true] {
-            let cache = layout.auth_cache();
+        let cache = layout.auth_cache();
+        for auth_cache in [None, Some(cache.as_path())] {
             let command = core_command_for_address(
                 &layout,
                 &layout.core_executable,
                 &layout.runtime_root,
                 "example.test",
-                configured.then_some(cache.as_path()),
-                configured,
+                auth_cache,
+                false,
             );
-            assert!(
-                command
-                    .get_args()
-                    .any(|argument| argument == "-control-status")
+            let args: Vec<_> = command.get_args().collect();
+            assert!(args.iter().any(|argument| *argument == "-control-status"));
+            assert_eq!(
+                args.iter().any(|argument| *argument == "-cinnabar-api"),
+                auth_cache.is_some(),
+                "only an authenticated game core can open the Cinnabar API signaling socket",
             );
-            assert!(
-                command
-                    .get_args()
-                    .all(|argument| argument != "-xbox-presence" && argument != "-cinnabar-api")
+            assert_eq!(
+                args.iter().any(|argument| *argument == "-auth-cache"),
+                auth_cache.is_some(),
             );
+            assert!(args.iter().all(|argument| *argument != "-xbox-presence"));
         }
     }
 }

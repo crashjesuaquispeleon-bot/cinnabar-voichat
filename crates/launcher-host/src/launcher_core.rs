@@ -130,6 +130,7 @@ fn launcher_command(
     lease_game_cache: bool,
 ) -> Command {
     let mut command = Command::new(executable);
+    crate::voice_environment::configure_voice_environment(&mut command);
     command
         .arg("-socket-dir")
         .arg(socket_dir)

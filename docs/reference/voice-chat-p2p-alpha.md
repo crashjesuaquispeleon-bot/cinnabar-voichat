@@ -30,6 +30,7 @@ Provide a no-VPS, two-player voice path for Windows and Android using direct Web
 ### Application integration and packaging
 
 - P2P is the default native transport when Cinnabar API is available. SFU remains selectable explicitly with `CINNABAR_VOICE_TRANSPORT=sfu`.
+- The account core owns the FriendHost room and roster. An authenticated game core opens its own Cinnabar API socket for peer-session lookup and SDP/ICE signaling because it owns the voice IPC endpoint; it does not start a second FriendHost room for the same XUID.
 - FriendHost maintains the authenticated guest roster and renews the broker room lease using full snapshots.
 - Windows x64 setup EXE and Android arm64 APK workflow jobs are defined for this branch.
 - Android declares optional microphone hardware and requests the runtime microphone permission without blocking gameplay when declined.

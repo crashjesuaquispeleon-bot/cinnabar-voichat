@@ -177,74 +177,6 @@ async fn publish(path: &Path) -> Result<(Listener, Publication), BridgeError> {
     Ok((listener, publication))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn lease_blocks_a_second_owner_and_releases_on_drop() {
-        let root = tempfile::tempdir().unwrap();
-        let listener = SessionListener::bind(root.path()).await.unwrap();
-        let path = crate::session_endpoint_path(root.path());
-        assert!(path.exists());
-        assert!(SessionListener::bind(root.path()).await.is_err());
-        drop(listener);
-        assert!(!path.exists());
-        let next = SessionListener::bind(root.path()).await.unwrap();
-        assert!(path.exists());
-        drop(next);
-        assert!(!path.exists());
-    }
-
-    #[tokio::test]
-    async fn unrelated_endpoint_files_are_never_replaced() {
-        let root = tempfile::tempdir().unwrap();
-        let path = crate::session_endpoint_path(root.path());
-        fs::write(&path, b"not an endpoint").unwrap();
-        assert!(SessionListener::bind(root.path()).await.is_err());
-        assert_eq!(fs::read(&path).unwrap(), b"not an endpoint");
-    }
-
-    #[tokio::test]
-    async fn voice_endpoint_has_its_own_lease_and_coexists_with_session() {
-        let root = tempfile::tempdir().unwrap();
-        let session = SessionListener::bind(root.path()).await.unwrap();
-        let voice = VoiceListener::bind(root.path()).await.unwrap();
-        let session_path = crate::session_endpoint_path(root.path());
-        let voice_path = crate::voice_endpoint_path(root.path());
-        assert!(session_path.exists());
-        assert!(voice_path.exists());
-        assert_ne!(session_path, voice_path);
-        assert!(VoiceListener::bind(root.path()).await.is_err());
-        drop(voice);
-        assert!(!voice_path.exists());
-        assert!(session_path.exists());
-        drop(session);
-    }
-
-    #[tokio::test]
-    async fn unrelated_voice_endpoint_file_is_never_replaced() {
-        let root = tempfile::tempdir().unwrap();
-        let path = crate::voice_endpoint_path(root.path());
-        fs::write(&path, b"not an endpoint").unwrap();
-        assert!(VoiceListener::bind(root.path()).await.is_err());
-        assert_eq!(fs::read(&path).unwrap(), b"not an endpoint");
-    }
-
-    #[cfg(unix)]
-    #[tokio::test]
-    async fn cleanup_keeps_replacements_and_stale_sockets_can_be_rebound() {
-        let root = tempfile::tempdir().unwrap();
-        let path = crate::session_endpoint_path(root.path());
-        drop(std::os::unix::net::UnixListener::bind(&path).unwrap());
-        let listener = SessionListener::bind(root.path()).await.unwrap();
-        fs::remove_file(&path).unwrap();
-        fs::write(&path, b"replacement").unwrap();
-        drop(listener);
-        assert_eq!(fs::read(&path).unwrap(), b"replacement");
-    }
-}
-
 /// Dedicated listener for low-latency voice frames, isolated from game and control I/O.
 pub struct VoiceListener {
     listener: Listener,
@@ -324,3 +256,72 @@ impl Drop for VoiceListener {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn lease_blocks_a_second_owner_and_releases_on_drop() {
+        let root = tempfile::tempdir().unwrap();
+        let listener = SessionListener::bind(root.path()).await.unwrap();
+        let path = crate::session_endpoint_path(root.path());
+        assert!(path.exists());
+        assert!(SessionListener::bind(root.path()).await.is_err());
+        drop(listener);
+        assert!(!path.exists());
+        let next = SessionListener::bind(root.path()).await.unwrap();
+        assert!(path.exists());
+        drop(next);
+        assert!(!path.exists());
+    }
+
+    #[tokio::test]
+    async fn unrelated_endpoint_files_are_never_replaced() {
+        let root = tempfile::tempdir().unwrap();
+        let path = crate::session_endpoint_path(root.path());
+        fs::write(&path, b"not an endpoint").unwrap();
+        assert!(SessionListener::bind(root.path()).await.is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"not an endpoint");
+    }
+
+    #[tokio::test]
+    async fn voice_endpoint_has_its_own_lease_and_coexists_with_session() {
+        let root = tempfile::tempdir().unwrap();
+        let session = SessionListener::bind(root.path()).await.unwrap();
+        let voice = VoiceListener::bind(root.path()).await.unwrap();
+        let session_path = crate::session_endpoint_path(root.path());
+        let voice_path = crate::voice_endpoint_path(root.path());
+        assert!(session_path.exists());
+        assert!(voice_path.exists());
+        assert_ne!(session_path, voice_path);
+        assert!(VoiceListener::bind(root.path()).await.is_err());
+        drop(voice);
+        assert!(!voice_path.exists());
+        assert!(session_path.exists());
+        drop(session);
+    }
+
+    #[tokio::test]
+    async fn unrelated_voice_endpoint_file_is_never_replaced() {
+        let root = tempfile::tempdir().unwrap();
+        let path = crate::voice_endpoint_path(root.path());
+        fs::write(&path, b"not an endpoint").unwrap();
+        assert!(VoiceListener::bind(root.path()).await.is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"not an endpoint");
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn cleanup_keeps_replacements_and_stale_sockets_can_be_rebound() {
+        let root = tempfile::tempdir().unwrap();
+        let path = crate::session_endpoint_path(root.path());
+        drop(std::os::unix::net::UnixListener::bind(&path).unwrap());
+        let listener = SessionListener::bind(root.path()).await.unwrap();
+        fs::remove_file(&path).unwrap();
+        fs::write(&path, b"replacement").unwrap();
+        drop(listener);
+        assert_eq!(fs::read(&path).unwrap(), b"replacement");
+    }
+}
+

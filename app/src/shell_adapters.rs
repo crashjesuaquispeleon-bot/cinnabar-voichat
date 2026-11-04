@@ -2,6 +2,7 @@
 use crate::runtime::{network::resource_packs::PackApplication, world::ClientWorld};
 use bevy::prelude::*;
 use client_audio::audio::{
+    AudioSettings,
     voice_capture::{MicrophoneSelection, MicrophoneWorkerEvent},
     voice_controller::VoiceCaptureController,
     voice_input::{MicrophoneMode, MicrophonePermission, VoiceInputPolicy},
@@ -13,9 +14,10 @@ use client_shell::{
     ui_resources::UiRuntimeResource,
 };
 use launcher::menu::view::{MicrophonePermissionStatus, MicrophoneSelectionRequest};
+
 #[derive(bevy::ecs::system::SystemParam)]
 pub(crate) struct MenuVoiceSettings<'w> {
-    audio_settings: Option<ResMut<'w, client_audio::audio::AudioSettings>>,
+    audio_settings: Option<ResMut<'w, AudioSettings>>,
     voice_controller: Option<ResMut<'w, VoiceCaptureController>>,
     voice_policy: Option<ResMut<'w, VoiceInputPolicy>>,
 }
@@ -251,7 +253,6 @@ fn drive_microphone_settings(
     }
 }
 
-use client_audio::audio::AudioSettings;
 /// Applies the saved sound values to the live mixer.
 pub(crate) fn sync_audio_settings(menu: &MenuRuntime, settings: Option<ResMut<AudioSettings>>) {
     let Some(mut settings) = settings else {

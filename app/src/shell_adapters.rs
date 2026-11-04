@@ -1,7 +1,6 @@
 //! Drives account, world and settings services from the menu.
 use crate::runtime::{network::resource_packs::PackApplication, world::ClientWorld};
 use bevy::prelude::*;
-use bevy::ecs::system::SystemParam;
 use client_audio::audio::{
     voice_capture::{MicrophoneSelection, MicrophoneWorkerEvent},
     voice_controller::VoiceCaptureController,
@@ -14,7 +13,7 @@ use client_shell::{
     ui_resources::UiRuntimeResource,
 };
 use launcher::menu::view::{MicrophonePermissionStatus, MicrophoneSelectionRequest};
-#[derive(SystemParam)]
+#[derive(bevy::ecs::system::SystemParam)]
 struct MenuVoiceSettings<'w> {
     audio_settings: Option<ResMut<'w, client_audio::audio::AudioSettings>>,
     voice_controller: Option<ResMut<'w, VoiceCaptureController>>,

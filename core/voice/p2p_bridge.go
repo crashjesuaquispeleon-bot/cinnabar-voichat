@@ -12,6 +12,13 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
+const (
+	p2pICEGatherTimeout    = 35 * time.Second
+	p2pSignalSendTimeout   = 10 * time.Second
+	p2pSignalWaitTimeout   = 70 * time.Second
+	p2pConnectionTimeout   = 35 * time.Second
+)
+
 // P2PSignaler is implemented by the authenticated Cinnabar API client.
 type P2PSignaler interface {
 	VoicePeerSession(context.Context) (string, bool, error)
@@ -28,34 +35,84 @@ func serveP2PVoiceIPCConnection(ctx context.Context, raw net.Conn, iceServers []
 	if err != nil { _ = writeVoiceIPCStatus(ipc, voiceIPCStatus{Status:"disabled", Code:"peer_unavailable"}); return errors.New("voice: could not create P2P peer") }
 	defer peer.Close()
 
-	signalCtx, cancel := context.WithTimeout(ctx, 35*time.Second)
-	defer cancel()
 	if offerer {
-		offer, err := peer.CreateOffer(signalCtx)
-		if err != nil { return err }
+		// Offer generation includes local ICE gathering. Give each side its own
+		// gather budget instead of sharing one deadline across both peers.
+		offerCtx, cancelOffer := context.WithTimeout(ctx, p2pICEGatherTimeout)
+		offer, err := peer.CreateOffer(offerCtx)
+		cancelOffer()
+		if err != nil {
+			return err
+		}
 		encoded, err := json.Marshal(offer)
-		if err != nil { return err }
-		if len(encoded) > 8192 { return errors.New("voice: P2P offer exceeds broker signaling limit") }
-		if err := signaler.SendVoiceSignal(signalCtx, sessionID, "offer", string(encoded)); err != nil { return errors.New("voice: broker rejected P2P offer") }
-		remoteSession, kind, payload, err := signaler.ReceiveVoiceSignal(signalCtx)
-		if err != nil { return errors.New("voice: waiting for P2P answer failed") }
-		if remoteSession != sessionID || kind != "answer" { return errors.New("voice: received an unexpected P2P signal") }
+		if err != nil {
+			return err
+		}
+		if len(encoded) > 8192 {
+			return errors.New("voice: P2P offer exceeds broker signaling limit")
+		}
+		sendCtx, cancelSend := context.WithTimeout(ctx, p2pSignalSendTimeout)
+		sendErr := signaler.SendVoiceSignal(sendCtx, sessionID, "offer", string(encoded))
+		cancelSend()
+		if sendErr != nil {
+			return errors.New("voice: broker rejected P2P offer")
+		}
+
+		answerCtx, cancelAnswer := context.WithTimeout(ctx, p2pSignalWaitTimeout)
+		remoteSession, kind, payload, err := signaler.ReceiveVoiceSignal(answerCtx)
+		cancelAnswer()
+		if err != nil {
+			return errors.New("voice: waiting for P2P answer failed")
+		}
+		if remoteSession != sessionID || kind != "answer" {
+			return errors.New("voice: received an unexpected P2P signal")
+		}
 		var answer webrtc.SessionDescription
-		if json.Unmarshal([]byte(payload), &answer) != nil || peer.AcceptAnswer(answer) != nil { return errors.New("voice: invalid P2P answer") }
+		if json.Unmarshal([]byte(payload), &answer) != nil || peer.AcceptAnswer(answer) != nil {
+			return errors.New("voice: invalid P2P answer")
+		}
 	} else {
-		remoteSession, kind, payload, err := signaler.ReceiveVoiceSignal(signalCtx)
-		if err != nil { return errors.New("voice: waiting for P2P offer failed") }
-		if remoteSession != sessionID || kind != "offer" { return errors.New("voice: received an unexpected P2P signal") }
+		// The answerer may start before the offerer finishes gathering ICE.
+		// Waiting has a separate budget from gathering and connecting locally.
+		offerCtx, cancelOfferWait := context.WithTimeout(ctx, p2pSignalWaitTimeout)
+		remoteSession, kind, payload, err := signaler.ReceiveVoiceSignal(offerCtx)
+		cancelOfferWait()
+		if err != nil {
+			return errors.New("voice: waiting for P2P offer failed")
+		}
+		if remoteSession != sessionID || kind != "offer" {
+			return errors.New("voice: received an unexpected P2P signal")
+		}
 		var offer webrtc.SessionDescription
-		if json.Unmarshal([]byte(payload), &offer) != nil { return errors.New("voice: invalid P2P offer") }
-		answer, err := peer.AcceptOffer(signalCtx, offer)
-		if err != nil { return errors.New("voice: could not accept P2P offer") }
+		if json.Unmarshal([]byte(payload), &offer) != nil {
+			return errors.New("voice: invalid P2P offer")
+		}
+		answerCtx, cancelAnswer := context.WithTimeout(ctx, p2pICEGatherTimeout)
+		answer, err := peer.AcceptOffer(answerCtx, offer)
+		cancelAnswer()
+		if err != nil {
+			return errors.New("voice: could not accept P2P offer")
+		}
 		encoded, err := json.Marshal(answer)
-		if err != nil { return err }
-		if len(encoded) > 8192 { return errors.New("voice: P2P answer exceeds broker signaling limit") }
-		if err := signaler.SendVoiceSignal(signalCtx, sessionID, "answer", string(encoded)); err != nil { return errors.New("voice: broker rejected P2P answer") }
+		if err != nil {
+			return err
+		}
+		if len(encoded) > 8192 {
+			return errors.New("voice: P2P answer exceeds broker signaling limit")
+		}
+		sendCtx, cancelSend := context.WithTimeout(ctx, p2pSignalSendTimeout)
+		sendErr := signaler.SendVoiceSignal(sendCtx, sessionID, "answer", string(encoded))
+		cancelSend()
+		if sendErr != nil {
+			return errors.New("voice: broker rejected P2P answer")
+		}
 	}
-	if err := peer.WaitReady(signalCtx); err != nil { return errors.New("voice: direct P2P connection did not become ready") }
+	readyCtx, cancelReady := context.WithTimeout(ctx, p2pConnectionTimeout)
+	err = peer.WaitReady(readyCtx)
+	cancelReady()
+	if err != nil {
+		return errors.New("voice: direct P2P connection did not become ready")
+	}
 	if err := writeVoiceIPCStatus(ipc, voiceIPCStatus{Status:"connected"}); err != nil { return err }
 
 	sessionCtx, stop := context.WithCancel(ctx)

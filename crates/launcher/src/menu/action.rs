@@ -1,7 +1,6 @@
 use super::{
-    inbox, invite, realm_membership, server_list, settings_options, settings_storage,
-    settings_support, updates, LocalWorldAction, MenuScreen, MenuServerTab, ProfileTab,
-    RendererChoice,
+    LocalWorldAction, MenuScreen, MenuServerTab, ProfileTab, RendererChoice, inbox, invite,
+    realm_membership, server_list, settings_options, settings_storage, settings_support, updates,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

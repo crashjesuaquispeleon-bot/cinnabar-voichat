@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"sync"
+	"net/http"
 	"time"
 
 	"github.com/hashimthearab/rust-mcbe/core/internal/bridgecontract"
@@ -28,7 +28,7 @@ type VoiceBridgeConfig struct {
 	Endpoint        string
 	ICEServers      []webrtc.ICEServer
 	AdmissionSource VoiceAdmissionSource
-	HTTPClient      interface{ Do(*http.Request) (*http.Response, error) }
+	HTTPClient      *http.Client
 	Logger          *slog.Logger
 	RenewInterval   time.Duration
 }
@@ -279,6 +279,3 @@ func writeVoiceIPCStatus(ipc *streamnet.FramedConn, status voiceIPCStatus) error
 	return err
 }
 
-// Keep one local connection's write path serialized even when downlink and
-// status messages are produced concurrently by independent goroutines.
-var _ sync.Locker = (*sync.Mutex)(nil)

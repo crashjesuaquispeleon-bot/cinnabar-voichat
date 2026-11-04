@@ -20,10 +20,11 @@ const friendHostRetry = 30 * time.Second
 
 // friendHosting hosts each running dedicated-server world to Xbox friends for as long as it runs.
 type friendHosting struct {
-	account *authcache.Account
-	worlds  *localworld.Local
-	log     *slog.Logger
-	open    func(context.Context, localworld.Session) (hostedFriends, io.Closer, error)
+	account     *authcache.Account
+	worlds      *localworld.Local
+	log         *slog.Logger
+	voiceBroker proxy.VoiceMembershipBroker
+	open        func(context.Context, localworld.Session) (hostedFriends, io.Closer, error)
 
 	mu      sync.Mutex
 	host    hostedFriends
@@ -134,6 +135,7 @@ func (h *friendHosting) openHost(ctx context.Context, session localworld.Session
 		Gamertag:    user.GamerTag,
 		World:       proxy.FriendWorld{ID: world.ID, Name: world.Name, GameMode: world.GameMode},
 		LocalTarget: session.ConnectionTarget,
+		VoiceBroker: h.voiceBroker,
 		Logger:      h.log,
 	})
 	if err != nil {

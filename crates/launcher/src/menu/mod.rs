@@ -27,8 +27,8 @@ pub mod updates;
 pub mod view;
 pub mod worlds_tab;
 
-pub use list::MenuList;
 pub use action::MenuAction;
+pub use list::MenuList;
 pub use profile::{
     ProfileTab, profile_banner_index, profile_count_display, profile_minutes_display,
 };
@@ -122,7 +122,6 @@ pub enum RendererChoice {
     Enhanced,
     ShaderPack(u16, u64),
 }
-
 
 /// Joining the featured-list entry at `index`.
 pub fn play_featured(view: &MenuView, index: usize) -> Option<MenuAction> {

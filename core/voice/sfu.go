@@ -27,7 +27,8 @@ const (
 	voiceSourceIDBytes = 16
 	voiceRemoteFrameBytes = voiceSourceIDBytes + voiceFrameBytes
 	maxBufferedVoiceBytes = voiceFrameBytes * 5
-	maxBufferedRemoteVoiceBytes = voiceRemoteFrameBytes * 5
+	maxRemoteVoiceSources = 64
+	maxBufferedRemoteFramesPerSource = 5
 	maxSignalMessageBytes = 64 << 10
 	signalReadTimeout = 15 * time.Second
 	iceGatherTimeout = 20 * time.Second
@@ -389,6 +390,20 @@ func (peer *sfuPeer) acceptSequence(sequence uint64) bool {
 	}
 }
 
+// remoteVoiceBufferBudget keeps roughly five 20 ms packets per possible remote
+// speaker in one receiver's shared downlink channel. A fixed five-frame total
+// would starve simultaneous speakers as soon as the room fan-in exceeds five.
+func remoteVoiceBufferBudget(roomParticipants int) uint64 {
+	remoteSources := roomParticipants - 1
+	if remoteSources < 1 {
+		remoteSources = 1
+	}
+	if remoteSources > maxRemoteVoiceSources {
+		remoteSources = maxRemoteVoiceSources
+	}
+	return uint64(voiceRemoteFrameBytes * remoteSources * maxBufferedRemoteFramesPerSource)
+}
+
 func (s *SFU) forward(sender *sfuPeer, frame []byte) {
 	// Serialize forwarding against the reliable PTT gate update. Once a
 	// transmit=false acknowledgement is sent, no callback that began earlier
@@ -410,10 +425,11 @@ func (s *SFU) forward(sender *sfuPeer, frame []byte) {
 	remoteFrame := make([]byte, voiceRemoteFrameBytes)
 	copy(remoteFrame[:voiceSourceIDBytes], sender.sourceID[:])
 	copy(remoteFrame[voiceSourceIDBytes:], frame)
+	remoteBufferBudget := remoteVoiceBufferBudget(len(room.peers))
 	for _, peer := range room.peers {
 		if peer == sender || peer.downlink == nil ||
 			peer.downlink.ReadyState() != webrtc.DataChannelStateOpen ||
-			peer.downlink.BufferedAmount() > maxBufferedRemoteVoiceBytes {
+			peer.downlink.BufferedAmount() > remoteBufferBudget {
 			continue
 		}
 		_ = peer.downlink.Send(remoteFrame)

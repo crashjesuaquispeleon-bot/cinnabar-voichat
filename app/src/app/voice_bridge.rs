@@ -218,7 +218,6 @@ async fn run_voice_bridge(
                 }
                 let state = *desired.borrow_and_update();
                 if !state.active {
-                    server_transmit_allowed = false;
                     transmit_queue.clear();
                     let _ = writer.send(Bytes::from_static(&[VOICE_IPC_KIND_CLOSE])).await;
                     return Ok(());

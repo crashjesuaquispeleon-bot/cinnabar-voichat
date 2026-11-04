@@ -252,7 +252,9 @@ async fn run_voice_bridge(
                                 server_transmit_allowed = false;
                                 let state = *desired.borrow();
                                 if !state.active {
-                                    let _ = writer.send(Bytes::from_static(&[VOICE_IPC_KIND_CLOSE])).await;
+                                    let _ = writer
+                                        .send(Bytes::from_static(&[VOICE_IPC_KIND_CLOSE]))
+                                        .await;
                                     return Ok(());
                                 }
                                 send_transmit_gate(&writer, state.transmit).await?;
@@ -276,7 +278,9 @@ async fn run_voice_bridge(
                                 }
                             }
                             "disabled" => {
-                                return Err(anyhow::anyhow!("voice admission or media service unavailable"));
+                                return Err(anyhow::anyhow!(
+                                    "voice admission or media service unavailable"
+                                ));
                             }
                             _ => return Err(anyhow::anyhow!("unknown voice IPC status")),
                         }

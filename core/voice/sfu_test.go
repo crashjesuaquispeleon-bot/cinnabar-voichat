@@ -42,6 +42,29 @@ func TestVoiceFrameFormatIsTwentyMillisecondsOfMonoPcm16(t *testing.T) {
 	}
 }
 
+func TestRemoteVoiceBufferBudgetScalesWithRoomFanIn(t *testing.T) {
+	tests := []struct {
+		name           string
+		participants   int
+		wantRemoteFrames int
+	}{
+		{name: "empty room guard", participants: 0, wantRemoteFrames: 5},
+		{name: "one recipient", participants: 2, wantRemoteFrames: 5},
+		{name: "default room", participants: 8, wantRemoteFrames: 35},
+		{name: "maximum configured room", participants: 64, wantRemoteFrames: 315},
+		{name: "unbounded configuration clamps", participants: 128, wantRemoteFrames: 320},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			want := uint64(voiceRemoteFrameBytes * test.wantRemoteFrames)
+			if got := remoteVoiceBufferBudget(test.participants); got != want {
+				t.Fatalf("remoteVoiceBufferBudget(%d) = %d, want %d",
+					test.participants, got, want)
+			}
+		})
+	}
+}
+
 // TestSFURelaysOnlyBetweenPeersWithTheSameSignedRoom proves that the native Go client,
 // the WebSocket signaling endpoint and the room relay work together with local Pion peers.
 func TestSFURelaysOnlyBetweenPeersWithTheSameSignedRoom(t *testing.T) {

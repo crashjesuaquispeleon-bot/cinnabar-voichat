@@ -112,7 +112,7 @@ Los archivos esperados son:
 - `/etc/letsencrypt/live/IP_PUBLICA.nip.io/fullchain.pem`
 - `/etc/letsencrypt/live/IP_PUBLICA.nip.io/privkey.pem`
 
-El servicio SFU debe poder leer el certificado y la clave privada. Mantén sus permisos restrictivos. Configura el timer de renovación de Certbot y un deploy hook que reinicie `cinnabar-voice-sfu` después de renovar el certificado, ya que el proceso carga los archivos TLS al arrancar.
+El servicio SFU debe poder leer el certificado y la clave privada. Mantén sus permisos restrictivos. El token administrativo se entrega mediante `LoadCredential`, no como variable de entorno. Configura el timer de renovación de Certbot y un deploy hook que reinicie `cinnabar-voice-sfu` después de renovar el certificado, ya que el proceso carga los archivos TLS al arrancar.
 
 ## Claves y secretos del broker
 
@@ -147,7 +147,7 @@ La clave privada nunca se copia al SFU ni a los clientes. El SFU recibe solo la 
 
 ## Archivo de entorno del SFU
 
-Crea `/etc/cinnabar/voice-sfu.env` con permisos 600 y propietario root. Sustituye todos los marcadores por valores reales obtenidos de forma segura:
+Crea `/etc/cinnabar/voice-sfu.env` con permisos 600 y propietario root. El token administrativo no va en ese archivo ni en una variable `Environment=`: guárdalo aparte como Base64 en `/etc/cinnabar/voice-control-token` con propietario root y modo 0600. El servicio lo recibirá con `LoadCredential` de systemd:
 
 ~~~ini
 CINNABAR_VOICE_LISTEN_ADDR=0.0.0.0:8443
@@ -156,7 +156,6 @@ CINNABAR_VOICE_TLS_KEY_FILE=/etc/cinnabar/tls/privkey.pem
 CINNABAR_VOICE_ISSUER=https://api.cinnabar.gg/voice
 CINNABAR_VOICE_AUDIENCE=cinnabar-voice-sfu
 CINNABAR_VOICE_BROKER_PUBLIC_KEY=BASE64_CLAVE_PUBLICA_ED25519
-CINNABAR_VOICE_CONTROL_TOKEN=BASE64_DE_LOS_32_CARACTERES_DEL_TOKEN
 CINNABAR_VOICE_ICE_SERVERS=[{"urls":["stun:stun.l.google.com:19302"]}]
 CINNABAR_VOICE_MAX_PARTICIPANTS=8
 CINNABAR_VOICE_UDP4_PORT=19132
@@ -182,7 +181,7 @@ sudo chown root:root /etc/cinnabar/voice-sfu.env
 sudo chmod 0600 /etc/cinnabar/voice-sfu.env
 ~~~
 
-Guarda lo siguiente en `/etc/systemd/system/cinnabar-voice-sfu.service`:
+Guarda lo siguiente en `/etc/systemd/system/cinnabar-voice-sfu.service` (systemd 247 o posterior):
 
 ~~~ini
 [Unit]
@@ -193,6 +192,8 @@ After=network-online.target
 [Service]
 Type=simple
 User=cinnabar-voice
+LoadCredential=voice-control-token:/etc/cinnabar/voice-control-token
+Environment=CINNABAR_VOICE_CONTROL_TOKEN_FILE=%d/voice-control-token
 EnvironmentFile=/etc/cinnabar/voice-sfu.env
 ExecStart=/usr/local/bin/cinnabar-voice-sfu
 Restart=on-failure

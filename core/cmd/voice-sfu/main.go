@@ -206,6 +206,34 @@ func sessionCloseHandler(token []byte, closeSession func(roomID, sessionID strin
 	})
 }
 
+// admissionRevokeHandler exposes participant-scoped revocation to the trusted broker.
+// It deliberately returns the same no-content response for present and absent admissions.
+func admissionRevokeHandler(token []byte, revoke func(roomID, tokenID string) bool) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Pragma", "no-cache")
+		provided := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if len(provided) != len(token) || subtle.ConstantTimeCompare([]byte(provided), token) != 1 {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		roomID := r.PathValue("roomID")
+		tokenID := r.PathValue("tokenID")
+		room, roomErr := uuid.Parse(roomID)
+		admission, admissionErr := uuid.Parse(tokenID)
+		if roomErr != nil || admissionErr != nil || room.String() != roomID || admission.String() != tokenID {
+			http.Error(w, "invalid room or admission identifier", http.StatusBadRequest)
+			return
+		}
+		if r.ContentLength != 0 {
+			http.Error(w, "request body must be empty", http.StatusBadRequest)
+			return
+		}
+		_ = revoke(roomID, tokenID)
+		w.WriteHeader(http.StatusNoContent)
+	})
+}
+
 func run(ctx context.Context, cfg config) error {
 	sfu, err := voice.NewSFU(voice.SFUConfig{
 		Admission: voice.VerifyConfig{
@@ -223,6 +251,8 @@ func run(ctx context.Context, cfg config) error {
 	mux.Handle("/v1/voice", sfu)
 	mux.Handle("POST /v1/admin/rooms/{roomID}/sessions/{sessionID}/close",
 		sessionCloseHandler(cfg.ControlToken, sfu.CloseSession))
+	mux.Handle("POST /v1/admin/rooms/{roomID}/admissions/{tokenID}/revoke",
+		admissionRevokeHandler(cfg.ControlToken, sfu.RevokeAdmission))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

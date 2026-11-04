@@ -94,7 +94,6 @@ CINNABAR_VOICE_TLS_KEY_FILE=${TLS_DIR}/privkey.pem
 CINNABAR_VOICE_ISSUER=https://api.cinnabar.gg/voice
 CINNABAR_VOICE_AUDIENCE=cinnabar-voice-sfu
 CINNABAR_VOICE_BROKER_PUBLIC_KEY=${BROKER_PUBLIC_KEY}
-CINNABAR_VOICE_CONTROL_TOKEN=${CONTROL_TOKEN_B64}
 CINNABAR_VOICE_ICE_SERVERS=[{"urls":["stun:stun.l.google.com:19302"]}]
 CINNABAR_VOICE_MAX_PARTICIPANTS=8
 CINNABAR_VOICE_UDP4_PORT=19132
@@ -102,6 +101,9 @@ CINNABAR_VOICE_UDP6_PORT=19133
 ENV
 chown root:root "$ENV_FILE"
 chmod 0600 "$ENV_FILE"
+printf '%s\n' "$CONTROL_TOKEN_B64" > "${ENV_DIR}/voice-control-token"
+chown root:root "${ENV_DIR}/voice-control-token"
+chmod 0600 "${ENV_DIR}/voice-control-token"
 unset BROKER_PUBLIC_KEY CONTROL_TOKEN_B64 PUBLIC_KEY_BYTES
 
 cat > "/etc/systemd/system/${SERVICE}.service" <<'UNIT'
@@ -113,6 +115,8 @@ After=network-online.target
 [Service]
 Type=simple
 User=cinnabar-voice
+LoadCredential=voice-control-token:/etc/cinnabar/voice-control-token
+Environment=CINNABAR_VOICE_CONTROL_TOKEN_FILE=%d/voice-control-token
 EnvironmentFile=/etc/cinnabar/voice-sfu.env
 ExecStart=/usr/local/bin/cinnabar-voice-sfu
 Restart=on-failure

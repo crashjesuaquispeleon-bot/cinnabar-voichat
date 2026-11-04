@@ -184,7 +184,7 @@ mod tests {
         assert_eq!(transmit.len(), 1);
         assert_eq!(monitor.len(), 1);
 
-        let mut source = VoiceLoopbackSource::new(Arc::clone(&monitor));
+        let source = VoiceLoopbackSource::new(Arc::clone(&monitor));
         let stopped = source.stop_flag();
         let (mut device, mut mixer) = crate::named_audio::AudioDevice::memory_mixer();
         assert!(device.play_source(source));

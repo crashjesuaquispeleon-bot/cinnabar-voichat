@@ -269,7 +269,9 @@ func (s *SFU) join(
 	pc.OnDataChannel(peer.acceptDataChannel)
 	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
 		if state == webrtc.PeerConnectionStateFailed || state == webrtc.PeerConnectionStateClosed {
-			peer.close()
+			// Pion may invoke this callback from PeerConnection.Close itself. Deferring
+			// teardown avoids re-entering the peer's sync.Once on the same goroutine.
+			go peer.close()
 		}
 	})
 

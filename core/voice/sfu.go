@@ -379,31 +379,30 @@ func (peer *sfuPeer) acceptSequence(sequence uint64) bool {
 }
 
 func (s *SFU) forward(sender *sfuPeer, frame []byte) {
-	admission, active := sender.activeAdmission(time.Now())
-	if !active {
+	// Serialize forwarding against the reliable PTT gate update. Once a
+	// transmit=false acknowledgement is sent, no callback that began earlier
+	// can enqueue another room frame after that acknowledgement.
+	sender.mu.Lock()
+	defer sender.mu.Unlock()
+	if sender.closed || !sender.transmitAllowed.Load() || !sender.admission.ExpiresAt.After(time.Now()) {
 		return
 	}
+	sessionID := sender.admission.SessionID
 	s.mu.RLock()
 	room := s.rooms[sender.roomID]
-	if room == nil || room.peers[sender.xuid] != sender || room.sessionID != admission.SessionID {
+	if room == nil || room.peers[sender.xuid] != sender || room.sessionID != sessionID {
 		s.mu.RUnlock()
 		return
 	}
-	targets := make([]*sfuPeer, 0, len(room.peers)-1)
 	for _, peer := range room.peers {
-		if peer != sender {
-			targets = append(targets, peer)
-		}
-	}
-	s.mu.RUnlock()
-
-	for _, peer := range targets {
-		if peer.downlink == nil || peer.downlink.ReadyState() != webrtc.DataChannelStateOpen ||
+		if peer == sender || peer.downlink == nil ||
+			peer.downlink.ReadyState() != webrtc.DataChannelStateOpen ||
 			peer.downlink.BufferedAmount() > maxBufferedVoiceBytes {
 			continue
 		}
 		_ = peer.downlink.Send(frame)
 	}
+	s.mu.RUnlock()
 }
 
 func (peer *sfuPeer) setTransmitAllowed(allowed bool) error {

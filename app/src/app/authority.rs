@@ -70,25 +70,38 @@ pub(crate) fn configure_client_authority_systems(app: &mut App) {
     .add_systems(
         Update,
         (
-            (
-                drive_chat_keyboard_input
-                    .in_set(OrdinaryInputSet)
-                    .before(client_state::ShellFrameSet::MenuInput),
-                drive_inventory_ui_actions.after(client_state::ShellFrameSet::MenuInput),
-                drive_menu_services,
-            )
-                .chain(),
-            (
-                crate::session::hide_window_before_exit,
-                drive_session.in_set(client_state::ShellFrameSet::Session),
-                crate::render_distance::apply_render_distance
-                    .after(client_state::ShellFrameSet::WindowSettings),
-                synchronize_semantic_input_authority.after(client_state::ShellFrameSet::Focus),
-            )
-                .chain(),
+            drive_chat_keyboard_input
+                .in_set(OrdinaryInputSet)
+                .before(client_state::ShellFrameSet::MenuInput),
+            drive_inventory_ui_actions.after(client_state::ShellFrameSet::MenuInput),
         )
             .chain()
             .after(drain_inventory_authority)
+            .in_set(ClientFrameSet::UiAuthority),
+    )
+    .add_systems(
+        Update,
+        (drive_menu_services, crate::session::hide_window_before_exit)
+            .chain()
+            .after(drive_inventory_ui_actions)
+            .in_set(ClientFrameSet::UiAuthority),
+    )
+    .add_systems(
+        Update,
+        (
+            drive_session.in_set(client_state::ShellFrameSet::Session),
+            crate::render_distance::apply_render_distance
+                .after(client_state::ShellFrameSet::WindowSettings),
+        )
+            .chain()
+            .after(crate::session::hide_window_before_exit)
+            .in_set(ClientFrameSet::UiAuthority),
+    )
+    .add_systems(
+        Update,
+        synchronize_semantic_input_authority
+            .after(crate::render_distance::apply_render_distance)
+            .after(client_state::ShellFrameSet::Focus)
             .in_set(ClientFrameSet::UiAuthority),
     )
     .add_systems(

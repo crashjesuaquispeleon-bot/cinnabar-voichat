@@ -152,7 +152,7 @@ impl MicrophoneBackend for CpalMicrophoneBackend {
                 id: format!("cpal-snapshot-{index}"),
                 // CPAL's name API cannot distinguish two devices with the same name.
                 // Never mark multiple physical devices as the system default.
-                is_default: default_name.as_deref() == Some(name.as_str()),
+                is_default: default_name == Some(name.as_str()),
                 name: if name.is_empty() {
                     format!("Input device {}", index + 1)
                 } else {

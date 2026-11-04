@@ -37,6 +37,12 @@ An active peer must renew its lease before exp (recommended interval: 60 seconds
 
 The current Go relay uses WebRTC DTLS-protected SCTP DataChannels, separate from Bedrock packet framing and the Rust/Go control channel. The client creates an unordered, zero-retransmit uplink named cinnabar-voice-uplink-v1; the SFU creates the versioned downlink cinnabar-voice-downlink-v2. An uplink frame is exactly 648 bytes: an unsigned 64-bit big-endian sequence followed by 320 little-endian signed PCM16 mono samples at 16 kHz (20 ms). The downlink envelope is exactly 664 bytes: a server-generated random 16-byte per-peer source ID followed by the unchanged 648-byte frame. The source ID is ephemeral and is not an XUID, account ID, room ID, or client-selected value. The SFU validates uplink frame sizes and each sender's strictly increasing sequence, then forwards only inside the same verified room. The client maintains an independent bounded playback queue and sequence check per source and mixes participants simultaneously, with a two-frame startup prebuffer. Configure operator-managed ICE/TURN, participant limits and no disk recording. This remains an initial uncompressed DataChannel profile, not the final bandwidth-efficient Opus/RTP transport. PTT release, mute, permission loss and disconnect must close the sender gate before the next frame is accepted.
 
+## Fixed UDP deployment ports
+
+The standalone SFU uses a Pion multi-UDP mux on UDP `19132` for IPv4 and UDP `19133` for IPv6. Those sockets carry ICE/WebRTC transport for many PeerConnections; WSS signaling remains a separate TCP/TLS endpoint. The ports can be overridden by the operator, and bind IP filters can restrict which local interfaces are used.
+
+These are also the default Bedrock Dedicated Server game ports. A sidecar SFU cannot bind the same local address/port while Bedrock owns it. Use a separate host or an IP not bound by Bedrock, or move the Minecraft server to custom ports. A wildcard Bedrock UDP bind still conflicts with every local address. UDP socket reuse is not a safe substitute for a protocol-aware multiplexer.
+
 ## Known integration blockers
 
 - The repository contains a native Cinnabar API client, not the server implementation that would mint these tokens.

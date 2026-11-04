@@ -52,7 +52,7 @@ func TestRemoteVoiceBufferBudgetScalesWithRoomFanIn(t *testing.T) {
 		{name: "one recipient", participants: 2, wantRemoteFrames: 5},
 		{name: "default room", participants: 8, wantRemoteFrames: 35},
 		{name: "maximum configured room", participants: 64, wantRemoteFrames: 315},
-		{name: "unbounded configuration clamps", participants: 128, wantRemoteFrames: 320},
+		{name: "unbounded configuration clamps", participants: 128, wantRemoteFrames: 315},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

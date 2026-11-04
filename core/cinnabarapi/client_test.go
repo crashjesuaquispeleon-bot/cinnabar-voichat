@@ -456,6 +456,11 @@ func TestVoiceHostOpenRetainsRequestIDUntilConfirmed(t *testing.T) {
 	client := newTestClient(t, api, nil)
 	client.Configure(testConfig)
 	session := receive(t, api.sessions)
+	testwait.Eventually(t, testwait.DefaultTimeout, "an authenticated session", func() bool {
+		client.mu.Lock()
+		defer client.mu.Unlock()
+		return client.live != nil
+	})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	first := make(chan error, 1)

@@ -12,7 +12,9 @@ La opción recomendada para intentar una prueba de bajo costo es una VM OCI Ampe
 - Disco: dentro del almacenamiento Always Free.
 - Región: la región principal de la cuenta. Always Free no está disponible en cualquier región secundaria.
 
-La creación depende de capacidad en la región principal; un error de capacidad agotada no significa que la cuenta esté mal configurada. Oracle también puede recuperar instancias Always Free que cumplan sus criterios de inactividad durante siete días. Por ello sirve para una prueba Alpha, no debe tratarse como SLA ni como infraestructura de producción. La documentación técnica de Always Free indica un total de 2 OCPU y 12 GB para A1, sujeto a capacidad y cuota de cuenta.\n\n**No puedo garantizar que el despliegue completo cueste S/ 0.** Antes de crear recursos comprueba en la consola el costo de la IPv4 pública, red, almacenamiento y cualquier otro elemento; continúa solo si cada recurso aparece como Always Free o el estimador muestra el costo que aceptas. La página de registro de Oracle indica que a la mayoría de usuarios se les pide teléfono y tarjeta para verificar la cuenta, y que no se cobra la tarjeta a menos que actualicen a una cuenta de pago.
+La creación depende de capacidad en la región principal; un error de capacidad agotada no significa que la cuenta esté mal configurada. Oracle también puede recuperar instancias Always Free que cumplan sus criterios de inactividad durante siete días. Por ello sirve para una prueba Alpha, no debe tratarse como SLA ni como infraestructura de producción. La documentación técnica de Always Free indica un total de 2 OCPU y 12 GB para A1, sujeto a capacidad y cuota de cuenta.
+
+**No puedo garantizar que el despliegue completo cueste S/ 0.** Antes de crear recursos comprueba en la consola el costo de la IPv4 pública, red, almacenamiento y cualquier otro elemento; continúa solo si cada recurso aparece como Always Free o el estimador muestra el costo que aceptas. La página de registro de Oracle indica que a la mayoría de usuarios se les pide teléfono y tarjeta para verificar la cuenta, y que no se cobra la tarjeta a menos que actualicen a una cuenta de pago.
 
 Si no hay capacidad A1 en la región principal, no cambies a una máquina de pago sin revisar el costo. Una alternativa es un VPS económico con IPv4 e IPv6 públicas, pero ya no sería gratuito.
 
@@ -32,7 +34,20 @@ En la VCN/NSG o Security List de OCI y en el firewall Linux permite únicamente:
 
 La SFU actual abre sockets IPv4 e IPv6 por separado; por eso la VM debe tener una interfaz IPv6 habilitada para usar UDP 19133. No abras SSH a todo Internet. No configures puertos 19132/19133 en la máquina de Bedrock: pertenecen al host separado del SFU durante esta prueba.
 
-## Compilar el SFU en ARM64
+## Instalación automática del SFU (recomendada)
+
+Después de crear la VM, asignar una IPv4 pública, habilitar una IPv6 global y abrir las reglas de red de la tabla anterior, ejecuta en Ubuntu ARM64:
+
+~~~sh
+curl -fsSL https://raw.githubusercontent.com/crashjesuaquispeleon-bot/cinnabar-voichat/feature/voice-chat-foundation/tools/voice/install-sfu.sh -o install-sfu.sh
+sudo bash install-sfu.sh
+~~~
+
+El instalador verifica que el nombre `IP_PUBLICA.nip.io` resuelva a la IPv4 indicada y que exista una IPv6 global, solicita el correo de Certbot, la clave **pública** Ed25519 del broker y el token administrativo (lo solicita sin mostrarlo), emite el certificado, compila y prueba el SFU, instala el servicio `systemd` y configura la renovación del certificado. Guarda el token administrativo para introducir exactamente el mismo valor como secreto `VOICE_SFU_ADMIN_TOKEN` en Cloudflare. El instalador no recibe ni instala la clave privada Ed25519.
+
+El script no crea la cuenta Oracle, la VM, las reglas NSG, el broker Cloudflare ni las variables de compilación GitHub. Tampoco aprueba por sí solo la prueba real entre dos jugadores. Si falla la verificación de IPv6, vuelve a la VNIC y la subnet de OCI: el SFU actual no arranca solo con IPv4.
+
+## Instalación manual alternativa del SFU en ARM64
 
 Conéctate por SSH a Ubuntu y ejecuta:
 

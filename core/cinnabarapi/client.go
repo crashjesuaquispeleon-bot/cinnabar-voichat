@@ -127,6 +127,7 @@ type session struct {
 	nextID          uint32
 	pending         map[uint32]chan lookupReply // guarded by Client.mu
 	voicePending    map[string]chan voiceReply  // guarded by Client.mu
+	voiceSignals    chan inbound
 	closed          chan struct{}
 	parameters      parameters
 }

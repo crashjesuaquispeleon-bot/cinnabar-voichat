@@ -22,8 +22,8 @@ pub mod voice_input;
 pub mod voice_loopback;
 pub mod voice_pcm;
 pub mod voice_permission;
-pub mod voice_stream;
 pub mod voice_remote;
+pub mod voice_stream;
 mod water;
 pub mod weather;
 

@@ -14,7 +14,10 @@ use std::sync::{
 };
 
 const REMOTE_SAMPLE_RATE: usize = 16_000;
-const REMOTE_FRAME_SAMPLES: usize = 320;
+const REMOTE_FRAME_DURATION_MS: usize = 20;
+const REMOTE_FRAME_SAMPLES: usize = REMOTE_SAMPLE_RATE * REMOTE_FRAME_DURATION_MS / 1000;
+const REMOTE_UPSAMPLE_RATIO: usize =
+    super::voice_pcm::VOICE_SAMPLE_RATE as usize / REMOTE_SAMPLE_RATE;
 const REMOTE_SEQUENCE_BYTES: usize = 8;
 const REMOTE_PCM_BYTES: usize = REMOTE_FRAME_SAMPLES * 2;
 const REMOTE_FRAME_BYTES: usize = REMOTE_SEQUENCE_BYTES + REMOTE_PCM_BYTES;
@@ -122,19 +125,25 @@ impl VoiceRemotePlayback {
         for index in 0..REMOTE_FRAME_SAMPLES {
             let current = source[index];
             let next = source.get(index + 1).copied().unwrap_or(current);
-            let output = index * 3;
-            upsampled[output] = current;
-            upsampled[output + 1] = current + (next - current) / 3.0;
-            upsampled[output + 2] = current + (next - current) * (2.0 / 3.0);
+            let output = index * REMOTE_UPSAMPLE_RATIO;
+            for step in 0..REMOTE_UPSAMPLE_RATIO {
+                let fraction = step as f32 / REMOTE_UPSAMPLE_RATIO as f32;
+                upsampled[output + step] = current + (next - current) * fraction;
+            }
         }
 
         let mut frame = PcmFrame::silence();
         frame.copy_from_slice(&upsampled);
+        let pushed_before = self.queue.pushed();
         let dropped_before = self.queue.dropped();
         self.queue.push(frame);
-        if self.queue.dropped() != dropped_before {
+        if self.queue.pushed() == pushed_before {
             self.dropped.fetch_add(1, Ordering::Relaxed);
-            return Err(RemoteVoiceFrameError::QueueFull);
+            return if self.queue.dropped() != dropped_before {
+                Err(RemoteVoiceFrameError::QueueFull)
+            } else {
+                Err(RemoteVoiceFrameError::Disabled)
+            };
         }
         Ok(())
     }

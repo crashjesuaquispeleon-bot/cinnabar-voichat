@@ -47,7 +47,7 @@ The native CPAL capture path runs inside the persistent microphone owner worker.
 
 ## Current staged media flow
 
-CPAL microphone -> local permission / enable / PTT gates -> bounded 48 kHz PCM queue -> native Rust voice worker (48 kHz to 16 kHz PCM16) -> dedicated Rust/Go voice IPC -> Go VoiceBridge (requires a trusted VoiceAdmissionSource) -> broker-signed short-lived room admission -> WSS signaling and Pion WebRTC SFU -> same-room / same-partida DataChannel fan-out -> Go IPC downlink -> VoiceRemotePlayback -> client audio mixer.
+CPAL microphone -> local permission / enable / PTT gates -> bounded 48 kHz PCM queue -> native Rust voice worker (48 kHz to 16 kHz PCM16) -> dedicated Rust/Go voice IPC -> Go VoiceBridge (requires a trusted VoiceAdmissionSource) -> broker-signed short-lived room admission -> WSS signaling and Pion WebRTC SFU -> same-room / same-partida DataChannel fan-out with server-generated ephemeral speaker IDs -> Go IPC downlink -> independent per-speaker receive queues, sequence validation and concurrent mixing in VoiceRemotePlayback -> client audio mixer.
 
 The Rust IPC client and the Go SFU/bridge layers now exist, but the Go core starts the voice endpoint only when an operator supplies a trusted VoiceBridgeConfig. The shipping bedrock-core command does not yet supply one. Do not wire a placeholder or local signing key to make the socket appear: the broker must independently authenticate the account and prove the active partida first.
 
@@ -129,7 +129,8 @@ References:
 - [x] Add Go two-peer SFU tests and a local IPC two-peer integration test (CI validation pending).
 - [ ] Implement/deploy the trusted broker issuer that derives XUID from the authenticated Cinnabar account and the partida UUID from an authoritative server-side adapter.
 - [ ] Inject the real VoiceAdmissionSource and deployed WSS/ICE/TURN settings into the production bedrock-core configuration. Until then, the IPC voice endpoint remains disabled by default.
-- [ ] Add jitter buffering, Opus/RTP evaluation, participant speaking state, per-player receive volume and multi-client UI.
+- [x] Give every downlink stream a random server-generated source ID; validate sequence numbers per source and mix up to the SFU's 64-participant limit concurrently, with bounded per-speaker queues and a two-frame startup prebuffer.
+- [ ] Add an adaptive jitter buffer, migrate the media plane to Opus/RTP, add participant speaking state, per-player receive volume and multi-client UI.
 - [ ] Verify real two-client and multi-client sessions across separate installations, session transfers, packet loss, reconnect, and shutdown.
 
 ### Stage 3 — Product integration and qualification

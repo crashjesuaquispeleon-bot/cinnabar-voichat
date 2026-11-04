@@ -119,10 +119,8 @@ pub(crate) fn drive_voice_bridge(
             // Close the previous room before requesting admission for the new
             // local session. Never retain an old partida's receive path.
             active.desired.send_replace(BridgeDesired::STOPPED);
-            if finished {
-                if let Some(thread) = active.thread.take() {
-                    let _ = thread.join();
-                }
+            if finished && let Some(thread) = active.thread.take() {
+                let _ = thread.join();
             }
         }
         runtime.retry_at = Some(Instant::now() + BRIDGE_RETRY_DELAY);

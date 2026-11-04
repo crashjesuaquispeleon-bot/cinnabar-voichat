@@ -178,6 +178,15 @@ func TestSessionCloseHandlerRequiresBrokerControlTokenAndCanonicalIDs(t *testing
 		t.Fatalf("body response=%d closed=%d", response.Code, closed)
 	}
 
+	request = httptest.NewRequest(http.MethodPost, path, strings.NewReader("chunked body"))
+	request.ContentLength = -1
+	request.Header.Set("Authorization", "Bearer "+string(token))
+	response = httptest.NewRecorder()
+	mux.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest || closed != 0 {
+		t.Fatalf("unknown-length body response=%d closed=%d", response.Code, closed)
+	}
+
 	request = httptest.NewRequest(http.MethodPost, path, nil)
 	request.Header.Set("Authorization", "Bearer "+string(token))
 	response = httptest.NewRecorder()

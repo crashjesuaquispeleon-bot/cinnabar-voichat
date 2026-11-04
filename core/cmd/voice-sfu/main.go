@@ -197,14 +197,11 @@ func sessionCloseHandler(token []byte, closeSession func(roomID, sessionID strin
 			http.Error(w, "invalid room or session identifier", http.StatusBadRequest)
 			return
 		}
-		if r.ContentLength > 0 {
+		if r.ContentLength != 0 {
 			http.Error(w, "request body must be empty", http.StatusBadRequest)
 			return
 		}
-		if closeSession(roomID, sessionID) < 0 {
-			http.Error(w, "session close failed", http.StatusInternalServerError)
-			return
-		}
+		_ = closeSession(roomID, sessionID)
 		w.WriteHeader(http.StatusNoContent)
 	})
 }

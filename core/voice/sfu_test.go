@@ -5,16 +5,13 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/binary"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/coder/websocket"
 	"github.com/google/uuid"
-	"github.com/pion/webrtc/v4"
 )
 
 func TestVoiceFrameSequenceRequiresExactPcmFrameAndNewSequence(t *testing.T) {
@@ -44,9 +41,8 @@ func TestVoiceFrameFormatIsTwentyMillisecondsOfMonoPcm16(t *testing.T) {
 	}
 }
 
-
-// TestSFURelaysOnlyBetweenPeersWithTheSameSignedRoom proves the Go signaling and
-// data-channel path end to end with two local Pion clients. It does not require public ICE.
+// TestSFURelaysOnlyBetweenPeersWithTheSameSignedRoom proves that the native Go client,
+// the WebSocket signaling endpoint and the room relay work together with local Pion peers.
 func TestSFURelaysOnlyBetweenPeersWithTheSameSignedRoom(t *testing.T) {
 	now := time.Now()
 	private, verify := verifier(t)
@@ -66,189 +62,74 @@ func TestSFURelaysOnlyBetweenPeersWithTheSameSignedRoom(t *testing.T) {
 	defer server.Close()
 	defer sfu.Close()
 	endpoint := "wss" + strings.TrimPrefix(server.URL, "https")
+	httpClient := &http.Client{Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // test server uses a self-signed certificate
+	}}
+	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
+	defer cancel()
 
-	first := connectTestVoicePeer(t, endpoint, signedToken(t, private, firstClaims))
-	defer first.close()
-	second := connectTestVoicePeer(t, endpoint, signedToken(t, private, secondClaims))
-	defer second.close()
-	isolated := connectTestVoicePeer(t, endpoint, signedToken(t, private, isolatedClaims))
-	defer isolated.close()
-
-	select {
-	case <-first.downlinkOpen:
-	case <-time.After(10 * time.Second):
-		t.Fatal("first peer downlink did not open")
+	first, err := DialClient(ctx, ClientConfig{
+		Endpoint: endpoint, AdmissionToken: signedToken(t, private, firstClaims), HTTPClient: httpClient,
+	})
+	if err != nil {
+		t.Fatalf("connect first voice client: %v", err)
 	}
-	select {
-	case <-second.downlinkOpen:
-	case <-time.After(10 * time.Second):
-		t.Fatal("second peer downlink did not open")
+	defer first.Close()
+	second, err := DialClient(ctx, ClientConfig{
+		Endpoint: endpoint, AdmissionToken: signedToken(t, private, secondClaims), HTTPClient: httpClient,
+	})
+	if err != nil {
+		t.Fatalf("connect second voice client: %v", err)
 	}
-	select {
-	case <-isolated.downlinkOpen:
-	case <-time.After(10 * time.Second):
-		t.Fatal("isolated peer downlink did not open")
+	defer second.Close()
+	isolated, err := DialClient(ctx, ClientConfig{
+		Endpoint: endpoint, AdmissionToken: signedToken(t, private, isolatedClaims), HTTPClient: httpClient,
+	})
+	if err != nil {
+		t.Fatalf("connect isolated voice client: %v", err)
 	}
+	defer isolated.Close()
 
 	frame := make([]byte, voiceFrameBytes)
 	binary.BigEndian.PutUint64(frame[:voiceSequenceBytes], 1)
 	for i := voiceSequenceBytes; i < len(frame); i++ {
 		frame[i] = byte(i)
 	}
-	if err := first.uplink.Send(frame); err != nil {
+	if err := first.SendFrame(frame); err != ErrVoiceTransmitDisabled {
+		t.Fatalf("frame sent before PTT gate opened: %v", err)
+	}
+	if err := first.SetTransmitAllowed(ctx, true); err != nil {
+		t.Fatalf("open server-authorized transmit gate: %v", err)
+	}
+	if err := first.SendFrame(frame); err != nil {
 		t.Fatalf("send first peer frame: %v", err)
 	}
 	select {
-	case received := <-second.frames:
+	case received := <-second.ReceiveFrames():
 		if !bytes.Equal(received, frame) {
 			t.Fatal("second peer received a different voice frame")
 		}
-	case <-time.After(5 * time.Second):
+	case <-ctx.Done():
 		t.Fatal("second peer did not receive the first peer's voice frame")
 	}
+
+	if err := first.SetTransmitAllowed(ctx, false); err != nil {
+		t.Fatalf("close server-authorized transmit gate: %v", err)
+	}
+	if err := first.SendFrame(frame); err != ErrVoiceTransmitDisabled {
+		t.Fatalf("frame sent after PTT gate closed: %v", err)
+	}
 	select {
-	case <-first.frames:
+	case <-first.ReceiveFrames():
 		t.Fatal("SFU looped the sender's voice frame back to its origin")
 	case <-time.After(150 * time.Millisecond):
 	}
 	select {
-	case frame := <-isolated.frames:
-		t.Fatalf("SFU leaked a room frame into another session: %d bytes", len(frame))
+	case leaked := <-isolated.ReceiveFrames():
+		t.Fatalf("SFU leaked a room frame into another session: %d bytes", len(leaked))
 	case <-time.After(150 * time.Millisecond):
 	}
 }
-
-type testVoicePeer struct {
-	pc *webrtc.PeerConnection
-	uplink *webrtc.DataChannel
-	downlinkOpen chan struct{}
-	frames chan []byte
-	signal *websocket.Conn
-}
-
-func (peer *testVoicePeer) close() {
-	if peer.signal != nil {
-		_ = peer.signal.Close(websocket.StatusNormalClosure, "test complete")
-	}
-	if peer.pc != nil {
-		_ = peer.pc.Close()
-	}
-}
-
-func connectTestVoicePeer(t *testing.T, endpoint, token string) *testVoicePeer {
-	t.Helper()
-	peer := &testVoicePeer{
-		downlinkOpen: make(chan struct{}),
-		frames: make(chan []byte, 8),
-	}
-	pc, err := webrtc.NewPeerConnection(webrtc.Configuration{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	peer.pc = pc
-	ordered := false
-	maxRetransmits := uint16(0)
-	uplink, err := pc.CreateDataChannel(voiceUplinkLabel, &webrtc.DataChannelInit{
-		Ordered: &ordered, MaxRetransmits: &maxRetransmits,
-	})
-	if err != nil {
-		peer.close()
-		t.Fatal(err)
-	}
-	peer.uplink = uplink
-	pc.OnDataChannel(func(channel *webrtc.DataChannel) {
-		if channel.Label() != voiceDownlinkLabel {
-			_ = channel.Close()
-			return
-		}
-		channel.OnOpen(func() {
-			select {
-			case <-peer.downlinkOpen:
-			default:
-				close(peer.downlinkOpen)
-			}
-		})
-		channel.OnMessage(func(message webrtc.DataChannelMessage) {
-			if !message.IsString {
-				peer.frames <- append([]byte(nil), message.Data...)
-			}
-		})
-	})
-
-	offer, err := pc.CreateOffer(nil)
-	if err != nil {
-		peer.close()
-		t.Fatal(err)
-	}
-	gathered := webrtc.GatheringCompletePromise(pc)
-	if err := pc.SetLocalDescription(offer); err != nil {
-		peer.close()
-		t.Fatal(err)
-	}
-	select {
-	case <-gathered:
-	case <-time.After(10 * time.Second):
-		peer.close()
-		t.Fatal("client ICE gathering timed out")
-	}
-
-	httpClient := &http.Client{Transport: &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // test server uses a self-signed certificate
-	}}
-	signal, _, err := websocket.Dial(context.Background(), endpoint, &websocket.DialOptions{HTTPClient: httpClient})
-	if err != nil {
-		peer.close()
-		t.Fatalf("dial local SFU signaling: %v", err)
-	}
-	peer.signal = signal
-	join, err := json.Marshal(joinSignal{Type: "join", Token: token, Offer: *pc.LocalDescription()})
-	if err != nil {
-		peer.close()
-		t.Fatal(err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := signal.Write(ctx, websocket.MessageText, join); err != nil {
-		peer.close()
-		t.Fatalf("write join: %v", err)
-	}
-	kind, response, err := signal.Read(ctx)
-	if err != nil || kind != websocket.MessageText {
-		peer.close()
-		t.Fatalf("read SFU answer: kind=%v err=%v", kind, err)
-	}
-	var answer serverSignal
-	if err := json.Unmarshal(response, &answer); err != nil || answer.Type != "answer" || answer.Answer == nil {
-		peer.close()
-		t.Fatalf("unexpected SFU join response: %s (%v)", response, err)
-	}
-	if err := pc.SetRemoteDescription(*answer.Answer); err != nil {
-		peer.close()
-		t.Fatalf("set SFU answer: %v", err)
-	}
-	transmitMessage, err := json.Marshal(clientSignal{Type: "transmit", Allowed: true})
-	if err != nil {
-		peer.close()
-		t.Fatal(err)
-	}
-	if err := signal.Write(ctx, websocket.MessageText, transmitMessage); err != nil {
-		peer.close()
-		t.Fatalf("open SFU transmission gate: %v", err)
-	}
-	ackKind, ackPayload, err := signal.Read(ctx)
-	if err != nil || ackKind != websocket.MessageText {
-		peer.close()
-		t.Fatalf("read transmit acknowledgement: %v", err)
-	}
-	var acknowledgement serverSignal
-	if err := json.Unmarshal(ackPayload, &acknowledgement); err != nil ||
-		acknowledgement.Type != "transmit" || !acknowledgement.Allowed {
-		peer.close()
-		t.Fatalf("invalid transmit acknowledgement: %s", ackPayload)
-	}
-	return peer
-}
-
 
 func TestVoiceFrameRateLimiterAllowsShortBurstAndCapsSustainedRate(t *testing.T) {
 	peer := &sfuPeer{}

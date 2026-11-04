@@ -88,6 +88,11 @@ fn android_manifest_renders_and_unknown_tokens_still_fail() {
         }
     }
     assert!(saw_manifest);
+    assert!(saw_record_audio, "Android voice alpha must declare RECORD_AUDIO");
+    assert!(
+        saw_optional_microphone,
+        "microphone hardware must remain optional for non-voice gameplay"
+    );
     let malformed = directory.path().join("unfilled.xml");
     fs::write(&malformed, "<manifest package=\"@UNKNOWN@\" />").unwrap();
     let result = render(&malformed);

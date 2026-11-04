@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -29,6 +30,7 @@ import (
 	"github.com/hashimthearab/rust-mcbe/core/packcache"
 	"github.com/hashimthearab/rust-mcbe/core/proxy"
 	voicebridge "github.com/hashimthearab/rust-mcbe/core/voice"
+	"github.com/pion/webrtc/v4"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"golang.org/x/oauth2"
 )
@@ -464,8 +466,13 @@ func runWithResourcePackCacheFactory(
 	var voiceConfig *voicebridge.VoiceBridgeConfig
 	if api != nil {
 		if endpoint := strings.TrimSpace(os.Getenv("CINNABAR_VOICE_WSS_ENDPOINT")); endpoint != "" {
-			voiceConfig = &voicebridge.VoiceBridgeConfig{
-				Endpoint: endpoint, AdmissionSource: api, Logger: logger,
+			iceServers, iceErr := parseVoiceICEServers(os.Getenv("CINNABAR_VOICE_ICE_SERVERS"))
+			if iceErr != nil {
+				logger.Warn("voice bridge disabled; ICE configuration is invalid", "error", iceErr)
+			} else {
+				voiceConfig = &voicebridge.VoiceBridgeConfig{
+					Endpoint: endpoint, ICEServers: iceServers, AdmissionSource: api, Logger: logger,
+				}
 			}
 		}
 	}

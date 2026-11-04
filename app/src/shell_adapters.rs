@@ -14,7 +14,7 @@ use client_shell::{
 };
 use launcher::menu::view::{MicrophonePermissionStatus, MicrophoneSelectionRequest};
 #[derive(bevy::ecs::system::SystemParam)]
-pub(crate) struct MenuVoiceSettings<'w> {
+pub(crate) pub(crate) struct MenuVoiceSettings<'w> {
     audio_settings: Option<ResMut<'w, client_audio::audio::AudioSettings>>,
     voice_controller: Option<ResMut<'w, VoiceCaptureController>>,
     voice_policy: Option<ResMut<'w, VoiceInputPolicy>>,

@@ -165,7 +165,8 @@ impl VoiceRemotePlayback {
     }
 
     fn update_queue_gate(&self) {
-        let accepting = self.enabled.load(Ordering::Acquire) && !self.muted.load(Ordering::Acquire);
+        let accepting =
+            self.enabled.load(Ordering::Acquire) && !self.muted.load(Ordering::Acquire);
         for queue in self.queues.iter() {
             queue.set_accepting(accepting);
         }
@@ -226,7 +227,9 @@ impl VoiceRemotePlayback {
             .position(Option::is_none)
             .or_else(|| {
                 sources.iter().position(|source| {
-                    source.is_some_and(|state| now.duration_since(state.last_seen) >= REMOTE_SOURCE_IDLE_TIMEOUT)
+                    source.is_some_and(|state| {
+                        now.duration_since(state.last_seen) >= REMOTE_SOURCE_IDLE_TIMEOUT
+                    })
                 })
             })
             .ok_or(RemoteVoiceFrameError::TooManySources)?;
@@ -566,7 +569,10 @@ mod tests {
         let playback = VoiceRemotePlayback::default();
         playback.set_voice_session_enabled(true);
         assert_eq!(playback.ingest_frame(&test_frame(1, 1, 8_192)), Ok(()));
-        assert_eq!(playback.ingest_frame(&test_frame(1, 1, 8_192)), Err(RemoteVoiceFrameError::StaleSequence));
+        assert_eq!(
+            playback.ingest_frame(&test_frame(1, 1, 8_192)),
+            Err(RemoteVoiceFrameError::StaleSequence)
+        );
         assert_eq!(playback.ingest_frame(&test_frame(2, 1, 16_384)), Ok(()));
         assert_eq!(playback.ingest_frame(&test_frame(1, 2, 8_192)), Ok(()));
     }

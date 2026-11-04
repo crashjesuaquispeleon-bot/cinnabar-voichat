@@ -171,7 +171,7 @@ func (client *Client) acceptDownlink(channel *webrtc.DataChannel) {
 	channel.OnOpen(func() { client.markChannelOpen(voiceDownlinkLabel) })
 	channel.OnClose(func() { go client.Close() })
 	channel.OnMessage(func(message webrtc.DataChannelMessage) {
-		if message.IsString || len(message.Data) != voiceFrameBytes {
+		if message.IsString || len(message.Data) != voiceRemoteFrameBytes {
 			client.droppedFrames.Add(1)
 			return
 		}

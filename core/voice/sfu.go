@@ -16,6 +16,7 @@ import (
 
 const (
 	voiceUplinkLabel = "cinnabar-voice-uplink-v1"
+	voiceControlLabel = "cinnabar-voice-control-v1"
 	voiceDownlinkLabel = "cinnabar-voice-downlink-v1"
 	voiceSampleRate = 16000
 	voiceFrameDurationMS = 20
@@ -73,6 +74,8 @@ type sfuPeer struct {
 	closed bool
 	closeOnce sync.Once
 	uplinkAttached atomic.Bool
+	controlAttached atomic.Bool
+	transmitAllowed atomic.Bool
 	lastSequence atomic.Uint64
 	droppedFrames atomic.Uint64
 	frameTokens float64
@@ -88,6 +91,11 @@ type joinSignal struct {
 type clientSignal struct {
 	Type string `json:"type"`
 	Token string `json:"token"`
+}
+
+type peerControlSignal struct {
+	Type string `json:"type"`
+	Allowed bool `json:"allowed"`
 }
 
 type serverSignal struct {
@@ -327,12 +335,44 @@ func (s *SFU) join(
 }
 
 func (peer *sfuPeer) acceptDataChannel(channel *webrtc.DataChannel) {
-	if channel.Label() != voiceUplinkLabel || !peer.uplinkAttached.CompareAndSwap(false, true) {
+	switch channel.Label() {
+	case voiceControlLabel:
+		peer.acceptControlChannel(channel)
+	case voiceUplinkLabel:
+		peer.acceptUplinkChannel(channel)
+	default:
+		_ = channel.Close()
+	}
+}
+
+func (peer *sfuPeer) acceptControlChannel(channel *webrtc.DataChannel) {
+	if !peer.controlAttached.CompareAndSwap(false, true) {
 		_ = channel.Close()
 		return
 	}
 	channel.OnMessage(func(message webrtc.DataChannelMessage) {
-		if message.IsString || !peer.allowVoiceFrame(time.Now()) {
+		var control peerControlSignal
+		if !message.IsString || len(message.Data) > 256 || decodeOneJSON(message.Data, &control) != nil ||
+			control.Type != "transmit" {
+			peer.transmitAllowed.Store(false)
+			_ = channel.Close()
+			return
+		}
+		peer.transmitAllowed.Store(control.Allowed)
+	})
+	channel.OnClose(func() {
+		peer.transmitAllowed.Store(false)
+		go peer.close()
+	})
+}
+
+func (peer *sfuPeer) acceptUplinkChannel(channel *webrtc.DataChannel) {
+	if !peer.uplinkAttached.CompareAndSwap(false, true) {
+		_ = channel.Close()
+		return
+	}
+	channel.OnMessage(func(message webrtc.DataChannelMessage) {
+		if !peer.transmitAllowed.Load() || message.IsString || !peer.allowVoiceFrame(time.Now()) {
 			peer.droppedFrames.Add(1)
 			return
 		}

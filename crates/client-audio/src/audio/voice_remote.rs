@@ -49,7 +49,7 @@ struct RemoteSourceState {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RemoteVoiceParticipant {
     pub source_id: [u8; REMOTE_SOURCE_ID_BYTES],
-    pub speaking: bool,
+    pub receiving: bool,
     pub volume_percent: u8,
 }
 
@@ -151,7 +151,7 @@ impl VoiceRemotePlayback {
     }
 
     /// Returns recently heard participants for lightweight UI polling.
-    /// A participant is considered speaking while a packet arrived in the last 300 ms;
+    /// A source is considered active while a packet arrived in the last 300 ms;
     /// an idle source is removed from this snapshot after the five-second expiry window.
     pub fn active_participants(&self) -> Vec<RemoteVoiceParticipant> {
         let now = Instant::now();
@@ -163,7 +163,7 @@ impl VoiceRemotePlayback {
                 let age = now.duration_since(state.last_seen);
                 (age < REMOTE_SOURCE_IDLE_TIMEOUT).then_some(RemoteVoiceParticipant {
                     source_id: state.id,
-                    speaking: age <= Duration::from_millis(300),
+                    receiving: age <= Duration::from_millis(300),
                     volume_percent: state.volume_percent,
                 })
             })
@@ -691,7 +691,7 @@ mod tests {
 
         let participants = playback.active_participants();
         assert_eq!(participants.len(), 2);
-        assert!(participants.iter().all(|participant| participant.speaking));
+        assert!(participants.iter().all(|participant| participant.receiving));
         assert!(participants.iter().any(|participant| {
             participant.source_id == [7; REMOTE_SOURCE_ID_BYTES]
                 && participant.volume_percent == 100

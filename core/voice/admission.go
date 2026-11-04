@@ -29,6 +29,7 @@ var (
 	ErrAdmissionNotYetValid = errors.New("voice: admission not yet valid")
 	ErrRoomSessionMismatch = errors.New("voice: room is bound to another game session")
 	ErrRoomFull = errors.New("voice: room is full")
+	ErrParticipantNotPresent = errors.New("voice: participant is not present")
 	ErrParticipantPresent = errors.New("voice: participant already present")
 	ErrAdmissionAlreadyUsed = errors.New("voice: admission token already used")
 	ErrAdmissionNotVerified = errors.New("voice: admission was not verified")
@@ -120,8 +121,9 @@ func VerifyAdmission(token string, config VerifyConfig, now time.Time) (Admissio
 		!canonicalUUID(claims.RoomID) || !canonicalUUID(claims.SessionID) || !canonicalUUID(claims.TokenID) {
 		return Admission{}, ErrInvalidAdmission
 	}
+	maxTTLSeconds := int64(config.MaxTTL / time.Second)
 	if claims.IssuedAt <= 0 || claims.NotBefore <= 0 || claims.ExpiresAt <= claims.IssuedAt ||
-		time.Duration(claims.ExpiresAt-claims.IssuedAt)*time.Second > config.MaxTTL {
+		claims.ExpiresAt-claims.IssuedAt > maxTTLSeconds {
 		return Admission{}, ErrInvalidAdmission
 	}
 	issued, notBefore, expires := time.Unix(claims.IssuedAt, 0), time.Unix(claims.NotBefore, 0), time.Unix(claims.ExpiresAt, 0)
@@ -178,6 +180,8 @@ func canonicalUUID(value string) bool {
 
 // Participant is a safe snapshot without bearer tokens or device metadata.
 type Participant struct {
+	RoomID string
+	TokenID string
 	Subject string
 	XUID string
 	ExpiresAt time.Time
@@ -195,13 +199,14 @@ type Registry struct {
 	maxMembers int
 	rooms map[string]*roomState
 	tokenToRoom map[string]string
+	usedTokens map[string]time.Time
 }
 
 func NewRegistry(maxMembers int) (*Registry, error) {
 	if maxMembers < 1 || maxMembers > maxRoomParticipants {
 		return nil, ErrInvalidRegistryLimit
 	}
-	return &Registry{maxMembers: maxMembers, rooms: make(map[string]*roomState), tokenToRoom: make(map[string]string)}, nil
+	return &Registry{maxMembers: maxMembers, rooms: make(map[string]*roomState), tokenToRoom: make(map[string]string), usedTokens: make(map[string]time.Time)}, nil
 }
 
 // Join adds a verified admission. A room UUID cannot span multiple game-session UUIDs.
@@ -215,7 +220,7 @@ func (r *Registry) Join(a Admission, now time.Time) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.expireLocked(now)
-	if _, exists := r.tokenToRoom[a.TokenID]; exists {
+	if _, exists := r.usedTokens[a.TokenID]; exists {
 		return ErrAdmissionAlreadyUsed
 	}
 	room := r.rooms[a.RoomID]
@@ -233,6 +238,37 @@ func (r *Registry) Join(a Admission, now time.Time) error {
 	}
 	room.members[a.XUID] = a
 	r.tokenToRoom[a.TokenID] = a.RoomID
+	r.usedTokens[a.TokenID] = a.ExpiresAt
+	return nil
+}
+
+// Renew replaces an active participant's lease without replacing their media connection.
+// A renewal must be freshly signed for the same account, XUID, room and game session.
+func (r *Registry) Renew(a Admission, now time.Time) error {
+	if !a.verified {
+		return ErrAdmissionNotVerified
+	}
+	if !a.ExpiresAt.After(now) || a.TokenID == "" {
+		return ErrAdmissionExpired
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.expireLocked(now)
+	if _, exists := r.usedTokens[a.TokenID]; exists {
+		return ErrAdmissionAlreadyUsed
+	}
+	room := r.rooms[a.RoomID]
+	if room == nil || room.sessionID != a.SessionID {
+		return ErrRoomSessionMismatch
+	}
+	current, exists := room.members[a.XUID]
+	if !exists || current.Subject != a.Subject {
+		return ErrParticipantNotPresent
+	}
+	delete(r.tokenToRoom, current.TokenID)
+	room.members[a.XUID] = a
+	r.tokenToRoom[a.TokenID] = a.RoomID
+	r.usedTokens[a.TokenID] = a.ExpiresAt
 	return nil
 }
 
@@ -272,13 +308,18 @@ func (r *Registry) expireLocked(now time.Time) []Participant {
 	for roomID, room := range r.rooms {
 		for xuid, admission := range room.members {
 			if !admission.ExpiresAt.After(now) {
-				expired = append(expired, Participant{Subject: admission.Subject, XUID: xuid, ExpiresAt: admission.ExpiresAt})
+				expired = append(expired, Participant{RoomID: roomID, TokenID: admission.TokenID, Subject: admission.Subject, XUID: xuid, ExpiresAt: admission.ExpiresAt})
 				delete(room.members, xuid)
 				delete(r.tokenToRoom, admission.TokenID)
 			}
 		}
 		if len(room.members) == 0 {
 			delete(r.rooms, roomID)
+		}
+	}
+	for tokenID, expires := range r.usedTokens {
+		if !expires.After(now) {
+			delete(r.usedTokens, tokenID)
 		}
 	}
 	return expired
@@ -293,7 +334,7 @@ func (r *Registry) Participants(roomID string) []Participant {
 	}
 	out := make([]Participant, 0, len(room.members))
 	for xuid, admission := range room.members {
-		out = append(out, Participant{Subject: admission.Subject, XUID: xuid, ExpiresAt: admission.ExpiresAt})
+		out = append(out, Participant{RoomID: roomID, TokenID: admission.TokenID, Subject: admission.Subject, XUID: xuid, ExpiresAt: admission.ExpiresAt})
 	}
 	return out
 }

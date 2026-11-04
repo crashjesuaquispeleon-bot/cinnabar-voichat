@@ -39,7 +39,7 @@ export CINNABAR_VOICE_MAX_PARTICIPANTS='8'
 go run ./cmd/voice-sfu
 ```
 
-Point the native core's operator-managed `VoiceBridgeConfig.Endpoint` at `wss://<host>/v1/voice` and supply the same ICE server configuration. In the current core startup, setting `CINNABAR_VOICE_WSS_ENDPOINT` enables construction of the bridge configuration; without that endpoint the bridge remains disabled. The signaling endpoint uses TCP/TLS; ICE voice traffic uses fixed UDP `19132` (IPv4) and `19133` (IPv6). Do not put the endpoint, public key, TURN credentials, or room ID in user-controlled settings.
+Point the native core's operator-managed `VoiceBridgeConfig.Endpoint` at `wss://<host>/v1/voice` and supply the same ICE server configuration. In the current core startup, setting `CINNABAR_VOICE_WSS_ENDPOINT` and a valid `CINNABAR_VOICE_ICE_SERVERS` JSON array enables construction of the bridge configuration; if ICE configuration is missing or malformed, startup logs a warning and leaves the bridge disabled. The signaling endpoint uses TCP/TLS; ICE voice traffic uses fixed UDP `19132` (IPv4) and `19133` (IPv6). Do not put the endpoint, public key, TURN credentials, or room ID in user-controlled settings.
 
 ## Important: Bedrock port ownership
 

@@ -5,7 +5,9 @@ import android.app.NativeActivity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Rect;
+import android.net.Uri;
 import android.os.Build;
+import android.provider.Settings;
 import android.os.Bundle;
 import android.view.View;
 import android.view.WindowInsets;
@@ -52,6 +54,28 @@ public final class CinnabarActivity extends NativeActivity {
                 .setPositiveButton("Allow microphone", (dialog, which) ->
                         requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 0x434E))
                 .setNegativeButton("Not now", null)
+                .show();
+    }
+
+    /** A denial never blocks gameplay; make the OS settings route visible for a later retry. */
+    @Override public void onRequestPermissionsResult(
+            int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != 0x434E || (grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
+            return;
+        }
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Microphone permission not granted")
+                .setMessage("You can keep playing without voice chat. To use the microphone later, "
+                        + "enable Microphone in Cinnabar's app permissions, then retry the microphone "
+                        + "check in Sound settings.")
+                .setPositiveButton("Open app settings", (dialog, which) -> {
+                    Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.fromParts("package", getPackageName(), null));
+                    startActivity(intent);
+                })
+                .setNegativeButton("Continue without voice", null)
                 .show();
     }
 

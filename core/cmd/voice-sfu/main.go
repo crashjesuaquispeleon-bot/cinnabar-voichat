@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hashimthearab/rust-mcbe/core/voice"
+	"github.com/pion/ice/v4"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -30,6 +31,8 @@ const (
 	defaultAudience      = "cinnabar-voice-sfu"
 	defaultRoomLimit     = 8
 	maxRoomLimit         = 64
+	defaultVoiceUDP4Port = 19132
+	defaultVoiceUDP6Port = 19133
 	shutdownTimeout      = 10 * time.Second
 )
 
@@ -44,6 +47,10 @@ type config struct {
 	ControlToken  []byte
 	ICEServers    []webrtc.ICEServer
 	MaxParticipants int
+	UDP4Port int
+	UDP6Port int
+	UDP4BindIP net.IP
+	UDP6BindIP net.IP
 }
 
 func main() {
@@ -73,12 +80,30 @@ func loadConfig(getenv func(string) string) (config, error) {
 		Issuer:        strings.TrimSpace(getenv("CINNABAR_VOICE_ISSUER")),
 		Audience:      strings.TrimSpace(getenv("CINNABAR_VOICE_AUDIENCE")),
 		MaxParticipants: defaultRoomLimit,
+		UDP4Port: defaultVoiceUDP4Port,
+		UDP6Port: defaultVoiceUDP6Port,
 	}
 	if cfg.ListenAddress == "" {
 		cfg.ListenAddress = defaultListenAddress
 	}
 	if cfg.Audience == "" {
 		cfg.Audience = defaultAudience
+	}
+	cfg.UDP4Port, err = parseUDPPort(getenv("CINNABAR_VOICE_UDP4_PORT"), defaultVoiceUDP4Port)
+	if err != nil {
+		return config{}, fmt.Errorf("voice SFU: invalid IPv4 UDP port: %w", err)
+	}
+	cfg.UDP6Port, err = parseUDPPort(getenv("CINNABAR_VOICE_UDP6_PORT"), defaultVoiceUDP6Port)
+	if err != nil {
+		return config{}, fmt.Errorf("voice SFU: invalid IPv6 UDP port: %w", err)
+	}
+	cfg.UDP4BindIP, err = parseUDPBindIP(getenv("CINNABAR_VOICE_UDP4_BIND_IP"), false)
+	if err != nil {
+		return config{}, fmt.Errorf("voice SFU: invalid IPv4 bind IP: %w", err)
+	}
+	cfg.UDP6BindIP, err = parseUDPBindIP(getenv("CINNABAR_VOICE_UDP6_BIND_IP"), true)
+	if err != nil {
+		return config{}, fmt.Errorf("voice SFU: invalid IPv6 bind IP: %w", err)
 	}
 	if _, _, err := net.SplitHostPort(cfg.ListenAddress); err != nil {
 		return config{}, fmt.Errorf("voice SFU: invalid listen address: %w", err)
@@ -146,6 +171,86 @@ func loadConfig(getenv func(string) string) (config, error) {
 		}
 	}
 	return cfg, nil
+}
+
+func parseUDPPort(raw string, fallback int) (int, error) {
+	if strings.TrimSpace(raw) == "" {
+		return fallback, nil
+	}
+	port, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || port < 1 || port > 65535 {
+		return 0, errors.New("port must be an integer from 1 to 65535")
+	}
+	return port, nil
+}
+
+func parseUDPBindIP(raw string, ipv6 bool) (net.IP, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+	ip := net.ParseIP(raw)
+	if ip == nil {
+		return nil, errors.New("expected a literal IP address")
+	}
+	if ipv6 {
+		if ip.To4() != nil || ip.To16() == nil {
+			return nil, errors.New("expected an IPv6 address")
+		}
+		if ip.IsLinkLocalUnicast() {
+			return nil, errors.New("link-local IPv6 addresses require a scope and are not supported")
+		}
+	} else if ip.To4() == nil {
+		return nil, errors.New("expected an IPv4 address")
+	}
+	if ip.IsMulticast() || isUnspecifiedIP(ip) {
+		return nil, errors.New("bind IP must be a unicast interface address")
+	}
+	return append(net.IP(nil), ip...), nil
+}
+
+func isUnspecifiedIP(ip net.IP) bool {
+	for _, value := range ip {
+		if value != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// newVoiceUDPMux reserves the fixed IPv4 and IPv6 ICE sockets before any
+// PeerConnection is created. Optional bind IPs keep the voice sockets off
+// interfaces already owned by a Bedrock server on the same host.
+func newVoiceUDPMux(cfg config) (ice.UDPMux, error) {
+	udp4Options := []ice.UDPMuxFromPortOption{
+		ice.UDPMuxFromPortWithNetworks(ice.NetworkTypeUDP4),
+	}
+	if cfg.UDP4BindIP != nil {
+		bindIP := append(net.IP(nil), cfg.UDP4BindIP...)
+		udp4Options = append(udp4Options, ice.UDPMuxFromPortWithIPFilter(
+			func(candidate net.IP) bool { return candidate.Equal(bindIP) },
+		))
+	}
+	udp4, err := ice.NewMultiUDPMuxFromPort(cfg.UDP4Port, udp4Options...)
+	if err != nil {
+		return nil, fmt.Errorf("bind IPv4 voice UDP %d: %w", cfg.UDP4Port, err)
+	}
+
+	udp6Options := []ice.UDPMuxFromPortOption{
+		ice.UDPMuxFromPortWithNetworks(ice.NetworkTypeUDP6),
+	}
+	if cfg.UDP6BindIP != nil {
+		bindIP := append(net.IP(nil), cfg.UDP6BindIP...)
+		udp6Options = append(udp6Options, ice.UDPMuxFromPortWithIPFilter(
+			func(candidate net.IP) bool { return candidate.Equal(bindIP) },
+		))
+	}
+	udp6, err := ice.NewMultiUDPMuxFromPort(cfg.UDP6Port, udp6Options...)
+	if err != nil {
+		_ = udp4.Close()
+		return nil, fmt.Errorf("bind IPv6 voice UDP %d: %w", cfg.UDP6Port, err)
+	}
+	return ice.NewMultiUDPMuxDefault(udp4, udp6), nil
 }
 
 func decodePublicKey(encoded string) (ed25519.PublicKey, error) {
@@ -235,14 +340,20 @@ func admissionRevokeHandler(token []byte, revoke func(roomID, tokenID string) bo
 }
 
 func run(ctx context.Context, cfg config) error {
+	udpMux, err := newVoiceUDPMux(cfg)
+	if err != nil {
+		return fmt.Errorf("voice SFU: initialize fixed UDP listeners: %w", err)
+	}
 	sfu, err := voice.NewSFU(voice.SFUConfig{
 		Admission: voice.VerifyConfig{
 			Issuer: cfg.Issuer, Audience: cfg.Audience, PublicKey: cfg.PublicKey,
 		},
 		ICEServers: cfg.ICEServers,
 		MaxParticipants: cfg.MaxParticipants,
+		UDPMux: udpMux,
 	})
 	if err != nil {
+		_ = udpMux.Close()
 		return fmt.Errorf("voice SFU: initialize media router: %w", err)
 	}
 	defer sfu.Close()
@@ -282,6 +393,8 @@ func run(ctx context.Context, cfg config) error {
 		"issuer", cfg.Issuer,
 		"audience", cfg.Audience,
 		"max_room_participants", cfg.MaxParticipants,
+		"udp4_port", cfg.UDP4Port,
+		"udp6_port", cfg.UDP6Port,
 		"ice_server_count", len(cfg.ICEServers),
 	)
 

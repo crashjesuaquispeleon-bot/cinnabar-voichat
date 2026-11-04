@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - feature/voice-chat-foundation
+      - feature/voice-chat-p2p-alpha
     paths:
       - ".github/workflows/voice-chat-alpha.yml"
       - "Cargo.toml"

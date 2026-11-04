@@ -55,6 +55,8 @@ func TestSFURelaysOnlyBetweenPeersWithTheSameSignedRoom(t *testing.T) {
 	firstClaims.RoomID, firstClaims.SessionID, firstClaims.XUID = roomID, sessionID, "10001"
 	secondClaims := claimsAt(now)
 	secondClaims.RoomID, secondClaims.SessionID, secondClaims.XUID = roomID, sessionID, "10002"
+	isolatedClaims := claimsAt(now)
+	isolatedClaims.XUID = "10003"
 
 	sfu, err := NewSFU(SFUConfig{Admission: verify, MaxParticipants: 4})
 	if err != nil {
@@ -69,6 +71,8 @@ func TestSFURelaysOnlyBetweenPeersWithTheSameSignedRoom(t *testing.T) {
 	defer first.close()
 	second := connectTestVoicePeer(t, endpoint, signedToken(t, private, secondClaims))
 	defer second.close()
+	isolated := connectTestVoicePeer(t, endpoint, signedToken(t, private, isolatedClaims))
+	defer isolated.close()
 
 	select {
 	case <-first.downlinkOpen:
@@ -79,6 +83,11 @@ func TestSFURelaysOnlyBetweenPeersWithTheSameSignedRoom(t *testing.T) {
 	case <-second.downlinkOpen:
 	case <-time.After(10 * time.Second):
 		t.Fatal("second peer downlink did not open")
+	}
+	select {
+	case <-isolated.downlinkOpen:
+	case <-time.After(10 * time.Second):
+		t.Fatal("isolated peer downlink did not open")
 	}
 
 	frame := make([]byte, voiceFrameBytes)
@@ -100,6 +109,11 @@ func TestSFURelaysOnlyBetweenPeersWithTheSameSignedRoom(t *testing.T) {
 	select {
 	case <-first.frames:
 		t.Fatal("SFU looped the sender's voice frame back to its origin")
+	case <-time.After(150 * time.Millisecond):
+	}
+	select {
+	case frame := <-isolated.frames:
+		t.Fatalf("SFU leaked a room frame into another session: %d bytes", len(frame))
 	case <-time.After(150 * time.Millisecond):
 	}
 }
@@ -213,4 +227,21 @@ func connectTestVoicePeer(t *testing.T, endpoint, token string) *testVoicePeer {
 		t.Fatalf("set SFU answer: %v", err)
 	}
 	return peer
+}
+
+
+func TestVoiceFrameRateLimiterAllowsShortBurstAndCapsSustainedRate(t *testing.T) {
+	peer := &sfuPeer{}
+	now := time.Unix(1_800_000_000, 0)
+	for i := 0; i < 10; i++ {
+		if !peer.allowVoiceFrame(now) {
+			t.Fatalf("frame %d unexpectedly rejected within burst", i+1)
+		}
+	}
+	if peer.allowVoiceFrame(now) {
+		t.Fatal("frame above burst allowance accepted")
+	}
+	if !peer.allowVoiceFrame(now.Add(20 * time.Millisecond)) {
+		t.Fatal("one replenished frame was not admitted after 20 ms")
+	}
 }

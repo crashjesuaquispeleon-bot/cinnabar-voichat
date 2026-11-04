@@ -27,7 +27,7 @@ const (
 	voiceSourceIDBytes = 16
 	voiceRemoteFrameBytes = voiceSourceIDBytes + voiceFrameBytes
 	maxBufferedVoiceBytes = voiceFrameBytes * 5
-	maxRemoteVoiceSources = 64
+	maxRemoteVoiceSources = maxRoomParticipants - 1
 	maxBufferedRemoteFramesPerSource = 5
 	maxSignalMessageBytes = 64 << 10
 	signalReadTimeout = 15 * time.Second

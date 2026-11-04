@@ -44,7 +44,13 @@ type SFU struct {
 	peerConfig webrtc.Configuration
 	registry *Registry
 
+	ctx context.Context
+	cancel context.CancelFunc
+	reaperDone chan struct{}
+	closeOnce sync.Once
+
 	mu sync.RWMutex
+	closed bool
 	rooms map[string]*sfuRoom
 }
 
@@ -69,6 +75,8 @@ type sfuPeer struct {
 	uplinkAttached atomic.Bool
 	lastSequence atomic.Uint64
 	droppedFrames atomic.Uint64
+	frameTokens float64
+	frameRefillAt time.Time
 }
 
 type joinSignal struct {
@@ -110,12 +118,18 @@ func NewSFU(config SFUConfig) (*SFU, error) {
 		return nil, err
 	}
 	config.Admission.PublicKey = append([]byte(nil), config.Admission.PublicKey...)
-	return &SFU{
+	ctx, cancel := context.WithCancel(context.Background())
+	sfu := &SFU{
 		admission: config.Admission,
 		peerConfig: webrtc.Configuration{ICEServers: append([]webrtc.ICEServer(nil), config.ICEServers...)},
 		registry: registry,
+		ctx: ctx,
+		cancel: cancel,
+		reaperDone: make(chan struct{}),
 		rooms: make(map[string]*sfuRoom),
-	}, nil
+	}
+	go sfu.expireLoop()
+	return sfu, nil
 }
 
 // ServeHTTP handles one WebSocket signaling connection. Mount this handler behind HTTPS
@@ -224,6 +238,12 @@ func (s *SFU) join(
 	if err != nil {
 		return nil, nil, err
 	}
+	s.mu.RLock()
+	closed := s.closed
+	s.mu.RUnlock()
+	if closed {
+		return nil, nil, errors.New("voice: SFU is closed")
+	}
 	if err := s.registry.Join(admission, time.Now()); err != nil {
 		return nil, nil, err
 	}
@@ -254,6 +274,11 @@ func (s *SFU) join(
 	})
 
 	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		peer.close()
+		return nil, nil, errors.New("voice: SFU is closed")
+	}
 	room := s.rooms[admission.RoomID]
 	if room == nil {
 		room = &sfuRoom{sessionID: admission.SessionID, peers: make(map[string]*sfuPeer)}
@@ -305,7 +330,7 @@ func (peer *sfuPeer) acceptDataChannel(channel *webrtc.DataChannel) {
 		return
 	}
 	channel.OnMessage(func(message webrtc.DataChannelMessage) {
-		if message.IsString {
+		if message.IsString || !peer.allowVoiceFrame(time.Now()) {
 			peer.droppedFrames.Add(1)
 			return
 		}
@@ -340,9 +365,13 @@ func (peer *sfuPeer) acceptSequence(sequence uint64) bool {
 }
 
 func (s *SFU) forward(sender *sfuPeer, frame []byte) {
+	admission, active := sender.activeAdmission(time.Now())
+	if !active {
+		return
+	}
 	s.mu.RLock()
 	room := s.rooms[sender.roomID]
-	if room == nil || room.sessionID != sender.currentAdmission().SessionID {
+	if room == nil || room.peers[sender.xuid] != sender || room.sessionID != admission.SessionID {
 		s.mu.RUnlock()
 		return
 	}
@@ -386,6 +415,42 @@ func (peer *sfuPeer) currentAdmission() Admission {
 	peer.mu.Lock()
 	defer peer.mu.Unlock()
 	return peer.admission
+}
+
+func (peer *sfuPeer) activeAdmission(now time.Time) (Admission, bool) {
+	peer.mu.Lock()
+	defer peer.mu.Unlock()
+	if peer.closed || !peer.admission.ExpiresAt.After(now) {
+		return Admission{}, false
+	}
+	return peer.admission, true
+}
+
+// allowVoiceFrame caps one sender at the expected 50 frames/second with a short burst
+// allowance. This bounds callback work and prevents a client from flooding the room.
+func (peer *sfuPeer) allowVoiceFrame(now time.Time) bool {
+	const framesPerSecond = 50.0
+	const burstFrames = 10.0
+	peer.mu.Lock()
+	defer peer.mu.Unlock()
+	if peer.closed {
+		return false
+	}
+	if peer.frameRefillAt.IsZero() {
+		peer.frameRefillAt = now
+		peer.frameTokens = burstFrames
+	} else {
+		elapsed := now.Sub(peer.frameRefillAt).Seconds()
+		if elapsed > 0 {
+			peer.frameTokens = min(burstFrames, peer.frameTokens+elapsed*framesPerSecond)
+			peer.frameRefillAt = now
+		}
+	}
+	if peer.frameTokens < 1 {
+		return false
+	}
+	peer.frameTokens--
+	return true
 }
 
 func (peer *sfuPeer) done() <-chan struct{} {
@@ -455,8 +520,29 @@ func (s *SFU) CloseSession(roomID, sessionID string) int {
 	return len(peers)
 }
 
+func (s *SFU) expireLoop() {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	defer close(s.reaperDone)
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case now := <-ticker.C:
+			s.SweepExpired(now)
+		}
+	}
+}
+
 // Close tears down every active PeerConnection and revokes its current admission.
 func (s *SFU) Close() {
+	s.closeOnce.Do(func() {
+		s.mu.Lock()
+		s.closed = true
+		s.mu.Unlock()
+		s.cancel()
+		<-s.reaperDone
+	})
 	s.mu.RLock()
 	var peers []*sfuPeer
 	for _, room := range s.rooms {

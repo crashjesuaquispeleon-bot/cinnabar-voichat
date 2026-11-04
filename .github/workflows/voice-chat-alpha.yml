@@ -7,6 +7,7 @@ on:
     branches:
       - feature/voice-chat-foundation
       - feature/voice-chat-p2p-alpha
+      - feature/voice-chat-p2p-foundation-synced
     paths:
       - ".github/workflows/voice-chat-alpha.yml"
       - "Cargo.toml"

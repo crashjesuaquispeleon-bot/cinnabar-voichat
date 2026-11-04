@@ -42,7 +42,6 @@ type Client struct {
 	pc *webrtc.PeerConnection
 	signal *websocket.Conn
 	uplink *webrtc.DataChannel
-	control *webrtc.DataChannel
 
 	incoming chan []byte
 	done chan struct{}
@@ -51,7 +50,6 @@ type Client struct {
 	mu sync.Mutex
 	closed bool
 	uplinkOpen bool
-	controlOpen bool
 	downlinkOpen bool
 	readySignaled bool
 	downlinkAttached atomic.Bool
@@ -95,19 +93,9 @@ func DialClient(ctx context.Context, config ClientConfig) (*Client, error) {
 	if err != nil {
 		return fail(err)
 	}
-	control, err := pc.CreateDataChannel(voiceControlLabel, nil)
-	if err != nil {
-		return fail(err)
-	}
-	client.uplink, client.control = uplink, control
-
+	client.uplink = uplink
 	uplink.OnOpen(func() { client.markChannelOpen(voiceUplinkLabel) })
-	control.OnOpen(func() { client.markChannelOpen(voiceControlLabel) })
 	uplink.OnClose(func() { go client.Close() })
-	control.OnClose(func() {
-		client.transmitAllowed.Store(false)
-		go client.Close()
-	})
 	pc.OnDataChannel(client.acceptDownlink)
 	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
 		if state == webrtc.PeerConnectionStateFailed || state == webrtc.PeerConnectionStateClosed {
@@ -207,12 +195,10 @@ func (client *Client) markChannelOpen(label string) {
 	switch label {
 	case voiceUplinkLabel:
 		client.uplinkOpen = true
-	case voiceControlLabel:
-		client.controlOpen = true
 	case voiceDownlinkLabel:
 		client.downlinkOpen = true
 	}
-	if client.uplinkOpen && client.controlOpen && client.downlinkOpen && !client.readySignaled {
+	if client.uplinkOpen && client.downlinkOpen && !client.readySignaled {
 		close(client.ready)
 		client.readySignaled = true
 	}
@@ -230,12 +216,12 @@ func (client *Client) WaitReady(ctx context.Context) error {
 	}
 }
 
-// SetTransmitAllowed updates the local gate immediately and sends the same state over the
-// reliable control channel. If the control message cannot be delivered, the peer is closed
-// rather than leaving the SFU's transmit gate open.
-func (client *Client) SetTransmitAllowed(allowed bool) error {
-	client.controlMu.Lock()
-	defer client.controlMu.Unlock()
+// SetTransmitAllowed updates the local gate immediately on release and waits for
+// the SFU's reliable signaling acknowledgement before opening the local gate on press.
+// If acknowledgement fails, the connection is closed so the server cannot remain open.
+func (client *Client) SetTransmitAllowed(ctx context.Context, allowed bool) error {
+	client.signalMu.Lock()
+	defer client.signalMu.Unlock()
 
 	select {
 	case <-client.done:
@@ -245,18 +231,31 @@ func (client *Client) SetTransmitAllowed(allowed bool) error {
 	if !allowed {
 		client.transmitAllowed.Store(false)
 	}
-	if client.control == nil || client.control.ReadyState() != webrtc.DataChannelStateOpen {
+	if client.signal == nil {
 		client.Close()
 		return ErrVoiceClientClosed
 	}
-	payload, err := json.Marshal(peerControlSignal{Type: "transmit", Allowed: allowed})
+	payload, err := json.Marshal(clientSignal{Type: "transmit", Allowed: allowed})
 	if err != nil {
 		client.Close()
 		return err
 	}
-	if err := client.control.SendText(string(payload)); err != nil {
+	if err := client.signal.Write(ctx, websocket.MessageText, payload); err != nil {
 		client.Close()
 		return err
+	}
+	ackCtx, cancel := context.WithTimeout(ctx, signalReadTimeout)
+	defer cancel()
+	kind, response, err := client.signal.Read(ackCtx)
+	if err != nil || kind != websocket.MessageText {
+		client.Close()
+		return ErrVoiceClientClosed
+	}
+	var acknowledgement serverSignal
+	if err := decodeOneJSON(response, &acknowledgement); err != nil ||
+		acknowledgement.Type != "transmit" || acknowledgement.Allowed != allowed {
+		client.Close()
+		return ErrInvalidAdmission
 	}
 	if allowed {
 		client.transmitAllowed.Store(true)

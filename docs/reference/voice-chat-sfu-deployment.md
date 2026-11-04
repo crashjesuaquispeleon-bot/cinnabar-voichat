@@ -12,7 +12,7 @@ La opción recomendada para intentar una prueba de bajo costo es una VM OCI Ampe
 - Disco: dentro del almacenamiento Always Free.
 - Región: la región principal de la cuenta. Always Free no está disponible en cualquier región secundaria.
 
-La creación depende de capacidad de la región; un error de capacidad agotada no significa que la cuenta esté mal configurada. Oracle también puede recuperar instancias Always Free que cumplan sus criterios de inactividad durante siete días. Por ello sirve para una prueba Alpha, no debe tratarse como SLA ni como infraestructura de producción. Consulta los límites y reglas vigentes directamente en la consola de Oracle antes de crear la instancia.
+La creación depende de capacidad en la región principal; un error de capacidad agotada no significa que la cuenta esté mal configurada. Oracle también puede recuperar instancias Always Free que cumplan sus criterios de inactividad durante siete días. Por ello sirve para una prueba Alpha, no debe tratarse como SLA ni como infraestructura de producción. La documentación técnica de Always Free indica un total de 2 OCPU y 12 GB para A1, sujeto a capacidad y cuota de cuenta.\n\n**No puedo garantizar que el despliegue completo cueste S/ 0.** Antes de crear recursos comprueba en la consola el costo de la IPv4 pública, red, almacenamiento y cualquier otro elemento; continúa solo si cada recurso aparece como Always Free o el estimador muestra el costo que aceptas. La página de registro de Oracle indica que a la mayoría de usuarios se les pide teléfono y tarjeta para verificar la cuenta, y que no se cobra la tarjeta a menos que actualicen a una cuenta de pago.
 
 Si no hay capacidad A1 en la región principal, no cambies a una máquina de pago sin revisar el costo. Una alternativa es un VPS económico con IPv4 e IPv6 públicas, pero ya no sería gratuito.
 
@@ -125,7 +125,7 @@ La URL STUN del ejemplo es un marcador, no un servidor real. Sustitúyela por un
 
 ## Servicio systemd
 
-Crea el usuario de servicio y concede solo lectura del certificado al grupo de certificados del sistema:
+Crea el usuario de servicio y concede solo lectura de las copias TLS al grupo dedicado del servicio:
 
 ~~~sh
 sudo useradd --system --no-create-home --shell /usr/sbin/nologin cinnabar-voice
@@ -195,10 +195,13 @@ sudo journalctl -u cinnabar-voice-sfu -n 100 --no-pager
 Para UFW, si está habilitado, replica las reglas permitidas en OCI:
 
 ~~~sh
+sudo ufw allow 80/tcp
 sudo ufw allow 8443/tcp
 sudo ufw allow 19132/udp
 sudo ufw allow 19133/udp
-# SSH debe quedar limitado a tu IP pública, no abierto a todos.
+# Antes de habilitar UFW, permite SSH solo desde tu IP administrativa:
+# sudo ufw allow from TU_IP_PUBLICA to any port 22 proto tcp
+# No abras SSH a todo Internet.
 ~~~
 
 ## Desplegar el broker API

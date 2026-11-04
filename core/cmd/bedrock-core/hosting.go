@@ -172,3 +172,10 @@ func (h *friendHosting) closeHost(host hostedFriends, xbox io.Closer) {
 	}
 	_ = xbox.Close()
 }
+
+// shouldRunFriendHosting keeps the broker-owned FriendHost room in the account
+// core. Authenticated game cores may also connect to the API for P2P signaling,
+// but must not open a competing room for the same XUID.
+func shouldRunFriendHosting(upstream string, hasAccount, hasLocalWorlds bool) bool {
+	return upstream == "" && hasAccount && hasLocalWorlds
+}

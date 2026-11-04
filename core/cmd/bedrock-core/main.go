@@ -29,6 +29,7 @@ import (
 	"github.com/hashimthearab/rust-mcbe/core/packcache"
 	"github.com/hashimthearab/rust-mcbe/core/proxy"
 	voicebridge "github.com/hashimthearab/rust-mcbe/core/voice"
+	"github.com/pion/webrtc/v4"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"golang.org/x/oauth2"
 )
@@ -463,15 +464,36 @@ func runWithResourcePackCacheFactory(
 	}
 	var voiceConfig *voicebridge.VoiceBridgeConfig
 	if api != nil {
-		if endpoint := strings.TrimSpace(os.Getenv("CINNABAR_VOICE_WSS_ENDPOINT")); endpoint != "" {
-			iceServers, iceErr := parseVoiceICEServers(os.Getenv("CINNABAR_VOICE_ICE_SERVERS"))
-			if iceErr != nil {
-				logger.Warn("voice bridge disabled; ICE configuration is invalid", "error", iceErr)
+		transport := strings.ToLower(strings.TrimSpace(os.Getenv("CINNABAR_VOICE_TRANSPORT")))
+		if transport == "" { transport = "p2p" }
+		rawICEServers := strings.TrimSpace(os.Getenv("CINNABAR_VOICE_ICE_SERVERS"))
+		var iceServers []webrtc.ICEServer
+		var iceErr error
+		if rawICEServers == "" && transport == "p2p" {
+			// Public STUN is a free best-effort discovery service; it is not a TURN relay
+			// and cannot guarantee connectivity through restrictive or symmetric NATs.
+			iceServers = []webrtc.ICEServer{{URLs: []string{"stun:stun.l.google.com:19302"}}}
+		} else {
+			iceServers, iceErr = parseVoiceICEServers(rawICEServers)
+		}
+		if iceErr != nil {
+			logger.Warn("voice bridge disabled; ICE configuration is invalid", "error", iceErr)
+		} else if transport == "p2p" {
+			voiceConfig = &voicebridge.VoiceBridgeConfig{
+				Transport: "p2p", P2PSignaler: api, ICEServers: iceServers, Logger: logger,
+			}
+		} else if transport == "sfu" {
+			endpoint := strings.TrimSpace(os.Getenv("CINNABAR_VOICE_WSS_ENDPOINT"))
+			if endpoint == "" {
+				logger.Warn("SFU voice bridge disabled; CINNABAR_VOICE_WSS_ENDPOINT is missing")
 			} else {
 				voiceConfig = &voicebridge.VoiceBridgeConfig{
-					Endpoint: endpoint, ICEServers: iceServers, AdmissionSource: api, Logger: logger,
+					Transport: "sfu", Endpoint: endpoint, ICEServers: iceServers,
+					AdmissionSource: api, Logger: logger,
 				}
 			}
+		} else {
+			logger.Warn("voice bridge disabled; CINNABAR_VOICE_TRANSPORT must be p2p or sfu")
 		}
 	}
 	serveErr := serve(ctx, proxy.Config{

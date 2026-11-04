@@ -18,7 +18,7 @@ Stage 2 now has a substantial code-level media path, but it is not enabled in th
 
 Implemented:
 - Go core/voice verifies broker-signed Ed25519 admission tokens and maintains a room registry with one-use token IDs, expiry/renewal, participant caps, revocation, and room-to-session binding.
-- The Pion WebRTC SFU performs signaling and bounded, unordered DataChannel fan-out only between peers whose signed admissions resolve to the same room and authoritative session claim. It enforces the server-side transmit gate and rejects malformed, duplicate, stale, or over-rate frames. The standalone SFU admin API now also supports immediate broker-only revocation of one participant's current admission jti, in addition to closing an entire room/session.
+- The Pion WebRTC SFU performs signaling and bounded, unordered DataChannel fan-out only between peers whose signed admissions resolve to the same room and authoritative session claim. It enforces the server-side transmit gate and rejects malformed, duplicate, stale, or over-rate frames. Each receiver's outbound buffer budget scales with room fan-in, up to 64 source streams and five 20 ms packets per source, instead of sharing a five-packet budget across the entire room. The standalone SFU admin API supports immediate broker-only revocation of one participant's current admission jti, in addition to closing an entire room/session.
 - core/cmd/voice-sfu is an independently deployable TLS service. It requires the broker public key and explicit operator-managed ICE/TURN configuration; it does not hold or generate the signing private key.
 - The native Rust app has a separate local IPC worker. It converts captured 48 kHz frames to the current 16 kHz PCM16 wire format, sends only after the Go bridge acknowledges the transmit gate, receives remote frames, and attaches them to the existing client audio mixer.
 - The bridge closes and requests fresh admission when the local WorldClock session generation or WorldStream actor session ID changes. Those values are local teardown discriminators only; they are never sent as proof of identity or partida membership.
@@ -26,7 +26,7 @@ Implemented:
 
 Not yet available in a live installation: the trusted Cinnabar broker/token issuer and a general authoritative partida-membership adapter are not present in this repository. The regular bedrock-core startup does not yet inject a production VoiceBridgeConfig, and no WSS SFU/TURN endpoint or broker public key is deployed/configured. Therefore the local app bridge safely remains inactive and two players still cannot talk in an ordinary running Cinnabar build.
 
-The current media profile is uncompressed PCM over WebRTC DataChannels for initial two-client validation. Opus/RTP, a jitter buffer, speaking indicators, per-player receive volume, participant UI, physical-device tests, and Windows/macOS/Linux qualification remain outstanding. The microphone permission indicator remains best-effort OS error classification, not a universal permission API.
+The current media profile is uncompressed PCM over WebRTC DataChannels for initial multi-speaker validation. Opus/RTP and adaptive jitter buffering remain outstanding. The native client exposes recent media activity and independent per-speaker receive volume, but connecting those controls to the in-game participant UI, physical-device tests, and Windows/macOS/Linux qualification remain outstanding. The media-activity signal is not voice-activity detection. The microphone permission indicator remains best-effort OS error classification, not a universal permission API.
 
 ## Repository facts confirmed during initial inspection
 
@@ -129,7 +129,7 @@ References:
 - [x] Add Go two-peer SFU tests and a local IPC two-peer integration test (CI validation pending).
 - [ ] Implement/deploy the trusted broker issuer that derives XUID from the authenticated Cinnabar account and the partida UUID from an authoritative server-side adapter.
 - [ ] Inject the real VoiceAdmissionSource and deployed WSS/ICE/TURN settings into the production bedrock-core configuration. Until then, the IPC voice endpoint remains disabled by default.
-- [x] Give every downlink stream a random server-generated source ID; validate sequence numbers per source and mix up to the SFU's 64-participant limit concurrently, with bounded per-speaker queues and a two-frame startup prebuffer.
+- [x] Give every downlink stream a random server-generated source ID; validate sequence numbers per source and mix up to the SFU's 64-participant limit concurrently, with bounded per-speaker queues, a two-frame startup prebuffer and a fan-in-scaled SFU downlink budget of up to five queued frames per source.
 - [x] Expose an ephemeral-source snapshot of recent media activity (300 ms packet freshness) and independent 0–200% per-speaker receive volume, combined with the master receive-volume setting. This reports active media frames, not voice-activity detection; the source API does not expose XUID or account identity.
 - [ ] Connect participant snapshots and per-speaker volume controls to the in-game UI.
 - [ ] Add an adaptive jitter buffer and migrate the media plane to Opus/RTP.

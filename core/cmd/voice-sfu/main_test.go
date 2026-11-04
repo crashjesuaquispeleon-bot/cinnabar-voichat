@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -31,7 +32,8 @@ func TestLoadConfigUsesPinnedBrokerKeyAndExplicitICE(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.ListenAddress != "127.0.0.1:9443" || cfg.Audience != defaultAudience {
+	if cfg.ListenAddress != "127.0.0.1:9443" || cfg.Audience != defaultAudience ||
+		cfg.UDP4Port != defaultVoiceUDP4Port || cfg.UDP6Port != defaultVoiceUDP6Port {
 		t.Fatalf("unexpected listener/audience config: %#v", cfg)
 	}
 	if len(cfg.PublicKey) != ed25519.PublicKeySize || len(cfg.ControlToken) != 32 ||
@@ -73,6 +75,49 @@ func TestLoadConfigRejectsMissingTLSIssuerKeyAndICE(t *testing.T) {
 			test.edit(values)
 			if _, err := loadConfig(func(key string) string { return values[key] }); err == nil {
 				t.Fatal("invalid voice SFU configuration was accepted")
+			}
+		})
+	}
+}
+
+
+func TestLoadConfigAcceptsFixedVoicePortsAndSpecificBindAddresses(t *testing.T) {
+	values := validVoiceSFUEnvironment()
+	values["CINNABAR_VOICE_UDP4_PORT"] = "20000"
+	values["CINNABAR_VOICE_UDP6_PORT"] = "20001"
+	values["CINNABAR_VOICE_UDP4_BIND_IP"] = "192.0.2.10"
+	values["CINNABAR_VOICE_UDP6_BIND_IP"] = "2001:db8::10"
+
+	cfg, err := loadConfig(func(key string) string { return values[key] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.UDP4Port != 20000 || cfg.UDP6Port != 20001 ||
+		!cfg.UDP4BindIP.Equal(net.ParseIP("192.0.2.10")) ||
+		!cfg.UDP6BindIP.Equal(net.ParseIP("2001:db8::10")) {
+		t.Fatalf("unexpected fixed UDP configuration: %#v", cfg)
+	}
+}
+
+func TestLoadConfigRejectsInvalidVoicePortsAndBindAddresses(t *testing.T) {
+	cases := []struct {
+		name  string
+		key   string
+		value string
+	}{
+		{name: "zero IPv4 port", key: "CINNABAR_VOICE_UDP4_PORT", value: "0"},
+		{name: "too large IPv6 port", key: "CINNABAR_VOICE_UDP6_PORT", value: "65536"},
+		{name: "nonnumeric IPv4 port", key: "CINNABAR_VOICE_UDP4_PORT", value: "bedrock"},
+		{name: "IPv6 address in IPv4 bind", key: "CINNABAR_VOICE_UDP4_BIND_IP", value: "2001:db8::1"},
+		{name: "IPv4 address in IPv6 bind", key: "CINNABAR_VOICE_UDP6_BIND_IP", value: "192.0.2.1"},
+		{name: "wildcard IPv4 bind", key: "CINNABAR_VOICE_UDP4_BIND_IP", value: "0.0.0.0"},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			values := validVoiceSFUEnvironment()
+			values[test.key] = test.value
+			if _, err := loadConfig(func(key string) string { return values[key] }); err == nil {
+				t.Fatal("invalid fixed UDP configuration was accepted")
 			}
 		})
 	}

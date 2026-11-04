@@ -59,7 +59,8 @@ type sfuPeer struct {
 	downlink *webrtc.DataChannel
 	roomID string
 	xuid string
-	signalClose func()
+	signalClose func() error
+	pcClosed chan struct{}
 
 	mu sync.Mutex
 	admission Admission
@@ -233,7 +234,7 @@ func (s *SFU) join(
 	}
 	peer := &sfuPeer{
 		sfu: s, pc: pc, roomID: admission.RoomID, xuid: admission.XUID,
-		admission: admission, signalClose: closeSignal,
+		admission: admission, signalClose: closeSignal, pcClosed: make(chan struct{}),
 	}
 	ordered := false
 	maxRetransmits := uint16(0)

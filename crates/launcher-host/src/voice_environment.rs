@@ -143,7 +143,11 @@ mod tests {
                 Some("wss://voice.example.test/v1/voice"),
                 Some(value),
             );
-            assert_eq!(configured_value(&command, ICE_SERVERS), None, "accepted {value}");
+            assert_eq!(
+                configured_value(&command, ICE_SERVERS),
+                None,
+                "accepted {value}"
+            );
         }
     }
 

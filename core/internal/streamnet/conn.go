@@ -22,13 +22,14 @@ var (
 	// ErrInvalidFrameLength is returned for an empty local transport frame.
 	ErrInvalidFrameLength = errors.New("streamnet: frame length must be positive")
 	// ErrFrameTooLarge is returned when a local transport frame exceeds MaxFrameLen.
-	ErrFrameTooLarge = errors.New("streamnet: frame exceeds 64 MiB")
+	ErrFrameTooLarge = errors.New("streamnet: frame exceeds configured maximum")
 )
 
 // FramedConn wraps a net.Conn with an unsigned 32-bit big-endian length prefix.
 // Each Write is one complete frame and ReadPacket reads one complete frame.
 type FramedConn struct {
 	net.Conn
+	maximum   uint64
 	writeMu   sync.Mutex
 	closeOnce sync.Once
 	closeErr  error
@@ -51,7 +52,15 @@ type FramePayloadReader interface {
 
 // NewFramedConn wraps conn in the local bridge framing contract.
 func NewFramedConn(conn net.Conn) *FramedConn {
-	return &FramedConn{Conn: conn}
+	return &FramedConn{Conn: conn, maximum: MaxFrameLen}
+}
+
+// NewFramedConnWithMax wraps conn with an endpoint-specific payload limit.
+func NewFramedConnWithMax(conn net.Conn, maximum uint64) *FramedConn {
+	if maximum == 0 || maximum > MaxFrameLen {
+		maximum = MaxFrameLen
+	}
+	return &FramedConn{Conn: conn, maximum: maximum}
 }
 
 // PeerDone reads the next frame ahead and returns a channel closed if that read ends the
@@ -103,7 +112,7 @@ func (c *FramedConn) readFrame() ([]byte, error) {
 		return nil, fmt.Errorf("streamnet: read frame header: %w", classifyTerminalError(err))
 	}
 	length := binary.BigEndian.Uint32(header[:])
-	if err := validateFrameLength64(uint64(length)); err != nil {
+	if err := c.validateFrameLength64(uint64(length)); err != nil {
 		return nil, err
 	}
 	var payload []byte
@@ -126,7 +135,7 @@ func (c *FramedConn) readFrame() ([]byte, error) {
 // Write writes b as one complete framed payload. Concurrent calls remain
 // frame-atomic and preserve mutex acquisition order.
 func (c *FramedConn) Write(b []byte) (int, error) {
-	if err := validateFrameLength(len(b)); err != nil {
+	if err := c.validateFrameLength64(uint64(len(b))); err != nil {
 		return 0, err
 	}
 
@@ -158,6 +167,20 @@ func (c *FramedConn) Write(b []byte) (int, error) {
 		return n, fmt.Errorf("streamnet: write frame payload: %w", classifyTerminalError(err))
 	}
 	return n, nil
+}
+
+func (c *FramedConn) validateFrameLength64(length uint64) error {
+	if length == 0 {
+		return ErrInvalidFrameLength
+	}
+	maximum := c.maximum
+	if maximum == 0 {
+		maximum = MaxFrameLen
+	}
+	if length > maximum {
+		return fmt.Errorf("%w: got %d bytes, maximum is %d", ErrFrameTooLarge, length, maximum)
+	}
+	return nil
 }
 
 func validateFrameLength(length int) error {

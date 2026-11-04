@@ -1,0 +1,140 @@
+name: Voice Chat Alpha Builds
+
+# Creates installable, unsigned Windows setup EXE and a test-signed Android arm64 APK.
+# These are CI artifacts, not a public stable release. Android's throwaway key is per run.
+on:
+  push:
+    branches:
+      - feature/voice-chat-foundation
+    paths:
+      - ".github/workflows/voice-chat-alpha.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "Makefile"
+      - "app/**"
+      - "crates/**"
+      - "core/**"
+      - "packaging/**"
+      - "tools/**"
+  workflow_dispatch:
+
+concurrency:
+  group: voice-chat-alpha-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows x64 setup EXE
+    runs-on: windows-2025
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+    env:
+      CINNABAR_BUILD_COMMIT: ${{ github.sha }}
+      # Public routing config only; TURN credentials and private keys are never build variables.
+      CINNABAR_VOICE_WSS_ENDPOINT: ${{ vars.CINNABAR_VOICE_WSS_ENDPOINT }}
+      CINNABAR_VOICE_ICE_SERVERS: ${{ vars.CINNABAR_VOICE_ICE_SERVERS }}
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_RELEASE_DEBUG: "line-tables-only"
+      CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO: "packed"
+      CARGO_PROFILE_RELEASE_STRIP: "debuginfo"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          cache: false
+      - name: Install WiX, ImageMagick and make
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          & "$env:USERPROFILE\\.dotnet\\tools\\wix.exe" extension add -g WixToolset.BootstrapperApplications.wixext/5.0.2
+          choco install imagemagick --no-progress -y
+          if (-not (Get-Command make -ErrorAction SilentlyContinue)) { choco install make --no-progress -y }
+          $magick = Get-ChildItem "$env:ProgramFiles\\ImageMagick*" -Directory | Select-Object -First 1
+          if (-not $magick) { throw "ImageMagick install directory not found" }
+          Add-Content $env:GITHUB_PATH $magick.FullName
+          Add-Content $env:GITHUB_PATH "$env:USERPROFILE\\.dotnet\\tools"
+          Add-Content $env:GITHUB_PATH "$env:ProgramData\\chocolatey\\bin"
+      - name: Build the complete Windows runtime
+        run: make package-binaries PACKAGE_CARGO_FLAGS=--timings
+      - name: Build the installer EXE
+        shell: pwsh
+        run: |
+          & packaging/windows/build-installer.ps1 -Root "$env:GITHUB_WORKSPACE"
+      - name: Smoke test the installer bundle layout
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem ".local/dist/windows-release/Cinnabar-*-x64-setup.exe" | Select-Object -First 1
+          if (-not $setup) { throw "Windows setup EXE was not produced" }
+          $layout = Join-Path $env:RUNNER_TEMP "cinnabar-alpha-layout"
+          $log = Join-Path $env:RUNNER_TEMP "cinnabar-alpha-layout.log"
+          $process = Start-Process -FilePath $setup.FullName -ArgumentList @('/layout', ('"' + $layout + '"'), '/quiet', '/norestart', '/log', ('"' + $log + '"')) -WindowStyle Hidden -Wait -PassThru
+          if ($process.ExitCode -ne 0) { if (Test-Path $log) { Get-Content $log }; throw "Setup layout failed: $($process.ExitCode)" }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cinnabar-voice-alpha-windows-x64
+          path: |
+            .local/dist/windows-release/Cinnabar-*-x64-setup.exe
+            .local/dist/windows-release/Cinnabar-*-x64.msi
+          if-no-files-found: error
+          retention-days: 14
+
+  android:
+    name: Android arm64-v8a APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      CINNABAR_ANDROID_PROFILE: play
+      CINNABAR_BUILD_COMMIT: ${{ github.sha }}
+      # Public routing config only; TURN credentials and private keys are never build variables.
+      CINNABAR_VOICE_WSS_ENDPOINT: ${{ vars.CINNABAR_VOICE_WSS_ENDPOINT }}
+      CINNABAR_VOICE_ICE_SERVERS: ${{ vars.CINNABAR_VOICE_ICE_SERVERS }}
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.99.0
+        with:
+          targets: aarch64-linux-android
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          cache: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Install the pinned Android SDK packages and cargo-ndk
+        run: |
+          pin() { python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])' packaging/android/runtime.json "$1"; }
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \
+            "platforms;android-$(pin target_sdk)" "build-tools;$(pin build_tools)" "ndk;$(pin ndk)" >/dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$(pin ndk)" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/$(pin ndk)" >> "$GITHUB_ENV"
+          cargo install cargo-ndk --version "$(pin cargo_ndk)" --locked
+      - name: Install Android build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends librsvg2-bin cmake ninja-build gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+      - name: Build and verify the Alpha APK
+        run: |
+          bash packaging/android/build-apk.sh
+          apk="$(find target/android -maxdepth 1 -type f -name '*-arm64-v8a.apk' -print -quit)"
+          test -n "$apk"
+          build_tools="$ANDROID_HOME/build-tools/$(python3 -c 'import json; print(json.load(open("packaging/android/runtime.json"))["build_tools"])')"
+          "$build_tools/apksigner" verify "$apk"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cinnabar-voice-alpha-android-arm64
+          path: target/android/*-arm64-v8a.apk
+          if-no-files-found: error
+          retention-days: 14

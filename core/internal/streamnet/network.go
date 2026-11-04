@@ -33,6 +33,15 @@ func ListenSession(socketDir string) (net.Listener, error) {
 	return &rawEndpointListener{Listener: inner, cleanup: cleanup, lease: lease}, nil
 }
 
+// ListenVoice publishes the dedicated media-only local endpoint.
+func ListenVoice(socketDir string) (net.Listener, error) {
+	inner, cleanup, lease, err := openEndpoint(socketDir, voiceEndpoint)
+	if err != nil {
+		return nil, err
+	}
+	return &rawEndpointListener{Listener: inner, cleanup: cleanup, lease: lease}, nil
+}
+
 func openEndpoint(socketDir string, names endpointNames) (net.Listener, func() error, io.Closer, error) {
 	if err := ensureSocketDir(socketDir); err != nil {
 		return nil, nil, nil, err

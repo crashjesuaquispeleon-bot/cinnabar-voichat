@@ -16,6 +16,15 @@ mod server;
 pub mod settings;
 pub mod systems;
 mod voice;
+pub mod voice_capture;
+pub mod voice_controller;
+pub mod voice_input;
+pub mod voice_loopback;
+pub mod voice_pcm;
+pub mod voice_permission;
+pub mod voice_remote;
+pub mod voice_stream;
+pub mod voice_wire;
 mod water;
 pub mod weather;
 

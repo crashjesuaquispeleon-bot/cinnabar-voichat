@@ -47,6 +47,8 @@ fn android_manifest_renders_and_unknown_tokens_still_fail() {
     let xml = fs::read_to_string(&output).unwrap();
     let mut reader = quick_xml::Reader::from_str(&xml);
     let mut saw_manifest = false;
+    let mut saw_record_audio = false;
+    let mut saw_optional_microphone = false;
     loop {
         match reader.read_event().unwrap() {
             quick_xml::events::Event::Start(tag) if tag.name().as_ref() == b"manifest" => {
@@ -57,11 +59,41 @@ fn android_manifest_renders_and_unknown_tokens_still_fail() {
                 );
                 saw_manifest = true;
             }
+            quick_xml::events::Event::Empty(tag) if tag.name().as_ref() == b"uses-permission" => {
+                if let Some(permission) = tag.try_get_attribute("android:name").unwrap() {
+                    saw_record_audio |= permission
+                        .decode_and_unescape_value(reader.decoder())
+                        .unwrap()
+                        == "android.permission.RECORD_AUDIO";
+                }
+            }
+            quick_xml::events::Event::Empty(tag) if tag.name().as_ref() == b"uses-feature" => {
+                if let Some(feature) = tag.try_get_attribute("android:name").unwrap() {
+                    let name = feature.decode_and_unescape_value(reader.decoder()).unwrap();
+                    if name == "android.hardware.microphone" {
+                        let required = tag
+                            .try_get_attribute("android:required")
+                            .unwrap()
+                            .expect("microphone feature must declare whether it is required")
+                            .decode_and_unescape_value(reader.decoder())
+                            .unwrap();
+                        saw_optional_microphone = required == "false";
+                    }
+                }
+            }
             quick_xml::events::Event::Eof => break,
             _ => {}
         }
     }
     assert!(saw_manifest);
+    assert!(
+        saw_record_audio,
+        "Android voice alpha must declare RECORD_AUDIO"
+    );
+    assert!(
+        saw_optional_microphone,
+        "microphone hardware must remain optional for non-voice gameplay"
+    );
     let malformed = directory.path().join("unfilled.xml");
     fs::write(&malformed, "<manifest package=\"@UNKNOWN@\" />").unwrap();
     let result = render(&malformed);

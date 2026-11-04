@@ -28,6 +28,7 @@ import (
 	"github.com/hashimthearab/rust-mcbe/core/localworld"
 	"github.com/hashimthearab/rust-mcbe/core/packcache"
 	"github.com/hashimthearab/rust-mcbe/core/proxy"
+	voicebridge "github.com/hashimthearab/rust-mcbe/core/voice"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"golang.org/x/oauth2"
 )
@@ -377,7 +378,31 @@ func runWithResourcePackCacheFactory(
 	var networkObservation func(proxy.NetworkObservation)
 	var sessionTarget func(context.Context, string, string) (string, error)
 	var serverTrust minecraft.ServerTrust
+	var api *cinnabarapi.Client
 	if statusStore != nil {
+		artworkDir, cacheFile := filepath.Join(opts.socketDir, "artwork"), ""
+		if dir := authSibling(opts.authCache, "catalog-cache"); dir != "" {
+			artworkDir, cacheFile = filepath.Join(dir, "artwork"), filepath.Join(dir, "catalog.json")
+		}
+		service := launcher.New(launcher.Config{
+			Account: account, AuthCache: opts.authCache, Language: opts.language,
+			Store: statusStore, Selector: selector, Transfers: transfers,
+			ArtworkDir: artworkDir, CacheFile: cacheFile, Logger: logger,
+		})
+		// Start the account's authenticated API connection before FriendHost. The host
+		// retries room creation until this socket has completed its Minecraft proof.
+		if opts.cinnabarAPI {
+			api = service.StartCinnabarAPI(ctx, func(release cinnabarapi.Release) {
+				statusStore.ObserveCinnabarRelease(release)
+			})
+			defer api.Close()
+			controlServer.SetCinnabarAPI(api)
+		}
+		if opts.xboxPresence {
+			presence := service.StartPresence(ctx)
+			defer presence.Close()
+			controlServer.SetPresence(presence.Set)
+		}
 		// Opening a local world supersedes any pending transfer or selected upstream.
 		worlds := controlWorlds{local: localWorlds, onOpen: func() {
 			transfers.Clear()
@@ -385,7 +410,7 @@ func runWithResourcePackCacheFactory(
 			statusStore.ClearTransfer()
 		}}
 		if account != nil {
-			hosting := &friendHosting{account: account, worlds: localWorlds, log: logger}
+			hosting := &friendHosting{account: account, worlds: localWorlds, log: logger, voiceBroker: api}
 			hostingCtx, stopHosting := context.WithCancel(ctx)
 			hostingDone := make(chan struct{})
 			go func() {
@@ -399,27 +424,6 @@ func runWithResourcePackCacheFactory(
 			worlds.invite = hosting.Invite
 		}
 		controlServer.SetWorlds(worlds)
-		artworkDir, cacheFile := filepath.Join(opts.socketDir, "artwork"), ""
-		if dir := authSibling(opts.authCache, "catalog-cache"); dir != "" {
-			artworkDir, cacheFile = filepath.Join(dir, "artwork"), filepath.Join(dir, "catalog.json")
-		}
-		service := launcher.New(launcher.Config{
-			Account: account, AuthCache: opts.authCache, Language: opts.language,
-			Store: statusStore, Selector: selector, Transfers: transfers,
-			ArtworkDir: artworkDir, CacheFile: cacheFile, Logger: logger,
-		})
-		if opts.xboxPresence {
-			presence := service.StartPresence(ctx)
-			defer presence.Close()
-			controlServer.SetPresence(presence.Set)
-		}
-		if opts.cinnabarAPI {
-			api := service.StartCinnabarAPI(ctx, func(release cinnabarapi.Release) {
-				statusStore.ObserveCinnabarRelease(release)
-			})
-			defer api.Close()
-			controlServer.SetCinnabarAPI(api)
-		}
 		controlServer.SetLogger(logger)
 		controlServer.SetServices(launcherControl{service})
 		sessionTarget = service.SessionTarget
@@ -457,7 +461,21 @@ func runWithResourcePackCacheFactory(
 	if deviceErr != nil {
 		logger.Warn("device profile not saved; using it for this run only")
 	}
+	var voiceConfig *voicebridge.VoiceBridgeConfig
+	if api != nil {
+		if endpoint := strings.TrimSpace(os.Getenv("CINNABAR_VOICE_WSS_ENDPOINT")); endpoint != "" {
+			iceServers, iceErr := parseVoiceICEServers(os.Getenv("CINNABAR_VOICE_ICE_SERVERS"))
+			if iceErr != nil {
+				logger.Warn("voice bridge disabled; ICE configuration is invalid", "error", iceErr)
+			} else {
+				voiceConfig = &voicebridge.VoiceBridgeConfig{
+					Endpoint: endpoint, ICEServers: iceServers, AdmissionSource: api, Logger: logger,
+				}
+			}
+		}
+	}
 	serveErr := serve(ctx, proxy.Config{
+		VoiceBridge:         voiceConfig,
 		PacketDelay:         packetDelay,
 		SocketDir:           opts.socketDir,
 		Upstream:            opts.upstream,

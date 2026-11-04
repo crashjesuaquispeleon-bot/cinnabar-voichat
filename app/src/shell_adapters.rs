@@ -1,17 +1,33 @@
 //! Drives account, world and settings services from the menu.
 use crate::runtime::{network::resource_packs::PackApplication, world::ClientWorld};
 use bevy::prelude::*;
+use client_audio::audio::{
+    AudioSettings,
+    voice_capture::{MicrophoneSelection, MicrophoneWorkerEvent},
+    voice_controller::VoiceCaptureController,
+    voice_input::{MicrophoneMode, MicrophonePermission, VoiceInputPolicy},
+};
 use client_runtime::{blob_cache::ClientBlobCacheOwner, network::NetworkHandle};
-use client_shell::ui_resources::UiRuntimeResource;
 use client_shell::{
     menu::{LauncherCoreSlot, MenuRuntime, launcher_account},
     player_skin::LocalPlayerSkin,
+    ui_resources::UiRuntimeResource,
 };
+use launcher::menu::view::{MicrophonePermissionStatus, MicrophoneSelectionRequest};
+
+#[derive(bevy::ecs::system::SystemParam)]
+pub(crate) struct MenuVoiceSettings<'w> {
+    audio_settings: Option<ResMut<'w, AudioSettings>>,
+    voice_controller: Option<ResMut<'w, VoiceCaptureController>>,
+    voice_policy: Option<ResMut<'w, VoiceInputPolicy>>,
+}
+
 /// Drives the launcher's own services: catalog, saves, settings, the account core and local worlds.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn drive_menu_services(
     mut commands: Commands,
     mut menu: ResMut<MenuRuntime>,
+    keys: Res<ButtonInput<KeyCode>>,
     client_blob_cache: Res<ClientBlobCacheOwner>,
     player_runtime: Res<client_state::PlayerRuntime>,
     mut client_world: ResMut<ClientWorld>,
@@ -19,7 +35,7 @@ pub(crate) fn drive_menu_services(
     launcher: Option<ResMut<LauncherCoreSlot>>,
     launcher_account: Option<ResMut<launcher_account::LauncherAccount>>,
     mut local_worlds: Option<ResMut<client_shell::local_worlds::LocalWorlds>>,
-    audio_settings: Option<ResMut<client_audio::audio::AudioSettings>>,
+    voice: MenuVoiceSettings,
     settings: Option<ResMut<client_state::RuntimeSettings>>,
     antialiasing: Option<Res<client_presentation::camera::antialiasing::CameraAntiAliasingSupport>>,
     mut local_skin: Option<ResMut<LocalPlayerSkin>>,
@@ -41,11 +57,24 @@ pub(crate) fn drive_menu_services(
     menu.poll_catalog(launcher_account.is_some());
     menu.poll_saves();
     menu.poll_accounts();
-    sync_audio_settings(&menu, audio_settings);
+    sync_audio_settings(&menu, voice.audio_settings);
     if let Some(support) = antialiasing {
         menu.sync_anti_aliasing_support(support.0);
     }
     menu.sync_user_settings(settings);
+    let voice_session_available = client_world.stream.is_some()
+        && network
+            .as_ref()
+            .and_then(|network| network.core_socket_dir())
+            .map(std::path::PathBuf::from)
+            .is_some_and(|directory| bridge::voice_endpoint_path(&directory).exists());
+    drive_microphone_settings(
+        &mut menu,
+        voice.voice_controller,
+        voice.voice_policy,
+        voice_session_available,
+        keys.pressed(KeyCode::KeyV),
+    );
     menu.sync_language(&mut runtime);
     if let Some(account) = launcher_account.as_deref() {
         client_shell::menu::sync_cinnabar_players(account, &mut runtime.0);
@@ -63,7 +92,167 @@ pub(crate) fn drive_menu_services(
     );
 }
 
-use client_audio::audio::AudioSettings;
+/// Applies saved Sound-panel values to the real microphone gates.
+///
+/// Voice IPC availability only decides whether this client may open its local capture
+/// device. The signed broker admission remains the sole authority for room membership.
+fn apply_voice_preferences(
+    options: &launcher::menu::settings_options::SettingsOptions,
+    controller: Option<&VoiceCaptureController>,
+    policy: &mut VoiceInputPolicy,
+    voice_session_available: bool,
+    push_to_talk_held: bool,
+) {
+    use launcher::menu::settings_options::SettingId;
+
+    policy.set_enabled(options.value(SettingId::VoiceChatEnabled) != 0);
+    policy.set_mode(match options.value(SettingId::VoiceActivationMode) {
+        0 => MicrophoneMode::OpenMicrophone,
+        _ => MicrophoneMode::PushToTalk,
+    });
+    policy.set_muted(options.value(SettingId::VoiceChatMuted) != 0);
+    policy.set_session_active(voice_session_available);
+    policy.set_push_to_talk_held(push_to_talk_held);
+
+    if let Some(controller) = controller {
+        controller.set_input_sensitivity_percent(
+            options
+                .value(SettingId::VoiceInputSensitivity)
+                .clamp(0, 200) as u8,
+        );
+    }
+}
+
+/// Routes presentation-only microphone actions and worker events without blocking the menu.
+fn drive_microphone_settings(
+    menu: &mut MenuRuntime,
+    mut controller: Option<ResMut<VoiceCaptureController>>,
+    mut voice_policy: Option<ResMut<VoiceInputPolicy>>,
+    voice_session_available: bool,
+    push_to_talk_held: bool,
+) {
+    let (options, _) = menu.settings_snapshot();
+    if let Some(policy) = voice_policy.as_deref_mut() {
+        apply_voice_preferences(
+            &options,
+            controller.as_deref(),
+            policy,
+            voice_session_available,
+            push_to_talk_held,
+        );
+    } else if let Some(controller) = controller.as_deref() {
+        controller.set_input_sensitivity_percent(
+            options
+                .value(launcher::menu::settings_options::SettingId::VoiceInputSensitivity)
+                .clamp(0, 200) as u8,
+        );
+    }
+
+    if menu.take_microphone_permission_retry_request() {
+        if let Some(controller) = controller.as_deref_mut() {
+            controller.retry_permission_probe();
+        }
+        if let Some(policy) = voice_policy.as_deref_mut() {
+            // A fresh open attempt is allowed only if voice remains enabled in a live session.
+            policy.set_permission(MicrophonePermission::Unknown);
+            menu.set_microphone_message(
+                "Permission check restarted. Enable Voice Chat in an active multiplayer session to prompt the OS again.",
+            );
+        } else {
+            menu.set_microphone_message(
+                "Microphone permission state is unavailable on this client.",
+            );
+        }
+    }
+
+    let permission =
+        voice_policy.map_or(MicrophonePermission::Unknown, |policy| policy.permission());
+    menu.set_microphone_permission_status(match permission {
+        MicrophonePermission::Unknown => MicrophonePermissionStatus::Unknown,
+        MicrophonePermission::Granted => MicrophonePermissionStatus::Granted,
+        MicrophonePermission::Denied => MicrophonePermissionStatus::Denied,
+    });
+
+    let Some(mut controller) = controller else {
+        if menu.take_microphone_refresh_request() {
+            menu.set_microphone_message("Microphone control is unavailable on this client.");
+        }
+        if menu.take_microphone_selection_request().is_some() {
+            menu.set_microphone_message("Microphone control is unavailable on this client.");
+        }
+        return;
+    };
+
+    // A stopped capture worker invalidates every UI token from its prior catalog.
+    if !controller.supports_input_device_selection() && menu.has_microphone_devices() {
+        menu.clear_microphone_devices(
+            "Enable Voice Chat in an active multiplayer session to refresh microphone devices.",
+        );
+    }
+
+    // Worker events carry only presentation tokens. A new snapshot invalidates the old list.
+    for event in controller.poll_microphone_events() {
+        match event {
+            MicrophoneWorkerEvent::Devices(devices) => {
+                menu.publish_microphone_devices(
+                    devices
+                        .into_iter()
+                        .map(|device| launcher::menu::view::MicrophoneDeviceView {
+                            id: device.id,
+                            name: device.name,
+                            is_default: device.is_default,
+                        })
+                        .collect(),
+                );
+            }
+            MicrophoneWorkerEvent::Selected { device_id } => {
+                menu.mark_microphone_selected(device_id);
+            }
+            MicrophoneWorkerEvent::SelectionRejected(error) => {
+                menu.clear_microphone_devices(format!(
+                    "The microphone selection was rejected: {error:?}. Refresh the list and try again."
+                ));
+            }
+            MicrophoneWorkerEvent::DeviceUnavailable { .. } => {
+                menu.clear_microphone_devices(
+                    "The active microphone disconnected. Refresh the list to choose another input.",
+                );
+            }
+            MicrophoneWorkerEvent::BackendError(error) => {
+                menu.clear_microphone_devices(format!(
+                    "Microphone device error: {error}. Refresh the list before choosing another input."
+                ));
+            }
+            MicrophoneWorkerEvent::Stopped => {
+                menu.clear_microphone_devices(
+                    "The microphone worker stopped. Enable Voice Chat in a multiplayer session to scan again.",
+                );
+            }
+        }
+    }
+
+    if menu.take_microphone_refresh_request() {
+        match controller.refresh_microphone_devices() {
+            Ok(()) => menu.set_microphone_message("Refreshing microphone input devices…"),
+            Err(error) => menu.clear_microphone_devices(format!(
+                "Could not refresh microphones: {error}. Enable Voice Chat in an active multiplayer session first."
+            )),
+        }
+    }
+
+    if let Some(request) = menu.take_microphone_selection_request() {
+        let selection = match request {
+            MicrophoneSelectionRequest::SystemDefault => MicrophoneSelection::SystemDefault,
+            MicrophoneSelectionRequest::Device(id) => MicrophoneSelection::Device(id),
+        };
+        if let Err(error) = controller.select_microphone_device(selection) {
+            menu.clear_microphone_devices(format!(
+                "Could not switch microphone: {error}. Refresh the list before trying again."
+            ));
+        }
+    }
+}
+
 /// Applies the saved sound values to the live mixer.
 pub(crate) fn sync_audio_settings(menu: &MenuRuntime, settings: Option<ResMut<AudioSettings>>) {
     let Some(mut settings) = settings else {
@@ -155,5 +344,57 @@ fn server_kind(
         Destination::FriendWorld => ServerKind::FriendWorld,
         Destination::Experience => ServerKind::Experience,
         Destination::LocalWorld(_) => ServerKind::LocalWorld,
+    }
+}
+
+#[cfg(test)]
+mod voice_settings_tests {
+    use super::*;
+    use launcher::menu::settings_options::{SettingId, SettingsOptions};
+
+    fn enabled_options(mode: i32) -> SettingsOptions {
+        let mut options = SettingsOptions::default();
+        assert!(options.set(SettingId::VoiceChatEnabled.index(), 1));
+        if mode != 0 {
+            assert!(options.set(SettingId::VoiceActivationMode.index(), mode));
+        }
+        options
+    }
+
+    #[test]
+    fn open_microphone_uses_saved_enablement_only_with_a_live_voice_endpoint() {
+        let options = enabled_options(0);
+        let mut policy = VoiceInputPolicy::default();
+        policy.set_permission(MicrophonePermission::Granted);
+
+        apply_voice_preferences(&options, None, &mut policy, false, false);
+        assert!(policy.enabled());
+        assert!(!policy.session_active());
+        assert!(!policy.transmission_permitted());
+
+        apply_voice_preferences(&options, None, &mut policy, true, false);
+        assert_eq!(policy.mode(), MicrophoneMode::OpenMicrophone);
+        assert!(policy.capture_permitted());
+        assert!(policy.transmission_permitted());
+    }
+
+    #[test]
+    fn push_to_talk_uses_v_and_mute_overrides_the_held_key() {
+        let mut options = enabled_options(1);
+        let mut policy = VoiceInputPolicy::default();
+        policy.set_permission(MicrophonePermission::Granted);
+
+        apply_voice_preferences(&options, None, &mut policy, true, false);
+        assert_eq!(policy.mode(), MicrophoneMode::PushToTalk);
+        assert!(policy.capture_permitted());
+        assert!(!policy.transmission_permitted());
+
+        apply_voice_preferences(&options, None, &mut policy, true, true);
+        assert!(policy.transmission_permitted());
+
+        assert!(options.set(SettingId::VoiceChatMuted.index(), 1));
+        apply_voice_preferences(&options, None, &mut policy, true, true);
+        assert!(policy.muted());
+        assert!(!policy.transmission_permitted());
     }
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"sort"
 	"sync"
 	"time"
 
@@ -44,6 +45,14 @@ type FriendWorld struct {
 	GameMode string
 }
 
+// VoiceMembershipBroker is the authenticated Cinnabar API connection used to
+// maintain the server-owned roster and request this account's admission lease.
+type VoiceMembershipBroker interface {
+	OpenVoiceRoom(ctx context.Context) (roomID, sessionID string, err error)
+	UpdateVoiceMembers(ctx context.Context, members []string) error
+	CloseVoiceRoom(ctx context.Context) error
+}
+
 // FriendHostConfig starts hosting one open local world to Xbox friends.
 type FriendHostConfig struct {
 	Account *authcache.Account
@@ -55,6 +64,9 @@ type FriendHostConfig struct {
 	World          FriendWorld
 	// LocalTarget routes accepted friends into the open world's loopback server.
 	LocalTarget LocalTargetFunc
+	// VoiceBroker is optional. It receives only XUIDs from friends accepted by
+	// this host after Xbox login and the MPSD session's nonce check.
+	VoiceBroker VoiceMembershipBroker
 	Logger      *slog.Logger
 }
 
@@ -63,14 +75,18 @@ type FriendHostConfig struct {
 // the franchise messaging service, admits only Xbox-authenticated players holding the nonce the
 // session issued them, and relays each into the offline loopback server.
 type FriendHost struct {
-	open     func(context.Context) (*friendEndpoint, error)
-	config   func(friendDirectory) minecraft.ListenConfig
-	prepared *preparedConnections
-	log      *slog.Logger
-	sessions sync.WaitGroup
-	ctx      context.Context // ends every friend's relay; only Close cancels it
-	cancel   context.CancelFunc
-	done     chan struct{}
+	open         func(context.Context) (*friendEndpoint, error)
+	config       func(friendDirectory) minecraft.ListenConfig
+	prepared     *preparedConnections
+	log          *slog.Logger
+	sessions     sync.WaitGroup
+	ctx          context.Context // ends every friend's relay; only Close cancels it
+	cancel       context.CancelFunc
+	done         chan struct{}
+	voiceBroker  VoiceMembershipBroker
+	voiceWake    chan struct{}
+	voiceDone    chan struct{}
+	voiceMembers map[string]int // accepted authenticated XUID -> live connection count
 
 	mu       sync.Mutex
 	endpoint *friendEndpoint
@@ -124,6 +140,12 @@ func StartFriendHost(ctx context.Context, cfg FriendHostConfig) (*FriendHost, er
 	if err := host.start(ctx); err != nil {
 		return nil, err
 	}
+	if cfg.VoiceBroker != nil {
+		host.voiceBroker = cfg.VoiceBroker
+		host.voiceWake = make(chan struct{}, 1)
+		host.voiceDone = make(chan struct{})
+		go host.runVoiceMembership()
+	}
 	log.Info("hosting local world for friends", "world", cfg.World.ID)
 	return host, nil
 }
@@ -131,7 +153,10 @@ func StartFriendHost(ctx context.Context, cfg FriendHostConfig) (*FriendHost, er
 // newFriendHost admits friends of the host XUID through endpoints from open.
 func newFriendHost(xuid string, log *slog.Logger, open func(context.Context) (*friendEndpoint, error)) *FriendHost {
 	ctx, cancel := context.WithCancel(context.Background())
-	h := &FriendHost{open: open, log: log, ctx: ctx, cancel: cancel, done: make(chan struct{})}
+	h := &FriendHost{
+		open: open, log: log, ctx: ctx, cancel: cancel, done: make(chan struct{}),
+		voiceMembers: make(map[string]int),
+	}
 	h.prepared = newPreparedConnections("", nil, log)
 	h.config = func(directory friendDirectory) minecraft.ListenConfig {
 		return friendListenConfig(xuid, directory, h.prepared, log)
@@ -366,14 +391,122 @@ func (h *FriendHost) retire(endpoint *friendEndpoint) {
 	}()
 }
 
-// addPlayers counts friends joining or leaving and publishes the total with the host to the
-// current endpoint, under the lock that replacing the endpoint holds.
-func (h *FriendHost) addPlayers(delta int) {
+// addPlayer counts one accepted connection and tracks its authenticated XUID for the
+// broker. A duplicate account connection is reference-counted so one disconnect
+// cannot remove another live connection for that same account.
+func (h *FriendHost) addPlayer(xuid string, delta int) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.players += delta
+	h.players = max(0, h.players+delta)
+	if ValidFriendVoiceXUID(xuid) {
+		count := h.voiceMembers[xuid] + delta
+		if count <= 0 {
+			delete(h.voiceMembers, xuid)
+		} else {
+			h.voiceMembers[xuid] = count
+		}
+	}
 	if h.endpoint != nil {
 		h.endpoint.directory.setMembers(h.players + 1)
+	}
+	h.mu.Unlock()
+	if h.voiceWake != nil {
+		select {
+		case h.voiceWake <- struct{}{}:
+		default:
+		}
+	}
+}
+
+// ValidFriendVoiceXUID checks the decimal XUID shape expected by the Cinnabar API.
+func ValidFriendVoiceXUID(xuid string) bool {
+	if xuid == "" || len(xuid) > 20 {
+		return false
+	}
+	for _, digit := range xuid {
+		if digit < '0' || digit > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// voiceRoster snapshots accepted authenticated guests, excluding the owner (who the broker adds).
+func (h *FriendHost) voiceRoster() []string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	members := make([]string, 0, len(h.voiceMembers))
+	for xuid, count := range h.voiceMembers {
+		if count > 0 {
+			members = append(members, xuid)
+		}
+	}
+	sort.Strings(members)
+	return members
+}
+
+// runVoiceMembership maintains a short broker lease and sends full roster snapshots.
+// A failed API connection never blocks Bedrock hosting; the worker retries and the
+// server-side lease expires closed if the host cannot refresh its roster.
+func (h *FriendHost) runVoiceMembership() {
+	defer close(h.voiceDone)
+	delay := 5 * time.Second
+	for {
+		openCtx, cancel := context.WithTimeout(h.ctx, 10*time.Second)
+		_, _, err := h.voiceBroker.OpenVoiceRoom(openCtx)
+		cancel()
+		if err == nil {
+			break
+		}
+		if h.ctx.Err() != nil {
+			return
+		}
+		h.log.Debug("friends: voice room unavailable; retrying", "retry_in", delay)
+		select {
+		case <-h.ctx.Done():
+			return
+		case <-time.After(delay):
+		}
+		delay = min(delay*2, 30*time.Second)
+	}
+	update := func() {
+		// Re-open idempotently before every roster refresh. If the last authenticated
+		// API socket was offline, the broker may have retired this room; the retained
+		// open request ID recreates it without rotating a still-live room.
+		openCtx, cancelOpen := context.WithTimeout(h.ctx, 10*time.Second)
+		_, _, openErr := h.voiceBroker.OpenVoiceRoom(openCtx)
+		cancelOpen()
+		if openErr != nil {
+			if h.ctx.Err() == nil {
+				h.log.Debug("friends: voice room refresh unavailable")
+			}
+			return
+		}
+		members := h.voiceRoster()
+		updateCtx, cancelUpdate := context.WithTimeout(h.ctx, 10*time.Second)
+		err := h.voiceBroker.UpdateVoiceMembers(updateCtx, members)
+		cancelUpdate()
+		if err != nil && h.ctx.Err() == nil {
+			h.log.Debug("friends: voice roster update unavailable")
+		}
+	}
+	update()
+	ticker := time.NewTicker(25 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-h.ctx.Done():
+			closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			if err := h.voiceBroker.CloseVoiceRoom(closeCtx); err != nil {
+				h.log.Debug("friends: close voice room unavailable")
+			}
+			cancel()
+			return
+		case <-h.voiceWake:
+			update()
+		case <-ticker.C:
+			// Full snapshots also renew the broker's 90-second host lease.
+			update()
+		}
 	}
 }
 
@@ -403,11 +536,12 @@ func (h *FriendHost) accept(listener *minecraft.Listener) {
 		if prepared == nil {
 			continue
 		}
+		xuid := downstream.IdentityData().XUID
 		h.sessions.Add(1)
-		h.addPlayers(1)
+		h.addPlayer(xuid, 1)
 		go func() {
 			defer h.sessions.Done()
-			defer h.addPlayers(-1)
+			defer h.addPlayer(xuid, -1)
 			// A friend's session ending never stops the host.
 			if err := servePreparedConnection(h.ctx, downstream, prepared); err != nil && h.ctx.Err() == nil {
 				logFriendSessionEnded(h.log, downstream.IdentityData().XUID, err)
@@ -448,6 +582,9 @@ func (h *FriendHost) Close() error {
 	}
 	<-h.done
 	h.retries.Wait()
+	if h.voiceDone != nil {
+		<-h.voiceDone
+	}
 	stopErr := h.prepared.shutdown()
 	h.sessions.Wait()
 	return errors.Join(retireErr, stopErr)

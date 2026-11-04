@@ -19,6 +19,8 @@ const (
 	controlWindowsEndpointName = bridgecontract.ControlWindowsEndpointName
 	sessionUnixEndpointName    = bridgecontract.SessionUnixEndpointName
 	sessionWindowsEndpointName = bridgecontract.SessionWindowsEndpointName
+	voiceUnixEndpointName = bridgecontract.VoiceUnixEndpointName
+	voiceWindowsEndpointName = bridgecontract.VoiceWindowsEndpointName
 )
 
 type endpointNames struct {
@@ -28,6 +30,7 @@ type endpointNames struct {
 var (
 	controlEndpoint = endpointNames{unix: controlUnixEndpointName, windows: controlWindowsEndpointName, lease: "control.lock"}
 	sessionEndpoint = endpointNames{unix: sessionUnixEndpointName, windows: sessionWindowsEndpointName, lease: "session.lock"}
+	voiceEndpoint = endpointNames{unix: voiceUnixEndpointName, windows: voiceWindowsEndpointName, lease: bridgecontract.VoiceLockFileName}
 )
 
 // ResolveControl discovers the separately published control endpoint.
@@ -38,6 +41,11 @@ func ResolveControl(socketDir string) (network, address string, err error) {
 // ResolveSession discovers the separately published session endpoint.
 func ResolveSession(socketDir string) (network, address string, err error) {
 	return resolveEndpoint(socketDir, sessionEndpoint)
+}
+
+// ResolveVoice discovers the dedicated low-latency voice endpoint.
+func ResolveVoice(socketDir string) (network, address string, err error) {
+	return resolveEndpoint(socketDir, voiceEndpoint)
 }
 
 func resolveEndpoint(socketDir string, names endpointNames) (network, address string, err error) {

@@ -50,6 +50,9 @@ fn app(stream: chunk_pipeline::WorldStream, enabled: bool) -> bevy::prelude::App
     let mut app = bevy::prelude::App::new();
     app.add_message::<SequencedAudioEvent>()
         .init_resource::<client_presentation::environment::WorldClock>()
+        .init_resource::<client_audio::audio::voice_input::VoiceInputPolicy>()
+        .init_resource::<client_audio::audio::voice_controller::VoiceCaptureController>()
+        .init_resource::<client_state::SemanticInputSnapshot>()
         .insert_resource(crate::runtime::world::ClientWorld {
             stream: Some(stream),
             ..crate::runtime::world::ClientWorld::default()
@@ -168,16 +171,21 @@ fn production_evidence_precedes_missing_catalog_without_changing_resolution() {
         .observed_sequences();
     let enabled = enabled.world().resource::<SessionAudio>();
     let disabled = disabled.world().resource::<SessionAudio>();
-    assert_eq!(
-        enabled.iter().collect::<Vec<_>>(),
-        disabled.iter().collect::<Vec<_>>()
-    );
-    assert_eq!(
-        enabled.catalog_unavailable_total(),
-        disabled.catalog_unavailable_total()
-    );
+    let enabled_outcomes: Vec<_> = enabled.iter().collect();
+    let disabled_outcomes: Vec<_> = disabled.iter().collect();
+    assert_eq!(enabled_outcomes, disabled_outcomes);
     assert!(
-        enabled
+        !enabled_outcomes.is_empty(),
+        "missing catalog must still produce SessionAudio outcomes"
+    );
+    assert_eq!(enabled.catalog_unavailable_total(), 1);
+    assert_eq!(disabled.catalog_unavailable_total(), 1);
+    assert_eq!(enabled.admitted_total(), 1);
+    assert_eq!(disabled.admitted_total(), 1);
+    assert_eq!(enabled.unknown_definition_total(), 0);
+    assert_eq!(disabled.unknown_definition_total(), 0);
+    assert!(
+        enabled_outcomes
             .iter()
             .all(|outcome| matches!(outcome, AudioOutcome::Skipped { .. }))
     );

@@ -406,6 +406,31 @@ pub struct MenuFriendCard {
     pub max_members: u32,
 }
 
+/// Presentation-only microphone descriptor. The ID is a short-lived token from the
+/// current native enumeration snapshot; it must never be persisted or sent over the network.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct MicrophoneDeviceView {
+    pub id: String,
+    pub name: String,
+    pub is_default: bool,
+}
+
+/// A transient request routed from the Settings UI to the active microphone owner.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum MicrophoneSelectionRequest {
+    SystemDefault,
+    Device(String),
+}
+
+/// Best-effort local status of the operating system's microphone permission.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MicrophonePermissionStatus {
+    #[default]
+    Unknown,
+    Granted,
+    Denied,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct MenuView {
     /// Verified update notice and the available release-channel choices.
@@ -509,6 +534,12 @@ pub struct MenuView {
     pub local: crate::local_worlds::WorldsView,
     pub settings: SettingsInteraction,
     pub settings_options: std::sync::Arc<super::settings_options::SettingsOptions>,
+    /// Current presentation descriptors only; these generation-scoped IDs are never saved.
+    pub microphone_devices: Vec<MicrophoneDeviceView>,
+    pub microphone_devices_revision: u64,
+    pub selected_microphone_id: Option<String>,
+    pub microphone_message: Option<String>,
+    pub microphone_permission_status: MicrophonePermissionStatus,
     pub storage: std::sync::Arc<super::settings_storage::StorageView>,
     pub language_choices: std::sync::Arc<[(String, String)]>,
     pub feeds: MenuFeeds,
@@ -780,6 +811,14 @@ impl MenuView {
             world_settings: None,
             settings: SettingsInteraction::default(),
             settings_options: Default::default(),
+            microphone_devices: Vec::new(),
+            microphone_devices_revision: 0,
+            selected_microphone_id: None,
+            microphone_message: Some(
+                "Enable Voice Chat in a multiplayer session before refreshing microphone devices."
+                    .to_owned(),
+            ),
+            microphone_permission_status: MicrophonePermissionStatus::Unknown,
             storage: Default::default(),
             language_choices: Default::default(),
             feeds: Default::default(),

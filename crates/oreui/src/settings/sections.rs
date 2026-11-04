@@ -121,6 +121,94 @@ fn video(content: &mut Content<'_, '_>) -> Result<(), PaintError> {
 fn audio(content: &mut Content<'_, '_>) -> Result<(), PaintError> {
     content.heading("menu.audio.tab.title", "menu.audio.tab.description")?;
     options(content, SettingPanel::Audio)?;
+
+    content.heading(
+        "Microphone Input",
+        "Choose which local input device Voice Chat uses. Device choices are temporary and are not saved.",
+    )?;
+    let permission_description = match content.view.microphone_permission_status {
+        launcher::menu::view::MicrophonePermissionStatus::Unknown => {
+            "Not checked yet. Enable Voice Chat in a multiplayer session to let the operating system check access."
+        }
+        launcher::menu::view::MicrophonePermissionStatus::Granted => {
+            "Granted. The operating system allows microphone capture."
+        }
+        launcher::menu::view::MicrophonePermissionStatus::Denied => {
+            "Denied. Allow microphone access in your operating system's privacy settings before retrying."
+        }
+    };
+    content.label_text("Microphone permission", permission_description)?;
+    if matches!(
+        content.view.microphone_permission_status,
+        launcher::menu::view::MicrophonePermissionStatus::Denied
+    ) {
+        super::services::action_row_text(
+            content,
+            "Retry microphone permission",
+            "After allowing microphone access in system privacy settings, retry the OS permission check.",
+            "Retry",
+            Some(MenuAction::SettingsMicrophoneRetryPermission),
+        )?;
+    }
+    super::services::action_row_text(
+        content,
+        "Available microphones",
+        "Scan the devices currently visible to the operating system.",
+        "Refresh",
+        Some(MenuAction::SettingsMicrophoneRefresh),
+    )?;
+
+    let default_available = content
+        .view
+        .microphone_devices
+        .iter()
+        .filter(|device| device.is_default)
+        .count()
+        == 1;
+    let default_selected = content.view.microphone_devices.iter().any(|device| {
+        device.is_default
+            && content.view.selected_microphone_id.as_deref() == Some(device.id.as_str())
+    });
+    super::services::action_row_text(
+        content,
+        "System default input",
+        "Let the operating system choose its current default microphone.",
+        if default_selected {
+            "Selected"
+        } else if default_available {
+            "Use default"
+        } else {
+            "Not available"
+        },
+        (default_available && !default_selected)
+            .then_some(MenuAction::SettingsMicrophoneUseSystemDefault),
+    )?;
+
+    for (index, device) in content.view.microphone_devices.iter().enumerate() {
+        let Ok(index) = u16::try_from(index) else {
+            continue;
+        };
+        let selected = content.view.selected_microphone_id.as_deref() == Some(device.id.as_str());
+        let description = if device.is_default {
+            "System default device"
+        } else {
+            "Available input device"
+        };
+        super::services::action_row_text(
+            content,
+            &device.name,
+            description,
+            if selected { "Selected" } else { "Use" },
+            (!selected).then_some(MenuAction::SettingsMicrophoneSelect(
+                index,
+                content.view.microphone_devices_revision,
+            )),
+        )?;
+    }
+    if let Some(message) = content.view.microphone_message.as_deref() {
+        content.label_text("", message)?;
+    }
+
     reset(content, SettingsGroup::Audio, "options.sound.resetSettings")
 }
 

@@ -305,6 +305,15 @@ fn default_bindings() -> Vec<ActionBinding> {
     bind(&mut bindings, Attack, Gameplay, MouseButton(1));
     bind(&mut bindings, Use, Gameplay, MouseButton(2));
     bind(&mut bindings, PickItem, Gameplay, MouseButton(3));
+    // Default only; users can remap this action through the ordinary controls settings.
+    bind(&mut bindings, PushToTalk, Gameplay, KeyboardUsage(0x19));
+    // One press toggles the local microphone mute; users can remap this action.
+    bind(
+        &mut bindings,
+        ToggleVoiceMute,
+        Gameplay,
+        KeyboardUsage(0x10),
+    );
     for (action, axis) in [
         (LookRight, XPositive),
         (LookLeft, XNegative),
@@ -414,8 +423,23 @@ fn default_bindings() -> Vec<ActionBinding> {
         (LookDown, touch::LOOK_DOWN, Gameplay),
         (LookLeft, touch::LOOK_LEFT, Gameplay),
         (LookRight, touch::LOOK_RIGHT, Gameplay),
+        (PushToTalk, touch::VOICE_PTT, Gameplay),
     ] {
         bind(&mut bindings, action, context, TouchControl(hit_id));
     }
     bindings
+}
+
+#[cfg(test)]
+mod voice_touch_binding_tests {
+    use super::*;
+
+    #[test]
+    fn touch_voice_button_is_the_default_push_to_talk_binding() {
+        assert!(ControlSettings::builtin().bindings().iter().any(|binding| {
+            binding.action == Action::PushToTalk
+                && binding.context == InputContext::Gameplay
+                && binding.chord.control == PhysicalControl::TouchControl(touch::VOICE_PTT)
+        }));
+    }
 }

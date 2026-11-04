@@ -5,6 +5,58 @@ use semantic_input::{ControlSettings, PerspectiveMode};
 mod view_bobbing;
 pub use view_bobbing::ViewBobbing;
 
+/// Local voice activation mode; Push to Talk is the privacy-preserving default.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum VoiceActivationMode {
+    /// Transmit whenever voice is enabled in an active multiplayer session.
+    OpenMicrophone,
+    /// Transmit only while the configured push-to-talk action is held.
+    #[default]
+    PushToTalk,
+}
+
+/// Persisted voice-chat preferences shared by settings and the runtime policy adapter.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct VoiceChatSettings {
+    /// Voice capture remains disabled until the player explicitly enables it.
+    pub enabled: bool,
+    /// Mute captured voice locally without turning off the rest of Voice Chat.
+    pub muted: bool,
+    /// Activation mode used after voice is enabled.
+    pub activation_mode: VoiceActivationMode,
+    /// Local microphone gain in percent; 100 is neutral and 200 is a 2x boost.
+    pub input_sensitivity_percent: u8,
+}
+
+impl Default for VoiceChatSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            muted: false,
+            activation_mode: VoiceActivationMode::PushToTalk,
+            input_sensitivity_percent: 100,
+        }
+    }
+}
+
+impl VoiceActivationMode {
+    /// Stable registry value; unknown values fail closed to Push to Talk.
+    pub const fn from_value(value: i32) -> Self {
+        match value {
+            0 => Self::OpenMicrophone,
+            _ => Self::PushToTalk,
+        }
+    }
+
+    /// Integer value stored by the launcher settings registry.
+    pub const fn value(self) -> i32 {
+        match self {
+            Self::OpenMicrophone => 0,
+            Self::PushToTalk => 1,
+        }
+    }
+}
+
 pub const CURRENT_SETTINGS_SCHEMA: u32 = 2;
 pub const DEFAULT_OUTLINE_SELECTION: bool = true;
 /// Server-pack held models are enabled until the player chooses item icons.
@@ -176,6 +228,8 @@ pub struct UserSettings {
     pub controls: ControlSettings,
     pub video: VideoSettings,
     pub gameplay: GameplaySettings,
+    /// Local Cinnabar-only voice preferences; never sent to a server as identity.
+    pub voice_chat: VoiceChatSettings,
 }
 
 impl Default for UserSettings {
@@ -185,6 +239,7 @@ impl Default for UserSettings {
             controls: ControlSettings::default(),
             video: VideoSettings::default(),
             gameplay: GameplaySettings::default(),
+            voice_chat: VoiceChatSettings::default(),
         }
     }
 }

@@ -28,6 +28,8 @@ mod realm_membership;
 pub use join_requests::open_join_requests_from_key;
 pub mod launcher_account;
 mod launcher_core;
+mod lifecycle;
+mod microphone;
 mod minecraft_import;
 mod navigation;
 mod presence_targets;
@@ -73,10 +75,8 @@ pub use launcher_core::LauncherCoreSlot;
 use servers::{ServerWriter, load_servers};
 pub use video_settings::persist_video_settings;
 
-use std::{
-    path::PathBuf,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use lifecycle::now_unix;
+use std::path::PathBuf;
 
 use bevy::prelude::{Commands, ResMut, Resource};
 
@@ -219,6 +219,14 @@ pub struct MenuRuntime {
     settings: launcher::menu::view::SettingsInteraction,
     settings_input: focus::SettingsInput,
     settings_options: std::sync::Arc<launcher::menu::settings_options::SettingsOptions>,
+    microphone_devices: Vec<launcher::menu::view::MicrophoneDeviceView>,
+    microphone_devices_revision: u64,
+    selected_microphone_id: Option<String>,
+    microphone_message: Option<String>,
+    microphone_permission_status: launcher::menu::view::MicrophonePermissionStatus,
+    microphone_permission_retry_requested: bool,
+    microphone_refresh_requested: bool,
+    microphone_selection_requested: Option<launcher::menu::view::MicrophoneSelectionRequest>,
     storage: std::sync::Arc<launcher::menu::settings_storage::StorageView>,
     settings_dirty: bool,
     settings_writer: Option<launcher::menu::settings_options::persistence::writer::Writer>,
@@ -770,6 +778,10 @@ impl MenuRuntime {
             | MenuAction::SettingsMacroCommand(_)
             | MenuAction::SettingsResetChat
             | MenuAction::SettingsAdvancedGraphics
+            | MenuAction::SettingsMicrophoneRefresh
+            | MenuAction::SettingsMicrophoneUseSystemDefault
+            | MenuAction::SettingsMicrophoneRetryPermission
+            | MenuAction::SettingsMicrophoneSelect(..)
             | MenuAction::EditTouchControls) => self.activate_settings(action),
             MenuAction::Respawn => {
                 if self.death_controls_ready() {
@@ -963,24 +975,6 @@ impl MenuRuntime {
             self.remember_retry_target(&address, Some(&auth_cache), false);
         }
     }
-}
-
-impl Drop for MenuRuntime {
-    fn drop(&mut self) {
-        if let Err(error) = self.flush_user_settings() {
-            bevy::log::warn!("could not save settings at shutdown: {error}");
-        }
-        self.stop_sign_in();
-        self.stop_catalog();
-    }
-}
-
-/// Condenses a runtime error into something that fits the menu message area.
-fn now_unix() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs()
 }
 
 use client_state::{JoinIntent, SessionStatus};

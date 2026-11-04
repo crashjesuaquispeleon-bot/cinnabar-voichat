@@ -648,3 +648,114 @@ fn global_watermark_rules_cover_keyboard_controller_and_touch_sources() {
         touch,
     );
 }
+
+
+#[test]
+fn push_to_talk_is_a_persistent_remappable_held_action() {
+    let mut router = SemanticInputRouter::default();
+    router
+        .route(DeviceFrame {
+            keyboard_mouse: Some(KeyboardMouseFrame {
+                activity_sequence: 1,
+                keys: vec![0x19],
+                ..KeyboardMouseFrame::default()
+            }),
+            ..DeviceFrame::default()
+        })
+        .unwrap();
+    let pressed = router.finalize().unwrap();
+    let phase = pressed.phases[Action::PushToTalk as usize];
+    assert!(phase.pressed);
+    assert!(phase.held);
+    assert!(!phase.released);
+
+    router
+        .route(DeviceFrame {
+            keyboard_mouse: Some(KeyboardMouseFrame {
+                activity_sequence: 1,
+                keys: vec![0x19],
+                ..KeyboardMouseFrame::default()
+            }),
+            ..DeviceFrame::default()
+        })
+        .unwrap();
+    let held = router.finalize().unwrap().phases[Action::PushToTalk as usize];
+    assert!(!held.pressed);
+    assert!(held.held);
+    assert!(!held.released);
+
+    router
+        .route(DeviceFrame {
+            keyboard_mouse: Some(KeyboardMouseFrame {
+                activity_sequence: 2,
+                ..KeyboardMouseFrame::default()
+            }),
+            ..DeviceFrame::default()
+        })
+        .unwrap();
+    let released = router.finalize().unwrap().phases[Action::PushToTalk as usize];
+    assert!(!released.held);
+    assert!(released.released);
+}
+
+#[test]
+fn quick_voice_mute_is_one_shot_and_uses_the_remappable_control() {
+    let default_binding = ControlSettings::default()
+        .bindings()
+        .iter()
+        .find(|binding| binding.action == Action::ToggleVoiceMute)
+        .copied()
+        .expect("quick voice mute has a default semantic binding");
+    assert_eq!(
+        default_binding.chord.control,
+        PhysicalControl::KeyboardUsage(0x10),
+        "the default quick-mute key is M"
+    );
+
+    let mut router = SemanticInputRouter::default();
+    for (sequence, keys, pressed_expected) in [
+        (1, vec![0x10], true),
+        (1, vec![0x10], false),
+        (2, vec![], false),
+    ] {
+        router
+            .route(DeviceFrame {
+                keyboard_mouse: Some(KeyboardMouseFrame {
+                    activity_sequence: sequence,
+                    keys,
+                    ..KeyboardMouseFrame::default()
+                }),
+                ..DeviceFrame::default()
+            })
+            .unwrap();
+        let phase = router.finalize().unwrap().phases[Action::ToggleVoiceMute as usize];
+        assert_eq!(phase.pressed, pressed_expected);
+        assert!(!phase.held);
+        assert!(!phase.released);
+    }
+
+    // The normal ControlSettings path remaps the same semantic action to U.
+    let mut bindings = ControlSettings::default().bindings().to_vec();
+    let mute_binding = bindings
+        .iter_mut()
+        .find(|binding| binding.action == Action::ToggleVoiceMute)
+        .unwrap();
+    mute_binding.chord = empty_chord(PhysicalControl::KeyboardUsage(0x18));
+    let remapped = ControlSettings::new(bindings, 1.0, 1.0, 1.0, false, false, 0.15, 0.15)
+        .unwrap();
+    router.replace_bindings(remapped).unwrap();
+    router
+        .route(DeviceFrame {
+            keyboard_mouse: Some(KeyboardMouseFrame {
+                activity_sequence: 3,
+                keys: vec![0x18],
+                ..KeyboardMouseFrame::default()
+            }),
+            ..DeviceFrame::default()
+        })
+        .unwrap();
+    let phase = router.finalize().unwrap().phases[Action::ToggleVoiceMute as usize];
+    assert!(phase.pressed);
+    assert!(!phase.held);
+}
+

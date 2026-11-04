@@ -73,13 +73,33 @@ fn section_rows_keep_order_and_shared_controls_from_the_registry() {
         .collect();
     assert!(video.contains(&SettingId::CameraShake));
     assert!(accessibility.contains(&SettingId::CameraShake));
+    let audio_rows = SettingPanel::Audio
+        .options()
+        .map(|row| row.id)
+        .collect::<Vec<_>>();
+    let volume_rows = volume_settings().map(|row| row.id).collect::<Vec<_>>();
+    assert_eq!(&audio_rows[..volume_rows.len()], volume_rows.as_slice());
     assert_eq!(
-        SettingPanel::Audio
-            .options()
-            .map(|row| row.id)
-            .collect::<Vec<_>>(),
-        volume_settings().map(|row| row.id).collect::<Vec<_>>()
+        &audio_rows[volume_rows.len()..],
+        &[
+            SettingId::VoiceChatEnabled,
+            SettingId::VoiceActivationMode,
+            SettingId::VoiceChatMuted,
+            SettingId::VoiceInputSensitivity,
+        ]
     );
+}
+
+#[test]
+fn voice_input_sensitivity_is_bounded_to_zero_through_two_hundred_percent() {
+    let mut settings = SettingsOptions::default();
+    assert_eq!(settings.value(SettingId::VoiceInputSensitivity), 100);
+
+    assert!(settings.set(SettingId::VoiceInputSensitivity.index(), 250));
+    assert_eq!(settings.value(SettingId::VoiceInputSensitivity), 200);
+
+    assert!(settings.set(SettingId::VoiceInputSensitivity.index(), -25));
+    assert_eq!(settings.value(SettingId::VoiceInputSensitivity), 0);
 }
 
 #[test]
@@ -541,4 +561,19 @@ fn saved_values_survive_alongside_removed_setting_keys() {
     for retired in RETIRED {
         assert!(encoded["values"].get(retired).is_none(), "{retired}");
     }
+}
+
+#[test]
+fn push_to_talk_is_registered_and_remappable_in_controls() {
+    let mut settings = SettingsOptions::default();
+    assert_eq!(
+        settings.named_key_control(BindingId::PushToTalk),
+        Some(semantic_input::PhysicalControl::KeyboardUsage(0x19))
+    );
+    let row = BindingId::PushToTalk.row(false).unwrap();
+    assert!(settings.remap(row, semantic_input::PhysicalControl::KeyboardUsage(0x1d)));
+    assert_eq!(
+        settings.named_key_control(BindingId::PushToTalk),
+        Some(semantic_input::PhysicalControl::KeyboardUsage(0x1d))
+    );
 }

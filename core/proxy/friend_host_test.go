@@ -86,6 +86,38 @@ func TestFriendSessionPropertiesDecodeAsAVanillaWorld(t *testing.T) {
 }
 
 // A friend's ended session is logged without the friend's XUID or the addresses in its error.
+func TestFriendHostVoiceRosterReferenceCountsDuplicateConnections(t *testing.T) {
+	host := &FriendHost{voiceMembers: make(map[string]int)}
+	first := "2535400000000002"
+	second := "2535400000000003"
+
+	host.addPlayer(first, 1)
+	host.addPlayer(first, 1)
+	host.addPlayer(second, 1)
+	host.addPlayer("not-an-xuid", 1)
+
+	want := first + "," + second
+	if got := strings.Join(host.voiceRoster(), ","); got != want {
+		t.Fatalf("voice roster = %q, want %q", got, want)
+	}
+
+	// One of two live connections for the same authenticated account ends.
+	host.addPlayer(first, -1)
+	if got := strings.Join(host.voiceRoster(), ","); got != want {
+		t.Fatalf("roster after one duplicate disconnect = %q, want %q", got, want)
+	}
+
+	// The final connection ending removes that account, but not the other guest.
+	host.addPlayer(first, -1)
+	if got := strings.Join(host.voiceRoster(), ","); got != second {
+		t.Fatalf("roster after final duplicate disconnect = %q, want %q", got, second)
+	}
+	host.addPlayer(second, -1)
+	if got := host.voiceRoster(); len(got) != 0 {
+		t.Fatalf("roster after all guests disconnect = %v, want empty", got)
+	}
+}
+
 func TestFriendSessionEndNamesNoFriend(t *testing.T) {
 	var output bytes.Buffer
 	log := slog.New(slog.NewTextHandler(&output, &slog.HandlerOptions{Level: slog.LevelDebug}))

@@ -254,6 +254,7 @@ fn session_audio_reader_consumes_each_sequenced_event_exactly_once() {
         .actor_session_id();
     assert_ne!(stream_session, previous_session);
     let mut app = App::new();
+    init_voice_adapter_resources(&mut app);
     app.add_message::<SequencedAudioEvent>()
         .init_resource::<client_presentation::environment::WorldClock>()
         .init_resource::<SessionAudio>()
@@ -293,6 +294,7 @@ fn production_audio_reader_clears_disconnect_state_and_drops_stale_messages() {
         .authority()
         .actor_session_id();
     let mut app = App::new();
+    init_voice_adapter_resources(&mut app);
     app.add_message::<SequencedAudioEvent>()
         .init_resource::<client_presentation::environment::WorldClock>()
         .init_resource::<SessionAudio>()
@@ -354,7 +356,14 @@ fn retained_session_audio() -> SessionAudio {
     audio
 }
 
+fn init_voice_adapter_resources(app: &mut App) {
+    app.init_resource::<client_audio::audio::voice_input::VoiceInputPolicy>()
+        .init_resource::<client_audio::audio::voice_controller::VoiceCaptureController>()
+        .init_resource::<client_state::SemanticInputSnapshot>();
+}
+
 fn add_audio_teardown_resources(app: &mut App, client_world: ClientWorld, menu: MenuRuntime) {
+    init_voice_adapter_resources(app);
     app.add_message::<SequencedAudioEvent>()
         .init_resource::<client_presentation::environment::WorldClock>()
         .insert_resource(SessionAudioCatalog(None))

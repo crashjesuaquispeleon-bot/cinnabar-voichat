@@ -28,9 +28,18 @@ const (
 	typeLookupResult      = "lookup_result"
 	typeRelease           = "release"
 	typeEmote             = "emote"
-	typeLoadout           = "loadout"
-	typeCosmeticOwnership = "cosmetic_ownership"
-	typeEmoteState        = "emote_state"
+	typeLoadout               = "loadout"
+	typeCosmeticOwnership     = "cosmetic_ownership"
+	typeEmoteState            = "emote_state"
+	typeVoiceHostOpen         = "voice_host_open"
+	typeVoiceHostMembers      = "voice_host_members"
+	typeVoiceHostClose        = "voice_host_close"
+	typeVoiceAdmissionRequest = "voice_admission_request"
+	typeVoiceRoom             = "voice_room"
+	typeVoiceMembersUpdated   = "voice_members_updated"
+	typeVoiceClosed           = "voice_closed"
+	typeVoiceAdmission        = "voice_admission"
+	typeVoiceError            = "voice_error"
 )
 
 // codeRateLimited is the error code for a refused lookup.
@@ -78,6 +87,27 @@ type lookupMessage struct {
 	UUIDs []string `json:"uuids,omitempty"`
 }
 
+type voiceHostOpenMessage struct {
+	Type      string `json:"type"`
+	RequestID string `json:"request_id"`
+}
+
+type voiceHostMembersMessage struct {
+	Type      string   `json:"type"`
+	RequestID string   `json:"request_id"`
+	Members   []string `json:"members"`
+}
+
+type voiceHostCloseMessage struct {
+	Type      string `json:"type"`
+	RequestID string `json:"request_id"`
+}
+
+type voiceAdmissionRequestMessage struct {
+	Type      string `json:"type"`
+	RequestID string `json:"request_id"`
+}
+
 // inbound is the union of server messages; absent fields stay zero and unknown ones are ignored.
 type inbound struct {
 	OwnedCosmetics  []string           `json:"owned_cosmetics"`
@@ -89,6 +119,13 @@ type inbound struct {
 	Slots           map[string]*string `json:"slots"`
 	ElapsedMS       uint32             `json:"elapsed_ms"`
 	ValidForMS      uint64             `json:"valid_for_ms"`
+	RequestID       string             `json:"request_id"`
+	RoomID          string             `json:"room_id"`
+	SessionID       string             `json:"session_id"`
+	Token           string             `json:"token"`
+	ExpiresAt       int64              `json:"expires_at"`
+	Count           int                `json:"count"`
+	SFUClosed       bool               `json:"sfu_closed"`
 	parameters
 	Build         uint64   `json:"build"`
 	Type          string   `json:"type"`

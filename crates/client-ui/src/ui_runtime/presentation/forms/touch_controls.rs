@@ -34,6 +34,7 @@ const CONTROLS: &[(&str, u16)] = &[
     ("menu", touch::MENU),
     ("chat", touch::CHAT),
     ("utilities", touch::UTILITIES),
+    ("voice_ptt", touch::VOICE_PTT),
 ];
 const UTILITY_ACTIONS: &[(&str, u16)] = &[
     ("emote", touch::EMOTE),
@@ -215,6 +216,7 @@ impl UiPresentationRuntime {
             Scalar::Bool(runtime.player_list_held()),
         );
         data.set_global("#touch_never_active", Scalar::Bool(false));
+        data.set_global("#touch_voice_ptt_label", Scalar::Text("PTT".to_owned()));
         for &(name, id) in CONTROLS {
             let held = state
                 .contacts

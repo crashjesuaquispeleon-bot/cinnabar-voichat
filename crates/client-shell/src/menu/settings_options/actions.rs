@@ -15,6 +15,39 @@ impl MenuRuntime {
     /// Applies settings navigation and edits without starting a game session.
     pub(in crate::menu) fn activate_settings(&mut self, action: MenuAction) {
         match action {
+            MenuAction::SettingsMicrophoneRefresh => {
+                self.microphone_selection_requested = None;
+                self.microphone_refresh_requested = true;
+                self.microphone_message = Some("Refreshing microphone input devices…".to_owned());
+            }
+            MenuAction::SettingsMicrophoneUseSystemDefault => {
+                self.microphone_selection_requested =
+                    Some(launcher::menu::view::MicrophoneSelectionRequest::SystemDefault);
+                self.microphone_message =
+                    Some("Switching to the system default microphone…".to_owned());
+            }
+            MenuAction::SettingsMicrophoneRetryPermission => {
+                self.microphone_permission_retry_requested = true;
+                self.microphone_message = Some("Retrying microphone permission check…".to_owned());
+            }
+            MenuAction::SettingsMicrophoneSelect(index, revision) => {
+                if revision != self.microphone_devices_revision {
+                    self.microphone_message = Some(
+                        "The microphone list changed. Refresh it before selecting a device."
+                            .to_owned(),
+                    );
+                } else if let Some(device) = self.microphone_devices.get(usize::from(index)) {
+                    self.microphone_selection_requested = Some(
+                        launcher::menu::view::MicrophoneSelectionRequest::Device(device.id.clone()),
+                    );
+                    self.microphone_message = Some(format!("Switching to {}…", device.name));
+                } else {
+                    self.microphone_message = Some(
+                        "That microphone is no longer available. Refresh the device list."
+                            .to_owned(),
+                    );
+                }
+            }
             MenuAction::EditTouchControls
                 if self.touch_available && self.screen == launcher::menu::MenuScreen::Settings =>
             {
@@ -182,5 +215,120 @@ impl MenuRuntime {
             self.settings_dirty = true;
             self.settings_apply = true;
         }
+    }
+}
+
+#[cfg(test)]
+mod microphone_settings_tests {
+    use crate::menu::MenuRuntime;
+    use launcher::menu::{
+        MenuAction,
+        view::{MicrophoneDeviceView, MicrophoneSelectionRequest},
+    };
+
+    fn menu() -> MenuRuntime {
+        MenuRuntime::new(true, 2, "Microphone test".to_owned())
+    }
+
+    #[test]
+    fn refresh_request_is_one_shot_and_device_choice_is_transient() {
+        let mut menu = menu();
+        menu.activate_from_input(MenuAction::SettingsMicrophoneRefresh);
+        assert!(menu.take_microphone_refresh_request());
+        assert!(!menu.take_microphone_refresh_request());
+
+        menu.publish_microphone_devices(vec![MicrophoneDeviceView {
+            id: "snapshot-token-a".to_owned(),
+            name: "USB Microphone".to_owned(),
+            is_default: true,
+        }]);
+        let revision = menu.view().microphone_devices_revision;
+        menu.activate_from_input(MenuAction::SettingsMicrophoneSelect(0, revision));
+        assert_eq!(
+            menu.take_microphone_selection_request(),
+            Some(MicrophoneSelectionRequest::Device(
+                "snapshot-token-a".to_owned()
+            ))
+        );
+
+        // The opaque token belongs only to the menu's transient request and is not a saved option.
+        let persisted_settings = menu.view().settings_options;
+        assert!(
+            !serde_json::to_string(persisted_settings.as_ref())
+                .unwrap()
+                .contains("snapshot-token-a")
+        );
+    }
+
+    #[test]
+    fn stale_device_row_revision_is_rejected_after_refresh() {
+        let mut menu = menu();
+        menu.publish_microphone_devices(vec![MicrophoneDeviceView {
+            id: "old-snapshot-token".to_owned(),
+            name: "Old microphone".to_owned(),
+            is_default: false,
+        }]);
+        let stale_revision = menu.view().microphone_devices_revision;
+
+        menu.publish_microphone_devices(vec![MicrophoneDeviceView {
+            id: "fresh-snapshot-token".to_owned(),
+            name: "New microphone".to_owned(),
+            is_default: true,
+        }]);
+        menu.activate_from_input(MenuAction::SettingsMicrophoneSelect(0, stale_revision));
+
+        assert_eq!(menu.take_microphone_selection_request(), None);
+        assert_eq!(
+            menu.view().microphone_message.as_deref(),
+            Some("The microphone list changed. Refresh it before selecting a device.")
+        );
+    }
+
+    #[test]
+    fn selected_device_is_marked_only_for_the_current_snapshot_and_clear_invalidates_rows() {
+        let mut menu = menu();
+        menu.publish_microphone_devices(vec![MicrophoneDeviceView {
+            id: "current-device-token".to_owned(),
+            name: "Built-in microphone".to_owned(),
+            is_default: true,
+        }]);
+        menu.mark_microphone_selected("current-device-token".to_owned());
+        assert_eq!(
+            menu.view().selected_microphone_id.as_deref(),
+            Some("current-device-token")
+        );
+
+        let revision = menu.view().microphone_devices_revision;
+        menu.clear_microphone_devices("The active microphone disconnected.");
+        let view = menu.view();
+        assert!(view.microphone_devices.is_empty());
+        assert!(view.selected_microphone_id.is_none());
+        assert!(view.microphone_devices_revision > revision);
+        assert_eq!(
+            view.microphone_message.as_deref(),
+            Some("The active microphone disconnected.")
+        );
+    }
+
+    #[test]
+    fn permission_retry_is_an_explicit_one_shot_request() {
+        let mut menu = menu();
+        menu.activate_from_input(MenuAction::SettingsMicrophoneRetryPermission);
+        assert!(menu.take_microphone_permission_retry_request());
+        assert!(!menu.take_microphone_permission_retry_request());
+        assert_eq!(
+            menu.view().microphone_message.as_deref(),
+            Some("Retrying microphone permission check…")
+        );
+    }
+
+    #[test]
+    fn system_default_request_is_explicit_and_not_a_persisted_device_token() {
+        let mut menu = menu();
+        menu.activate_from_input(MenuAction::SettingsMicrophoneUseSystemDefault);
+        assert_eq!(
+            menu.take_microphone_selection_request(),
+            Some(MicrophoneSelectionRequest::SystemDefault)
+        );
     }
 }

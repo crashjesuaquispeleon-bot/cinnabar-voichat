@@ -93,6 +93,41 @@ func TestResolveAndRoundTrip(t *testing.T) {
 	}
 }
 
+
+func TestSessionControlAndVoiceEndpointsAreSeparate(t *testing.T) {
+	dir := t.TempDir()
+	game, err := ListenSession(dir)
+	if err != nil {
+		t.Fatalf("listen session: %v", err)
+	}
+	defer game.Close()
+	control, err := ListenControl(dir)
+	if err != nil {
+		t.Fatalf("listen control: %v", err)
+	}
+	defer control.Close()
+	voice, err := ListenVoice(dir)
+	if err != nil {
+		t.Fatalf("listen voice: %v", err)
+	}
+	defer voice.Close()
+
+	addresses := make(map[string]bool)
+	for _, resolve := range []func(string) (string, string, error){ResolveSession, ResolveControl, ResolveVoice} {
+		network, address, err := resolve(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		addresses[network+"|"+address] = true
+	}
+	if len(addresses) != 3 {
+		t.Fatalf("three endpoint types resolve to %d unique paths", len(addresses))
+	}
+	if _, err := ListenVoice(dir); err == nil {
+		t.Fatal("second voice listener acquired an active voice lease")
+	}
+}
+
 func TestSessionAndControlEndpointsCoexistAndCloseIndependently(t *testing.T) {
 	dir := t.TempDir()
 	game, err := ListenSession(dir)

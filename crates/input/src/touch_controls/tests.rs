@@ -166,3 +166,19 @@ fn an_ended_finger_frees_its_id_for_a_new_contact_in_the_same_frame() {
     assert_eq!(held[0].hit_id, Some(touch::JOYSTICK));
     assert_eq!(state.end(8), None);
 }
+
+#[test]
+fn voice_push_to_talk_contact_stays_held_until_the_finger_is_released() {
+    let mut state = TouchControlState::default();
+    assert!(state.begin(21, [0.2, 0.8], 1, Some(region(touch::VOICE_PTT)),));
+
+    let held = state.sample();
+    assert_eq!(held.len(), 1);
+    assert_eq!(held[0].hit_id, Some(touch::VOICE_PTT));
+    assert!(state.move_to(21, [0.25, 0.75], 2));
+    assert_eq!(state.sample()[0].hit_id, Some(touch::VOICE_PTT));
+
+    let released = state.end(21).expect("the PTT finger must end");
+    assert_eq!(released.hit_id, Some(touch::VOICE_PTT));
+    assert!(state.sample().is_empty());
+}

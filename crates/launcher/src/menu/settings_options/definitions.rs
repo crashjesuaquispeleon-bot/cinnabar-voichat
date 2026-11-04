@@ -293,6 +293,18 @@ const GRAPHICS: &[SettingChoice] = &[
     },
 ];
 
+/// Voice activation choices shared by the Sound panel and persisted settings.
+const VOICE_ACTIVATION_CHOICES: &[SettingChoice] = &[
+    SettingChoice {
+        name: "voice_activation_radio_open_microphone",
+        label: "Open Microphone",
+    },
+    SettingChoice {
+        name: "voice_activation_radio_push_to_talk",
+        label: "Push to Talk (hold V)",
+    },
+];
+
 macro_rules! notification_choices {
     ($($suffix:ident => $millis:expr;)+) => {
         const TOAST_DURATIONS: &[SettingChoice] = &[$(
@@ -473,6 +485,14 @@ settings! {
         [(SettingPanel::Audio, 8)], [SettingsGroup::Audio], Some(AudioCategory::Records), None;
     WeatherVolume => "weather_volume", slider("soundCategory.weather", 0, 100, 100),
         [(SettingPanel::Audio, 9)], [SettingsGroup::Audio], Some(AudioCategory::Weather), None;
+    VoiceChatEnabled => "voice_chat_enabled", toggle("Enable Voice Chat", false),
+        [(SettingPanel::Audio, 10)], [SettingsGroup::Audio], None, None;
+    VoiceActivationMode => "voice_activation_mode", dropdown("Voice Activation Mode", VOICE_ACTIVATION_CHOICES, 0),
+        [(SettingPanel::Audio, 11)], [SettingsGroup::Audio], None, None;
+    VoiceChatMuted => "voice_chat_muted", toggle("Mute My Microphone", false),
+        [(SettingPanel::Audio, 12)], [SettingsGroup::Audio], None, None;
+    VoiceInputSensitivity => "voice_input_sensitivity", slider("Voice Input Sensitivity", 0, 200, 100),
+        [(SettingPanel::Audio, 13)], [SettingsGroup::Audio], None, None;
     ControllerInvertYAxis => "controller_invert_y_axis", toggle("options.invertYAxis", false),
         [(SettingPanel::Controller, 2)], [], None, Some("options.invertYAxis.name");
     SwapGamepadAbButtons => "swap_gamepad_ab_buttons", toggle("options.swapGamepadAB", false),

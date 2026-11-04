@@ -16,6 +16,7 @@ import (
 	"github.com/hashimthearab/rust-mcbe/core/internal/latencytrace"
 	"github.com/hashimthearab/rust-mcbe/core/internal/redact"
 	"github.com/hashimthearab/rust-mcbe/core/internal/streamnet"
+	voicebridge "github.com/hashimthearab/rust-mcbe/core/voice"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/device"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
@@ -63,6 +64,9 @@ type Config struct {
 	SessionTarget func(ctx context.Context, kind, value string) (string, error)
 	// Device, when set, is the install's device, claimed on every session login in place of the client's.
 	Device *device.Profile
+	// VoiceBridge enables the isolated local voice endpoint only when a trusted
+	// broker adapter can issue short-lived, partida-bound admission tokens.
+	VoiceBridge *voicebridge.VoiceBridgeConfig
 }
 
 const maxInitialTransferHops = 8
@@ -105,6 +109,17 @@ func Serve(ctx context.Context, cfg Config) (err error) {
 	if err != nil {
 		return errors.Join(fmt.Errorf("proxy: listen for sessions: %w", err), prepared.shutdown())
 	}
+	var voiceListener net.Listener
+	var voiceDone chan error
+	if cfg.VoiceBridge != nil {
+		voiceListener, err = streamnet.ListenVoice(cfg.SocketDir)
+		if err != nil {
+			_ = sessionListener.Close()
+			return errors.Join(fmt.Errorf("proxy: listen for voice: %w", err), prepared.shutdown())
+		}
+		voiceDone = make(chan error, 1)
+		go func() { voiceDone <- voicebridge.ServeBridge(serveCtx, voiceListener, *cfg.VoiceBridge) }()
+	}
 	sessionEndpoint := &sessionServer{
 		listener:     sessionListener,
 		prepared:     prepared,
@@ -123,7 +138,14 @@ func Serve(ctx context.Context, cfg Config) (err error) {
 	defer func() {
 		err = errors.Join(err, shutdownPreparedServer(prepared, func() error {
 			cancel()
-			return sessionEndpoint.close()
+			sessionErr := sessionEndpoint.close()
+			if voiceListener != nil {
+				_ = voiceListener.Close()
+				if voiceDone != nil {
+					sessionErr = errors.Join(sessionErr, <-voiceDone)
+				}
+			}
+			return sessionErr
 		}))
 	}()
 	<-ctx.Done()

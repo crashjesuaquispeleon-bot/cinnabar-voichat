@@ -22,6 +22,8 @@ pub mod settings_storage;
 pub mod sign_in_browser;
 pub mod video_settings;
 
+mod voice_environment;
+
 pub mod memory;
 pub mod minecraft_import;
 pub mod mod_library;

@@ -63,19 +63,52 @@ pub(crate) fn configure_client_authority_systems(app: &mut App) {
             crate::ui_runtime::mob_effects::drive_mob_effect_screen_input,
             drive_chat_ui_actions.in_set(OrdinaryInputSet),
             drain_inventory_authority,
+        )
+            .chain()
+            .in_set(ClientFrameSet::UiAuthority),
+    )
+    .add_systems(
+        Update,
+        (
             drive_chat_keyboard_input
                 .in_set(OrdinaryInputSet)
                 .before(client_state::ShellFrameSet::MenuInput),
             drive_inventory_ui_actions.after(client_state::ShellFrameSet::MenuInput),
-            drive_menu_services,
-            crate::session::hide_window_before_exit,
+        )
+            .chain()
+            .after(drain_inventory_authority)
+            .in_set(ClientFrameSet::UiAuthority),
+    )
+    .add_systems(
+        Update,
+        (drive_menu_services, crate::session::hide_window_before_exit)
+            .chain()
+            .after(drive_inventory_ui_actions)
+            .in_set(ClientFrameSet::UiAuthority),
+    )
+    .add_systems(
+        Update,
+        (
             drive_session.in_set(client_state::ShellFrameSet::Session),
             crate::render_distance::apply_render_distance
                 .after(client_state::ShellFrameSet::WindowSettings),
-            synchronize_semantic_input_authority.after(client_state::ShellFrameSet::Focus),
-            drive_world_inventory_keys.in_set(OrdinaryInputSet),
         )
             .chain()
+            .after(crate::session::hide_window_before_exit)
+            .in_set(ClientFrameSet::UiAuthority),
+    )
+    .add_systems(
+        Update,
+        synchronize_semantic_input_authority
+            .after(crate::render_distance::apply_render_distance)
+            .after(client_state::ShellFrameSet::Focus)
+            .in_set(ClientFrameSet::UiAuthority),
+    )
+    .add_systems(
+        Update,
+        drive_world_inventory_keys
+            .in_set(OrdinaryInputSet)
+            .after(synchronize_semantic_input_authority)
             .in_set(ClientFrameSet::UiAuthority),
     )
     .configure_sets(

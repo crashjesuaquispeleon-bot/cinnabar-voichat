@@ -129,6 +129,8 @@ const PHYSICS_REGISTRY_GENERATION_GUIDANCE: &str =
 
 pub(crate) mod authority;
 mod executor;
+#[cfg(not(target_arch = "wasm32"))]
+mod voice_bridge;
 use crate::game_frame::configure_client_frame_schedule;
 use authority::configure_client_authority_systems;
 
@@ -160,10 +162,12 @@ pub(crate) fn configure_client_production_frame_systems(app: &mut App) {
         .add_systems(
             Update,
             crate::session_audio::drain_sequenced_audio_into_session
+                .after(ClientFrameSet::SemanticFinalize)
                 .after(reconcile_world_stream_before_physics)
                 .after(drive_session)
                 .after(follow_server_transfer)
-                .after(recover_session_failure),
+                .after(recover_session_failure)
+                .before(client_audio::audio::voice_controller::sync_voice_capture_with_policy),
         )
 
         .add_systems(
@@ -211,11 +215,20 @@ pub(crate) fn configure_client_production_frame_systems(app: &mut App) {
                 .chain()
                 .in_set(ClientFrameSet::UiPreparation),
         )
+
         .add_systems(
             Update,
             (publish_ui_runtime, drive_menu_panorama)
                 .chain()
                 .in_set(ClientFrameSet::UiPublication),
+        );
+    #[cfg(not(target_arch = "wasm32"))]
+    app.init_resource::<voice_bridge::VoiceBridgeRuntime>()
+        .add_systems(
+            Update,
+            voice_bridge::drive_voice_bridge
+                .after(client_audio::audio::voice_controller::sync_voice_capture_with_policy)
+                .after(client_audio::audio::voice_remote::sync_remote_voice_playback),
         );
     #[cfg(feature = "tracy")]
     app.init_resource::<crate::tracy::PhysicsEnd>().add_systems(

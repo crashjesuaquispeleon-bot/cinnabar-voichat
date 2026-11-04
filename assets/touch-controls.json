@@ -214,6 +214,23 @@
         }
       },
       {
+        "voice_ptt@cinnabar_touch.mod_button": {
+          "anchor_from": "center",
+          "anchor_to": "center",
+          "offset": [
+            "42.5%",
+            "-25%"
+          ],
+          "size": [
+            "100%y",
+            "13.75%"
+          ],
+          "$control": "cinnabar.touch.voice_ptt",
+          "$held_binding": "#touch_voice_ptt_pressed",
+          "$label_binding": "#touch_voice_ptt_label"
+        }
+      },
+      {
         "utilities": {
           "type": "stack_panel",
           "orientation": "horizontal",

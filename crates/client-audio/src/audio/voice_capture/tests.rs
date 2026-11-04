@@ -427,9 +427,7 @@ fn owner_worker_does_not_publish_selected_when_stream_stops_during_startup() {
         worker
             .recv_timeout(std::time::Duration::from_secs(2))
             .unwrap(),
-        MicrophoneWorkerEvent::BackendError(
-            "microphone stream stopped during startup".to_owned()
-        )
+        MicrophoneWorkerEvent::BackendError("microphone stream stopped during startup".to_owned())
     );
     assert!(!running.load(Ordering::Acquire));
     assert_eq!(

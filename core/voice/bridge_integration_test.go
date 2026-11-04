@@ -52,18 +52,6 @@ func bridgeTestFrame(sequence uint64, sample byte) []byte {
 	return frame
 }
 
-func waitForVoiceParticipants(t *testing.T, registry *Registry, roomID string, count int) {
-	t.Helper()
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
-		if got := len(registry.Participants(roomID)); got == count {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatalf("voice participants = %d, want %d", len(registry.Participants(roomID)), count)
-}
-
 // TestServeBridgeRelaysBothDirectionsAndHonoursTheAcknowledgedTransmitGate exercises
 // the native local IPC bridge against a real in-process Pion SFU and a second peer.
 // The admission issuer is deliberately a test-only fixed token source; production must
@@ -185,8 +173,6 @@ func TestServeBridgeRelaysBothDirectionsAndHonoursTheAcknowledgedTransmitGate(t 
 	if _, err := ipc.Write([]byte{bridgecontract.VoiceIPCKindClose}); err != nil {
 		t.Fatalf("close bridge IPC session: %v", err)
 	}
-	waitForVoiceParticipants(t, sfu.registry, roomID, 1)
-
 	cancelBridge()
 	select {
 	case err := <-bridgeDone:
@@ -196,6 +182,8 @@ func TestServeBridgeRelaysBothDirectionsAndHonoursTheAcknowledgedTransmitGate(t 
 	case <-time.After(3 * time.Second):
 		t.Fatal("voice bridge did not stop after context cancellation")
 	}
+	// ServeBridge returns only after the IPC handler's deferred client.Close has
+	// revoked its admission, so this assertion needs no polling or wall-clock sleep.
 	if len(sfu.registry.Participants(roomID)) != 1 {
 		t.Fatal("closing the local IPC session should revoke only its peer admission")
 	}

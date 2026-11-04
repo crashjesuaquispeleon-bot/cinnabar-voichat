@@ -77,7 +77,7 @@ func TestVerifyAdmissionRejectsExpiredLongLivedAndMalformedClaims(t *testing.T) 
 	now := time.Unix(1_800_000_000, 0)
 	key, config := verifier(t)
 	cases := []struct{name string; edit func(*jwtClaims); want error}{
-		{"expired", func(c *jwtClaims){ c.ExpiresAt = now.Unix() }, ErrAdmissionExpired},
+		{"expired", func(c *jwtClaims){ c.IssuedAt = now.Add(-2*time.Minute).Unix(); c.NotBefore = c.IssuedAt; c.ExpiresAt = now.Add(-time.Minute).Unix() }, ErrAdmissionExpired},
 		{"long lifetime", func(c *jwtClaims){ c.ExpiresAt = now.Add(6*time.Minute).Unix() }, ErrInvalidAdmission},
 		{"invalid xuid", func(c *jwtClaims){ c.XUID = "not-an-xuid" }, ErrInvalidAdmission},
 		{"invalid room", func(c *jwtClaims){ c.RoomID = "not-a-uuid" }, ErrInvalidAdmission},
@@ -111,6 +111,26 @@ func TestRegistryBindsOneRoomToOneSessionAndCapsMembers(t *testing.T) {
 	}
 	if err := r.Join(Admission{RoomID: roomID, SessionID: sessionID, XUID: "bad"}, now); !errors.Is(err, ErrAdmissionNotVerified) {
 		t.Fatalf("unverified admission error = %v", err)
+	}
+}
+
+func TestRegistryRenewsLeaseAndRejectsTokenReplay(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	r, err := NewRegistry(8)
+	if err != nil { t.Fatal(err) }
+	roomID, sessionID := uuid.NewString(), uuid.NewString()
+	first := admissionFor(t, now, roomID, sessionID, "2001")
+	if err := r.Join(first, now); err != nil { t.Fatal(err) }
+	renewed := admissionFor(t, now.Add(30*time.Second), roomID, sessionID, "2001")
+	if err := r.Renew(renewed, now.Add(30*time.Second)); err != nil { t.Fatal(err) }
+	if err := r.Join(first, now.Add(30*time.Second)); !errors.Is(err, ErrAdmissionAlreadyUsed) {
+		t.Fatalf("replayed token error = %v", err)
+	}
+	if got := r.Expire(now.Add(61*time.Second)); len(got) != 0 {
+		t.Fatalf("renewed member expired with old lease: %#v", got)
+	}
+	if got := r.Expire(now.Add(91*time.Second)); len(got) != 1 || got[0].TokenID != renewed.TokenID {
+		t.Fatalf("renewal expiry = %#v", got)
 	}
 }
 

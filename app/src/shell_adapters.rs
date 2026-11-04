@@ -27,8 +27,8 @@ pub(crate) fn drive_menu_services(
     launcher_account: Option<ResMut<launcher_account::LauncherAccount>>,
     mut local_worlds: Option<ResMut<client_shell::local_worlds::LocalWorlds>>,
     audio_settings: Option<ResMut<client_audio::audio::AudioSettings>>,
-    mut voice_controller: Option<ResMut<VoiceCaptureController>>,
-    mut voice_policy: Option<ResMut<VoiceInputPolicy>>,
+    voice_controller: Option<ResMut<VoiceCaptureController>>,
+    voice_policy: Option<ResMut<VoiceInputPolicy>>,
     settings: Option<ResMut<client_state::RuntimeSettings>>,
     antialiasing: Option<Res<client_presentation::camera::antialiasing::CameraAntiAliasingSupport>>,
     mut local_skin: Option<ResMut<LocalPlayerSkin>>,
@@ -109,7 +109,9 @@ fn apply_voice_preferences(
 
     if let Some(controller) = controller {
         controller.set_input_sensitivity_percent(
-            options.value(SettingId::VoiceInputSensitivity).clamp(0, 200) as u8,
+            options
+                .value(SettingId::VoiceInputSensitivity)
+                .clamp(0, 200) as u8,
         );
     }
 }
@@ -338,7 +340,6 @@ fn server_kind(
         Destination::LocalWorld(_) => ServerKind::LocalWorld,
     }
 }
-
 
 #[cfg(test)]
 mod voice_settings_tests {

@@ -249,6 +249,15 @@ func TestAdmissionRevokeHandlerRequiresBrokerControlTokenAndCanonicalIDs(t *test
 		t.Fatalf("body response=%d revoked=%d", response.Code, revoked)
 	}
 
+	request = httptest.NewRequest(http.MethodPost, path, strings.NewReader("chunked body"))
+	request.ContentLength = -1
+	request.Header.Set("Authorization", "Bearer "+string(token))
+	response = httptest.NewRecorder()
+	mux.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest || revoked != 0 {
+		t.Fatalf("unknown-length body response=%d revoked=%d", response.Code, revoked)
+	}
+
 	request = httptest.NewRequest(http.MethodPost, path, nil)
 	request.Header.Set("Authorization", "Bearer "+string(token))
 	response = httptest.NewRecorder()

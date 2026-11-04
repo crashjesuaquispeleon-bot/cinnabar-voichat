@@ -83,6 +83,7 @@ func loadConfig(getenv func(string) string) (config, error) {
 		UDP4Port: defaultVoiceUDP4Port,
 		UDP6Port: defaultVoiceUDP6Port,
 	}
+	var err error
 	if cfg.ListenAddress == "" {
 		cfg.ListenAddress = defaultListenAddress
 	}
@@ -210,7 +211,11 @@ func parseUDPBindIP(raw string, ipv6 bool) (net.IP, error) {
 }
 
 func isUnspecifiedIP(ip net.IP) bool {
-	for _, value := range ip {
+	canonical := ip.To4()
+	if canonical == nil {
+		canonical = ip.To16()
+	}
+	for _, value := range canonical {
 		if value != 0 {
 			return false
 		}

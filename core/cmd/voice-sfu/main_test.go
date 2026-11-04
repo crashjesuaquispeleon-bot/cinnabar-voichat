@@ -7,6 +7,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -39,6 +41,25 @@ func TestLoadConfigUsesPinnedBrokerKeyAndExplicitICE(t *testing.T) {
 	if len(cfg.PublicKey) != ed25519.PublicKeySize || len(cfg.ControlToken) != 32 ||
 		len(cfg.ICEServers) != 1 || cfg.MaxParticipants != defaultRoomLimit {
 		t.Fatalf("unexpected SFU security config: %#v", cfg)
+	}
+}
+
+func TestLoadConfigReadsControlTokenFromCredentialFile(t *testing.T) {
+	values := validVoiceSFUEnvironment()
+	controlToken := values["CINNABAR_VOICE_CONTROL_TOKEN"]
+	delete(values, "CINNABAR_VOICE_CONTROL_TOKEN")
+	credentialPath := filepath.Join(t.TempDir(), "voice-control-token")
+	if err := os.WriteFile(credentialPath, []byte(controlToken+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	values["CINNABAR_VOICE_CONTROL_TOKEN_FILE"] = credentialPath
+
+	cfg, err := loadConfig(func(key string) string { return values[key] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.ControlToken) != 32 {
+		t.Fatalf("credential file produced a %d-byte token", len(cfg.ControlToken))
 	}
 }
 

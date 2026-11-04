@@ -208,6 +208,12 @@ impl VoiceRemotePlayback {
     ) -> Result<usize, RemoteVoiceFrameError> {
         let now = Instant::now();
         let mut sources = self.sources.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        // Recheck the policy after taking the source-state lock. If a session teardown
+        // began while this network callback was waiting, do not repopulate a source slot
+        // after update_queue_gate cleared the previous session's participant snapshot.
+        if !self.enabled.load(Ordering::Acquire) || self.muted.load(Ordering::Acquire) {
+            return Err(RemoteVoiceFrameError::Disabled);
+        }
 
         if let Some(index) = sources
             .iter()
@@ -526,6 +532,16 @@ mod tests {
                 .iter()
                 .all(|sample| (*sample - 0.5).abs() < 0.0001)
         );
+    }
+
+    #[test]
+    fn disabled_session_cannot_repopulate_source_state() {
+        let playback = VoiceRemotePlayback::default();
+        assert_eq!(
+            playback.resolve_source([1; REMOTE_SOURCE_ID_BYTES], 1),
+            Err(RemoteVoiceFrameError::Disabled)
+        );
+        assert!(playback.active_participants().is_empty());
     }
 
     #[test]

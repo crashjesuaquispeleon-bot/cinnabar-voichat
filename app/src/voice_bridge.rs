@@ -7,8 +7,13 @@
 use bevy::prelude::{Res, ResMut, Resource};
 use bytes::Bytes;
 use futures::StreamExt;
-use std::{path::PathBuf, thread::{self, JoinHandle}, time::{Duration, Instant}};
+use std::{
+    path::PathBuf,
+    thread::{self, JoinHandle},
+    time::{Duration, Instant},
+};
 
+use crate::runtime::network::resource_packs::PackApplication;
 use client_audio::audio::{
     voice_controller::VoiceCaptureController,
     voice_input::{MicrophoneMode, VoiceInputPolicy},
@@ -16,7 +21,6 @@ use client_audio::audio::{
     voice_wire::Pcm16VoiceFrameEncoder,
 };
 use client_runtime::network::NetworkHandle;
-use crate::runtime::network::resource_packs::PackApplication;
 
 const BRIDGE_RETRY_DELAY: Duration = Duration::from_secs(2);
 const AUDIO_TICK: Duration = Duration::from_millis(20);
@@ -28,7 +32,10 @@ struct BridgeDesired {
 }
 
 impl BridgeDesired {
-    const STOPPED: Self = Self { active: false, transmit: false };
+    const STOPPED: Self = Self {
+        active: false,
+        transmit: false,
+    };
 }
 
 /// Owns one optional local IPC worker for the currently joined game core.
@@ -70,9 +77,8 @@ pub(crate) fn drive_voice_bridge(
         runtime.stop();
         return;
     };
-    let feature_enabled = policy.enabled()
-        && policy.session_active()
-        && policy.mode() != MicrophoneMode::Unselected;
+    let feature_enabled =
+        policy.enabled() && policy.session_active() && policy.mode() != MicrophoneMode::Unselected;
     let Some(socket_dir) = network
         .as_deref()
         .and_then(|network| network.core_socket_dir())
@@ -83,8 +89,14 @@ pub(crate) fn drive_voice_bridge(
         return;
     };
 
-    let finished = runtime.active.as_ref().is_some_and(|active| active.thread.is_finished());
-    let changed_session = runtime.active.as_ref().is_some_and(|active| active.socket_dir != socket_dir);
+    let finished = runtime
+        .active
+        .as_ref()
+        .is_some_and(|active| active.thread.is_finished());
+    let changed_session = runtime
+        .active
+        .as_ref()
+        .is_some_and(|active| active.socket_dir != socket_dir);
     if finished || changed_session {
         if let Some(active) = runtime.active.take() {
             if finished {
@@ -94,7 +106,10 @@ pub(crate) fn drive_voice_bridge(
         runtime.retry_at = Some(Instant::now() + BRIDGE_RETRY_DELAY);
     }
 
-    let desired = BridgeDesired { active: true, transmit: policy.transmission_permitted() };
+    let desired = BridgeDesired {
+        active: true,
+        transmit: policy.transmission_permitted(),
+    };
     if let Some(active) = runtime.active.as_ref() {
         if *active.desired.borrow() != desired {
             active.desired.send_replace(desired);
@@ -120,11 +135,23 @@ pub(crate) fn drive_voice_bridge(
     let worker = thread::Builder::new()
         .name("cinnabar-voice-ipc".to_owned())
         .spawn(move || {
-            let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build();
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build();
             match runtime {
                 Ok(runtime) => {
-                    if runtime.block_on(run_voice_bridge(thread_socket_dir, queue, remote, desired_rx)).is_err() {
-                        bevy::log::debug!("voice IPC worker stopped; the next session tick may retry");
+                    if runtime
+                        .block_on(run_voice_bridge(
+                            thread_socket_dir,
+                            queue,
+                            remote,
+                            desired_rx,
+                        ))
+                        .is_err()
+                    {
+                        bevy::log::debug!(
+                            "voice IPC worker stopped; the next session tick may retry"
+                        );
                     }
                 }
                 Err(_) => bevy::log::warn!("voice IPC runtime could not be created"),
@@ -132,7 +159,11 @@ pub(crate) fn drive_voice_bridge(
         });
     match worker {
         Ok(thread) => {
-            runtime.active = Some(ActiveBridge { socket_dir, desired: desired_tx, thread });
+            runtime.active = Some(ActiveBridge {
+                socket_dir,
+                desired: desired_tx,
+                thread,
+            });
             runtime.retry_at = None;
         }
         Err(_) => {
@@ -149,8 +180,8 @@ async fn run_voice_bridge(
     mut desired: tokio::sync::watch::Receiver<BridgeDesired>,
 ) -> anyhow::Result<()> {
     use bridge::{
-        VOICE_FRAME_BYTES, VOICE_IPC_KIND_AUDIO, VOICE_IPC_KIND_CLOSE,
-        VOICE_IPC_KIND_REMOTE_AUDIO, VOICE_IPC_KIND_STATUS,
+        VOICE_FRAME_BYTES, VOICE_IPC_KIND_AUDIO, VOICE_IPC_KIND_CLOSE, VOICE_IPC_KIND_REMOTE_AUDIO,
+        VOICE_IPC_KIND_STATUS,
     };
 
     let (mut reader, writer) = bridge::connect_voice(&socket_dir).await?;
@@ -266,6 +297,11 @@ struct IpcStatus {
 
 async fn send_transmit_gate(writer: &bridge::FrameQueue, allowed: bool) -> anyhow::Result<()> {
     use bridge::VOICE_IPC_KIND_TRANSMIT;
-    writer.send(Bytes::from(vec![VOICE_IPC_KIND_TRANSMIT, u8::from(allowed)])).await?;
+    writer
+        .send(Bytes::from(vec![
+            VOICE_IPC_KIND_TRANSMIT,
+            u8::from(allowed),
+        ]))
+        .await?;
     Ok(())
 }

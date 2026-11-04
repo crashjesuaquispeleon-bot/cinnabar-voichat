@@ -2289,6 +2289,7 @@ dependencies = [
  "far-terrain",
  "first-run",
  "fontdue",
+ "futures",
  "gameplay",
  "glam",
  "image",

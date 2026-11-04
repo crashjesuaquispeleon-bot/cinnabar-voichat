@@ -23,8 +23,8 @@ pub mod voice_loopback;
 pub mod voice_pcm;
 pub mod voice_permission;
 pub mod voice_remote;
-pub mod voice_wire;
 pub mod voice_stream;
+pub mod voice_wire;
 mod water;
 pub mod weather;
 

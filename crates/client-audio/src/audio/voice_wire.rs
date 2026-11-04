@@ -67,7 +67,8 @@ impl Pcm16VoiceFrameEncoder {
             let offset = VOICE_WIRE_SEQUENCE_BYTES + output_index * 2;
             payload[offset..offset + 2].copy_from_slice(&pcm.to_le_bytes());
         }
-        self.history.copy_from_slice(&input[VOICE_FRAME_SAMPLES - 8..]);
+        self.history
+            .copy_from_slice(&input[VOICE_FRAME_SAMPLES - 8..]);
         payload
     }
 }
@@ -86,9 +87,11 @@ mod tests {
         let payload = encoder.encode(&frame, 0x0102_0304_0506_0708);
         assert_eq!(payload.len(), 648);
         assert_eq!(&payload[..8], &0x0102_0304_0506_0708_u64.to_be_bytes());
-        assert!(payload[8..].chunks_exact(2).all(|bytes| {
-            i16::from_le_bytes([bytes[0], bytes[1]]) == 16_384
-        }));
+        assert!(
+            payload[8..]
+                .chunks_exact(2)
+                .all(|bytes| { i16::from_le_bytes([bytes[0], bytes[1]]) == 16_384 })
+        );
     }
 
     #[test]

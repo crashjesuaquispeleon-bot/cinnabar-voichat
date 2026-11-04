@@ -38,19 +38,19 @@ const (
 
 // config contains operator-owned SFU settings. It never contains the broker's signing key.
 type config struct {
-	ListenAddress string
-	TLSCertFile   string
-	TLSKeyFile    string
-	Issuer        string
-	Audience      string
-	PublicKey     ed25519.PublicKey
-	ControlToken  []byte
-	ICEServers    []webrtc.ICEServer
+	ListenAddress   string
+	TLSCertFile     string
+	TLSKeyFile      string
+	Issuer          string
+	Audience        string
+	PublicKey       ed25519.PublicKey
+	ControlToken    []byte
+	ICEServers      []webrtc.ICEServer
 	MaxParticipants int
-	UDP4Port int
-	UDP6Port int
-	UDP4BindIP net.IP
-	UDP6BindIP net.IP
+	UDP4Port        int
+	UDP6Port        int
+	UDP4BindIP      net.IP
+	UDP6BindIP      net.IP
 }
 
 func main() {
@@ -240,6 +240,10 @@ func newVoiceUDPMux(cfg config) (ice.UDPMux, error) {
 	if err != nil {
 		return nil, fmt.Errorf("bind IPv4 voice UDP %d: %w", cfg.UDP4Port, err)
 	}
+	if len(udp4.GetListenAddresses()) == 0 {
+		_ = udp4.Close()
+		return nil, fmt.Errorf("bind IPv4 voice UDP %d: no eligible local IPv4 interface matched the bind filter", cfg.UDP4Port)
+	}
 
 	udp6Options := []ice.UDPMuxFromPortOption{
 		ice.UDPMuxFromPortWithNetworks(ice.NetworkTypeUDP6),
@@ -254,6 +258,11 @@ func newVoiceUDPMux(cfg config) (ice.UDPMux, error) {
 	if err != nil {
 		_ = udp4.Close()
 		return nil, fmt.Errorf("bind IPv6 voice UDP %d: %w", cfg.UDP6Port, err)
+	}
+	if len(udp6.GetListenAddresses()) == 0 {
+		_ = udp6.Close()
+		_ = udp4.Close()
+		return nil, fmt.Errorf("bind IPv6 voice UDP %d: no eligible local IPv6 interface matched the bind filter", cfg.UDP6Port)
 	}
 	return ice.NewMultiUDPMuxDefault(udp4, udp6), nil
 }

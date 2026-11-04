@@ -35,6 +35,9 @@ jobs:
         shell: bash
     env:
       CINNABAR_BUILD_COMMIT: ${{ github.sha }}
+      # Public routing config only; TURN credentials and private keys are never build variables.
+      CINNABAR_VOICE_WSS_ENDPOINT: ${{ vars.CINNABAR_VOICE_WSS_ENDPOINT }}
+      CINNABAR_VOICE_ICE_SERVERS: ${{ vars.CINNABAR_VOICE_ICE_SERVERS }}
       CARGO_INCREMENTAL: "0"
       CARGO_PROFILE_RELEASE_DEBUG: "line-tables-only"
       CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO: "packed"
@@ -91,6 +94,9 @@ jobs:
     env:
       CINNABAR_ANDROID_PROFILE: play
       CINNABAR_BUILD_COMMIT: ${{ github.sha }}
+      # Public routing config only; TURN credentials and private keys are never build variables.
+      CINNABAR_VOICE_WSS_ENDPOINT: ${{ vars.CINNABAR_VOICE_WSS_ENDPOINT }}
+      CINNABAR_VOICE_ICE_SERVERS: ${{ vars.CINNABAR_VOICE_ICE_SERVERS }}
       CARGO_INCREMENTAL: "0"
     steps:
       - uses: actions/checkout@v6

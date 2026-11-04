@@ -38,7 +38,7 @@ Conéctate por SSH a Ubuntu y ejecuta:
 
 ~~~sh
 sudo apt-get update
-sudo apt-get install -y git ca-certificates openssl certbot ufw
+sudo apt-get install -y git ca-certificates openssl certbot ufw golang-go
 sudo mkdir -p /opt/cinnabar
 sudo git clone --depth 1 --branch feature/voice-chat-foundation \
   https://github.com/crashjesuaquispeleon-bot/cinnabar-voichat.git \

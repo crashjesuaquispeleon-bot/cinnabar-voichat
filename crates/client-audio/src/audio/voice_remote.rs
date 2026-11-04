@@ -41,6 +41,16 @@ struct RemoteSourceState {
     id: [u8; REMOTE_SOURCE_ID_BYTES],
     last_sequence: u64,
     last_seen: Instant,
+    volume_percent: u8,
+}
+
+/// Opaque participant presentation data; it contains no account or XUID fields.
+/// The source ID is random per SFU connection and changes when a participant reconnects.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RemoteVoiceParticipant {
+    pub source_id: [u8; REMOTE_SOURCE_ID_BYTES],
+    pub speaking: bool,
+    pub volume_percent: u8,
 }
 
 /// A malformed, stale or unplayable remote payload.
@@ -62,6 +72,7 @@ pub struct VoiceRemotePlayback {
     sources: Arc<Mutex<RemoteSourceSlots>>,
     enabled: Arc<AtomicBool>,
     muted: Arc<AtomicBool>,
+    master_volume: Arc<std::sync::atomic::AtomicU32>,
     dropped: Arc<std::sync::atomic::AtomicU64>,
 }
 
@@ -77,6 +88,7 @@ impl Default for VoiceRemotePlayback {
             sources: Arc::new(Mutex::new(std::array::from_fn(|_| None))),
             enabled: Arc::new(AtomicBool::new(false)),
             muted: Arc::new(AtomicBool::new(false)),
+            master_volume: Arc::new(std::sync::atomic::AtomicU32::new(1.0_f32.to_bits())),
             dropped: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
     }
@@ -97,12 +109,59 @@ impl VoiceRemotePlayback {
         self.update_queue_gate();
     }
 
-    /// Sets the receive gain for every participant (0–200%).
+    /// Sets the master receive gain (0–200%) without overwriting individual speaker levels.
     pub fn set_receive_volume_percent(&self, percent: u8) {
         let gain = f32::from(percent.min(200)) / 100.0;
-        for queue in self.queues.iter() {
-            queue.set_input_gain(gain);
+        self.master_volume.store(gain.to_bits(), Ordering::Release);
+        let sources = self.sources.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        for (index, source) in sources.iter().enumerate() {
+            if let Some(source) = source {
+                self.queues[index].set_input_gain(gain * f32::from(source.volume_percent) / 100.0);
+            }
         }
+    }
+
+    /// Sets one currently active speaker's local receive level (0–200%).
+    /// The identifier is the SFU-generated ephemeral source ID, not a user/account ID.
+    /// Returns false when that source is not present in the current room receive state.
+    pub fn set_source_volume_percent(
+        &self,
+        source_id: [u8; REMOTE_SOURCE_ID_BYTES],
+        percent: u8,
+    ) -> bool {
+        let percent = percent.min(200);
+        let master = f32::from_bits(self.master_volume.load(Ordering::Acquire));
+        let mut sources = self.sources.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let Some(index) = sources
+            .iter()
+            .position(|source| source.is_some_and(|state| state.id == source_id))
+        else {
+            return false;
+        };
+        let source = sources[index].as_mut().expect("source index was found");
+        source.volume_percent = percent;
+        self.queues[index].set_input_gain(master * f32::from(percent) / 100.0);
+        true
+    }
+
+    /// Returns recently heard participants for lightweight UI polling.
+    /// A participant is considered speaking while a packet arrived in the last 300 ms;
+    /// an idle source is removed from this snapshot after the five-second expiry window.
+    pub fn active_participants(&self) -> Vec<RemoteVoiceParticipant> {
+        let now = Instant::now();
+        let sources = self.sources.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        sources
+            .iter()
+            .filter_map(|source| {
+                let state = (*source)?;
+                let age = now.duration_since(state.last_seen);
+                (age < REMOTE_SOURCE_IDLE_TIMEOUT).then_some(RemoteVoiceParticipant {
+                    source_id: state.id,
+                    speaking: age <= Duration::from_millis(300),
+                    volume_percent: state.volume_percent,
+                })
+            })
+            .collect()
     }
 
     fn update_queue_gate(&self) {
@@ -185,7 +244,10 @@ impl VoiceRemotePlayback {
             id: source_id,
             last_sequence: sequence,
             last_seen: now,
+            volume_percent: 100,
         });
+        let master = f32::from_bits(self.master_volume.load(Ordering::Acquire));
+        self.queues[index].set_input_gain(master);
         Ok(index)
     }
 
@@ -538,6 +600,56 @@ mod tests {
                 .iter()
                 .all(|sample| (*sample - 1.0).abs() < 0.0001)
         );
+    }
+
+    #[test]
+    fn individual_speaker_volume_does_not_change_other_sources_or_master_volume() {
+        let playback = VoiceRemotePlayback::default();
+        playback.set_voice_session_enabled(true);
+        assert_eq!(playback.ingest_frame(&test_frame(1, 1, 8_192)), Ok(()));
+        assert_eq!(playback.ingest_frame(&test_frame(2, 1, 16_384)), Ok(()));
+        let queues = playback.mixer_queues();
+        let _ = queues[0].pop().expect("first speaker initial frame");
+        let _ = queues[1].pop().expect("second speaker initial frame");
+
+        assert!(playback.set_source_volume_percent([1; REMOTE_SOURCE_ID_BYTES], 0));
+        assert!(playback.set_source_volume_percent([2; REMOTE_SOURCE_ID_BYTES], 200));
+        assert_eq!(playback.ingest_frame(&test_frame(1, 2, 8_192)), Ok(()));
+        assert_eq!(playback.ingest_frame(&test_frame(2, 2, 16_384)), Ok(()));
+
+        let first = queues[0].pop().expect("muted speaker frame");
+        let second = queues[1].pop().expect("boosted speaker frame");
+        assert!(first.samples().iter().all(|sample| *sample == 0.0));
+        assert!(second.samples().iter().all(|sample| (*sample - 1.0).abs() < 0.0001));
+
+        playback.set_receive_volume_percent(50);
+        assert_eq!(playback.ingest_frame(&test_frame(1, 3, 8_192)), Ok(()));
+        assert_eq!(playback.ingest_frame(&test_frame(2, 3, 16_384)), Ok(()));
+        let first = queues[0].pop().expect("master-scaled muted speaker frame");
+        let second = queues[1].pop().expect("master-scaled boosted speaker frame");
+        assert!(first.samples().iter().all(|sample| *sample == 0.0));
+        assert!(second.samples().iter().all(|sample| (*sample - 0.5).abs() < 0.0001));
+    }
+
+    #[test]
+    fn activity_snapshot_contains_only_ephemeral_source_ids_and_volume_controls() {
+        let playback = VoiceRemotePlayback::default();
+        playback.set_voice_session_enabled(true);
+        assert_eq!(playback.ingest_frame(&test_frame(7, 1, 8_192)), Ok(()));
+        assert_eq!(playback.ingest_frame(&test_frame(8, 1, 8_192)), Ok(()));
+        assert!(playback.set_source_volume_percent([8; REMOTE_SOURCE_ID_BYTES], 135));
+
+        let participants = playback.active_participants();
+        assert_eq!(participants.len(), 2);
+        assert!(participants.iter().all(|participant| participant.speaking));
+        assert!(participants.iter().any(|participant| {
+            participant.source_id == [7; REMOTE_SOURCE_ID_BYTES]
+                && participant.volume_percent == 100
+        }));
+        assert!(participants.iter().any(|participant| {
+            participant.source_id == [8; REMOTE_SOURCE_ID_BYTES]
+                && participant.volume_percent == 135
+        }));
     }
 
     #[test]

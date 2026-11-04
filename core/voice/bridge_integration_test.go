@@ -130,8 +130,14 @@ func TestServeBridgeRelaysBothDirectionsAndHonoursTheAcknowledgedTransmitGate(t 
 	}
 	select {
 	case received := <-peer.ReceiveFrames():
-		if string(received) != string(outbound) {
-			t.Fatal("second peer received a different frame from the local IPC uplink")
+		if len(received) != voiceRemoteFrameBytes {
+			t.Fatalf("second peer received %d bytes, want source envelope plus %d-byte PCM frame", len(received), voiceFrameBytes)
+		}
+		if string(received[voiceSourceIDBytes:]) != string(outbound) {
+			t.Fatal("second peer received a different PCM frame from the local IPC uplink")
+		}
+		if string(received[:voiceSourceIDBytes]) == string(make([]byte, voiceSourceIDBytes)) {
+			t.Fatal("second peer received a frame without its opaque speaker ID")
 		}
 	case <-bridgeCtx.Done():
 		t.Fatal("second peer did not receive the local IPC uplink frame")

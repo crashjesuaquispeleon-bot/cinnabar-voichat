@@ -130,7 +130,7 @@ References:
 - [ ] Implement/deploy the trusted broker issuer that derives XUID from the authenticated Cinnabar account and the partida UUID from an authoritative server-side adapter.
 - [ ] Inject the real VoiceAdmissionSource and deployed WSS/ICE/TURN settings into the production bedrock-core configuration. Until then, the IPC voice endpoint remains disabled by default.
 - [x] Give every downlink stream a random server-generated source ID; validate sequence numbers per source and mix up to the SFU's 64-participant limit concurrently, with bounded per-speaker queues and a two-frame startup prebuffer.
-- [x] Expose an ephemeral-source participant snapshot with speaking activity (300 ms packet freshness) and independent 0–200% per-speaker receive volume, combined with the master receive-volume setting. The source API does not expose XUID or account identity.
+- [x] Expose an ephemeral-source snapshot of recent media activity (300 ms packet freshness) and independent 0–200% per-speaker receive volume, combined with the master receive-volume setting. This reports active media frames, not voice-activity detection; the source API does not expose XUID or account identity.
 - [ ] Connect participant snapshots and per-speaker volume controls to the in-game UI.
 - [ ] Add an adaptive jitter buffer and migrate the media plane to Opus/RTP.
 - [ ] Verify real two-client and multi-client sessions across separate installations, session transfers, packet loss, reconnect, and shutdown.

@@ -20,6 +20,9 @@ Optional variables:
 - `CINNABAR_VOICE_LISTEN_ADDR`: listen address; defaults to `127.0.0.1:8443`.
 - `CINNABAR_VOICE_AUDIENCE`: audience claim; defaults to `cinnabar-voice-sfu`.
 - `CINNABAR_VOICE_MAX_PARTICIPANTS`: maximum participants per room, from 1 to 64; defaults to 8.
+- `CINNABAR_VOICE_UDP4_PORT`: fixed IPv4 ICE UDP port; defaults to `19132`.
+- `CINNABAR_VOICE_UDP6_PORT`: fixed IPv6 ICE UDP port; defaults to `19133`.
+- `CINNABAR_VOICE_UDP4_BIND_IP` and `CINNABAR_VOICE_UDP6_BIND_IP`: optional literal local interface IPs that restrict which addresses the SFU binds. Leave unset to bind every eligible interface.
 
 Example (replace every placeholder and keep TURN credentials in the deployment secret store):
 
@@ -36,7 +39,13 @@ export CINNABAR_VOICE_MAX_PARTICIPANTS='8'
 go run ./cmd/voice-sfu
 ```
 
-Point the native core's operator-managed `VoiceBridgeConfig.Endpoint` at `wss://<host>/v1/voice` and supply the same ICE server configuration. Do not put the endpoint, public key, TURN credentials, or room ID in user-controlled settings.
+Point the native core's operator-managed `VoiceBridgeConfig.Endpoint` at `wss://<host>/v1/voice` and supply the same ICE server configuration. The signaling endpoint uses TCP/TLS; ICE voice traffic uses fixed UDP `19132` (IPv4) and `19133` (IPv6). Do not put the endpoint, public key, TURN credentials, or room ID in user-controlled settings.
+
+## Important: Bedrock port ownership
+
+Bedrock Dedicated Server already defaults to UDP `19132` for IPv4 and UDP `19133` for IPv6. The SFU cannot bind an address/port while the Minecraft server owns the same UDP socket. Deploy the SFU on a separate host or a distinct public IP, or move the Minecraft server to different ports and update the address/port players use to join. On a shared host with multiple IP addresses, set the two `*_BIND_IP` variables to dedicated voice interface addresses so the SFU does not try to bind the Bedrock interface. If you move Bedrock to custom ports, review `enable-lan-visibility`: when enabled, Bedrock can still bind the default discovery ports and recreate the conflict.
+
+Do not solve this by enabling UDP port reuse: that would not reliably route Bedrock RakNet and WebRTC ICE datagrams to the correct process. A same-IP shared socket requires a deliberate protocol-aware multiplexer integrated with the Minecraft server and is not provided by this sidecar.
 
 ## Production boundary still required
 

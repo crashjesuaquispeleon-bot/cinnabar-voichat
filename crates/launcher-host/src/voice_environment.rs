@@ -38,7 +38,7 @@ fn public_wss_endpoint(value: Option<&str>) -> Option<&str> {
     let authority = value.strip_prefix("wss://")?.split('/').next()?;
     let safe_authority = !authority.is_empty()
         && !authority.contains('@')
-        && !authority.contains('\\\\');
+        && !authority.contains('\\');
     let safe_url = !value.contains('?')
         && !value.contains('#')
         && !value.chars().any(char::is_whitespace);
@@ -56,7 +56,7 @@ fn safe_public_stun_url(value: &str) -> bool {
     !authority.is_empty()
         && !authority.chars().any(|character| {
             character.is_whitespace()
-                || matches!(character, '@' | '/' | '?' | '#' | '\\\\')
+                || matches!(character, '@' | '/' | '?' | '#' | '\\')
         })
 }
 

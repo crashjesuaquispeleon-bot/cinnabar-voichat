@@ -134,7 +134,7 @@ El PEM privado se carga únicamente como secreto `VOICE_ADMISSION_PRIVATE_KEY` d
 openssl rand -hex 16
 ~~~
 
-Ese texto exacto se guarda como secreto `VOICE_SFU_ADMIN_TOKEN` del Worker. En el servidor SFU se configura `CINNABAR_VOICE_CONTROL_TOKEN` como Base64 de esos mismos 32 caracteres, no como la cadena hexadecimal sin codificar.
+Ese texto exacto se guarda como secreto `VOICE_SFU_ADMIN_TOKEN` del Worker. En el servidor SFU, codifica esos mismos 32 caracteres a Base64 y guárdalos en `/etc/cinnabar/voice-control-token` con propietario root y modo 0600. El servicio los recibe a través de `LoadCredential`; no los pongas en el archivo de entorno ni en `Environment=`.
 
 3. El issuer y audience deben coincidir exactamente entre broker y SFU:
 

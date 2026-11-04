@@ -39,7 +39,7 @@ export CINNABAR_VOICE_MAX_PARTICIPANTS='8'
 go run ./cmd/voice-sfu
 ```
 
-Point the native core's operator-managed `VoiceBridgeConfig.Endpoint` at `wss://<host>/v1/voice` and supply the same ICE server configuration. The signaling endpoint uses TCP/TLS; ICE voice traffic uses fixed UDP `19132` (IPv4) and `19133` (IPv6). Do not put the endpoint, public key, TURN credentials, or room ID in user-controlled settings.
+Point the native core's operator-managed `VoiceBridgeConfig.Endpoint` at `wss://<host>/v1/voice` and supply the same ICE server configuration. In the current core startup, setting `CINNABAR_VOICE_WSS_ENDPOINT` enables construction of the bridge configuration; without that endpoint the bridge remains disabled. The signaling endpoint uses TCP/TLS; ICE voice traffic uses fixed UDP `19132` (IPv4) and `19133` (IPv6). Do not put the endpoint, public key, TURN credentials, or room ID in user-controlled settings.
 
 ## Important: Bedrock port ownership
 
@@ -47,8 +47,14 @@ Bedrock Dedicated Server already defaults to UDP `19132` for IPv4 and UDP `19133
 
 Do not solve this by enabling UDP port reuse: that would not reliably route Bedrock RakNet and WebRTC ICE datagrams to the correct process. A same-IP shared socket requires a deliberate protocol-aware multiplexer integrated with the Minecraft server and is not provided by this sidecar.
 
-## Production boundary still required
+## Production trust scope and remaining deployment work
 
-This executable does not create admissions. The trusted broker must authenticate the Cinnabar account, obtain authoritative membership in one active Minecraft partida, mint a room UUID, and sign the short-lived token. It must renew and revoke those tokens on account/session lifecycle events. Until that server-side issuer and partida adapter are deployed and configured in the core, the core intentionally leaves `VoiceBridgeConfig` unset and multiplayer voice admission remains disabled.
+The separate [Cinnabar API broker PR](https://github.com/crashjesuaquispeleon-bot/cinnabar-api/pull/1) implements FriendHost-scoped room creation, durable roster membership, short-lived Ed25519 admissions, host lease refresh, guest account-presence checks, and SFU room/member revocation. The native FriendHost reports guest XUIDs only after its Xbox login and MPSD session nonce checks; the broker additionally requires each reported account to have a live authenticated Cinnabar API connection.
 
-Use a deployment firewall and rate-limited TLS ingress. Configure TURN for clients behind restrictive NATs; STUN-only deployments will not connect every pair of networks. When a partida closes, the broker calls `POST /v1/admin/rooms/{roomID}/sessions/{sessionID}/close` so every peer in that exact room/session is removed immediately. When a player signs out or loses partida membership, the broker calls `POST /v1/admin/rooms/{roomID}/admissions/{tokenID}/revoke` with that admission's current jti. Both operations require the separate control token, reject request bodies and return no participant data; lease expiry remains a backup. The SFU does not record or persist audio. Never log admission tokens, the control token, TURN credentials, or media frames.
+This is **not** independent proof of membership for arbitrary third-party Bedrock servers, nor protection against a compromised or modified FriendHost process that lies about its roster. General server support requires an independently trusted MPSD verifier or a server-signed membership assertion. Do not treat client-supplied XUIDs, room IDs, server names, or local actor/session identifiers as membership proof.
+
+The broker integration and core bridge wiring are present in the development branches, but neither service is deployed by this repository change. Production still requires an operator-managed WSS hostname, TLS certificate, Ed25519 public/private key pair (private key only in the broker), matching broker/SFU control token, API secrets, and reachable STUN/TURN infrastructure. The broker must be deployed with the same issuer/audience/key configuration used by the SFU. Configure TURN for clients behind restrictive NATs; STUN-only deployments will not connect every pair of networks.
+
+When a partida closes, the broker calls `POST /v1/admin/rooms/{roomID}/sessions/{sessionID}/close` so every peer in that exact room/session is removed immediately. When a player leaves the FriendHost roster or signs out, the broker calls `POST /v1/admin/rooms/{roomID}/admissions/{tokenID}/revoke` with that admission's current jti. The host refreshes the full roster on a 25-second cadence; the bridge requests a fresh admission token every 60 seconds and fails closed if renewal is rejected. The broker host lease and token expiry are additional safeguards, not substitutes for successful deployment tests.
+
+Both SFU admin operations require the separate control token, reject request bodies and return no participant data. The SFU does not record or persist audio. Never log admission tokens, the control token, TURN credentials, or media frames.

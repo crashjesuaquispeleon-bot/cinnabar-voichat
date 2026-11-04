@@ -113,7 +113,10 @@ impl VoiceRemotePlayback {
     pub fn set_receive_volume_percent(&self, percent: u8) {
         let gain = f32::from(percent.min(200)) / 100.0;
         self.master_volume.store(gain.to_bits(), Ordering::Release);
-        let sources = self.sources.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let sources = self
+            .sources
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         for (index, source) in sources.iter().enumerate() {
             if let Some(source) = source {
                 self.queues[index].set_input_gain(gain * f32::from(source.volume_percent) / 100.0);
@@ -131,7 +134,10 @@ impl VoiceRemotePlayback {
     ) -> bool {
         let percent = percent.min(200);
         let master = f32::from_bits(self.master_volume.load(Ordering::Acquire));
-        let mut sources = self.sources.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut sources = self
+            .sources
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let Some(index) = sources
             .iter()
             .position(|source| source.is_some_and(|state| state.id == source_id))
@@ -165,13 +171,15 @@ impl VoiceRemotePlayback {
     }
 
     fn update_queue_gate(&self) {
-        let accepting =
-            self.enabled.load(Ordering::Acquire) && !self.muted.load(Ordering::Acquire);
+        let accepting = self.enabled.load(Ordering::Acquire) && !self.muted.load(Ordering::Acquire);
         for queue in self.queues.iter() {
             queue.set_accepting(accepting);
         }
         if !accepting {
-            let mut sources = self.sources.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let mut sources = self
+                .sources
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             sources.fill(None);
         }
     }
@@ -600,8 +608,14 @@ mod tests {
 
         // Two frames per sender satisfy the 40 ms startup prebuffer.
         for sequence in [1, 2] {
-            assert_eq!(playback.ingest_frame(&test_frame(1, sequence, 8_192)), Ok(()));
-            assert_eq!(playback.ingest_frame(&test_frame(2, sequence, 16_384)), Ok(()));
+            assert_eq!(
+                playback.ingest_frame(&test_frame(1, sequence, 8_192)),
+                Ok(())
+            );
+            assert_eq!(
+                playback.ingest_frame(&test_frame(2, sequence, 16_384)),
+                Ok(())
+            );
         }
 
         let mut source = VoiceRemoteMixerSource::new(playback.mixer_queues());
@@ -615,7 +629,9 @@ mod tests {
         playback.set_voice_session_enabled(true);
         playback.set_receive_volume_percent(200);
         assert_eq!(playback.ingest_frame(&test_frame(1, 1, 16_384)), Ok(()));
-        let frame = playback.mixer_queues()[0].pop().expect("frame should be queued");
+        let frame = playback.mixer_queues()[0]
+            .pop()
+            .expect("frame should be queued");
         assert!(
             frame
                 .samples()
@@ -642,15 +658,27 @@ mod tests {
         let first = queues[0].pop().expect("muted speaker frame");
         let second = queues[1].pop().expect("boosted speaker frame");
         assert!(first.samples().iter().all(|sample| *sample == 0.0));
-        assert!(second.samples().iter().all(|sample| (*sample - 1.0).abs() < 0.0001));
+        assert!(
+            second
+                .samples()
+                .iter()
+                .all(|sample| (*sample - 1.0).abs() < 0.0001)
+        );
 
         playback.set_receive_volume_percent(50);
         assert_eq!(playback.ingest_frame(&test_frame(1, 3, 8_192)), Ok(()));
         assert_eq!(playback.ingest_frame(&test_frame(2, 3, 16_384)), Ok(()));
         let first = queues[0].pop().expect("master-scaled muted speaker frame");
-        let second = queues[1].pop().expect("master-scaled boosted speaker frame");
+        let second = queues[1]
+            .pop()
+            .expect("master-scaled boosted speaker frame");
         assert!(first.samples().iter().all(|sample| *sample == 0.0));
-        assert!(second.samples().iter().all(|sample| (*sample - 0.5).abs() < 0.0001));
+        assert!(
+            second
+                .samples()
+                .iter()
+                .all(|sample| (*sample - 0.5).abs() < 0.0001)
+        );
     }
 
     #[test]

@@ -31,7 +31,7 @@ Tokens are limited to 4 KiB and five minutes; the broker should issue them for a
 
 ## Revocation
 
-An active peer must renew its lease before exp (recommended interval: 60 seconds). Renewal uses a newly signed jti for the same account, XUID, room and partida; it replaces the lease without replacing the media connection. The SFU closes peers whose lease expires. It also removes a participant on WebRTC peer close, explicit broker revocation, account sign-out, membership removal, or session/partida close. Closing a session revokes every participant bound to its exact room_id and session_id pair. Reconnect requires a newly issued token; a previous token cannot be replayed.
+An active peer must renew its lease before exp (recommended interval: 60 seconds). Renewal uses a newly signed jti for the same account, XUID, room and partida; it replaces the lease without replacing the media connection. The SFU closes peers whose lease expires. It also removes a participant on WebRTC peer close, explicit broker revocation, account sign-out, membership removal, or session/partida close. Closing a session revokes every participant bound to its exact room_id and session_id pair. Reconnect requires a newly issued token; a previous token cannot be replayed. The broker can revoke one active participant immediately with `POST /v1/admin/rooms/{roomID}/admissions/{tokenID}/revoke`; the SFU closes the peer only if that jti is still its current lease, so a stale pre-renewal token cannot terminate the renewed connection. It returns the same `204 No Content` for present and absent admissions to avoid exposing room membership.
 
 ## Audio plane
 

@@ -57,7 +57,6 @@ type Client struct {
 	lastSequence atomic.Uint64
 	droppedFrames atomic.Uint64
 
-	controlMu sync.Mutex
 	signalMu sync.Mutex
 	closeOnce sync.Once
 }
@@ -204,7 +203,7 @@ func (client *Client) markChannelOpen(label string) {
 	}
 }
 
-// WaitReady blocks until uplink, control and downlink channels have all opened.
+// WaitReady blocks until the unordered uplink and SFU-created downlink have opened.
 func (client *Client) WaitReady(ctx context.Context) error {
 	select {
 	case <-ctx.Done():

@@ -470,6 +470,9 @@ func TestVoiceHostOpenRetainsRequestIDUntilConfirmed(t *testing.T) {
 		RequestID string `json:"request_id"`
 	}
 	session.receive(t, &request)
+	if request.Type != typeVoiceHostOpen || request.RequestID == "" {
+		t.Fatalf("first voice-room request = %+v", request)
+	}
 	cancel()
 	if err := receive(t, first); !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancelled open = %v", err)
@@ -483,6 +486,9 @@ func TestVoiceHostOpenRetainsRequestIDUntilConfirmed(t *testing.T) {
 		RequestID string `json:"request_id"`
 	}
 	session.receive(t, &retry)
+	if retry.Type != typeVoiceHostOpen || retry.RequestID != request.RequestID {
+		t.Fatalf("retry voice-room request = %+v, want type %q and request ID %q", retry, typeVoiceHostOpen, request.RequestID)
+	}
 	if retry.RequestID != request.RequestID {
 		t.Fatalf("retry request ID = %q, want %q", retry.RequestID, request.RequestID)
 	}

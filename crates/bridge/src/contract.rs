@@ -133,7 +133,7 @@ pub const SESSION_WINDOWS_ENDPOINT_NAME: &str = "session.addr";
 /// Maximum payload size on the dedicated local voice bridge.
 pub const VOICE_MAX_FRAME_LEN: usize = 1024;
 
-/// Voice media frame bytes: sequence plus 16 kHz mono PCM16 samples.
+/// Uplink voice frame bytes: sequence plus 16 kHz mono PCM16 samples; downlink adds a 16-byte opaque source ID.
 pub const VOICE_FRAME_BYTES: usize = 648;
 
 /// Local voice IPC uplink media frame.

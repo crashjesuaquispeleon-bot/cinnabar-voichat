@@ -11,19 +11,23 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/google/uuid"
 	"github.com/pion/webrtc/v4"
 )
 
 const (
 	voiceUplinkLabel = "cinnabar-voice-uplink-v1"
-	voiceDownlinkLabel = "cinnabar-voice-downlink-v1"
+	voiceDownlinkLabel = "cinnabar-voice-downlink-v2"
 	voiceSampleRate = 16000
 	voiceFrameDurationMS = 20
 	voiceSamplesPerFrame = voiceSampleRate * voiceFrameDurationMS / 1000
 	voicePCMBytesPerFrame = voiceSamplesPerFrame * 2
 	voiceSequenceBytes = 8
 	voiceFrameBytes = voiceSequenceBytes + voicePCMBytesPerFrame
+	voiceSourceIDBytes = 16
+	voiceRemoteFrameBytes = voiceSourceIDBytes + voiceFrameBytes
 	maxBufferedVoiceBytes = voiceFrameBytes * 5
+	maxBufferedRemoteVoiceBytes = voiceRemoteFrameBytes * 5
 	maxSignalMessageBytes = 64 << 10
 	signalReadTimeout = 15 * time.Second
 	iceGatherTimeout = 20 * time.Second
@@ -64,6 +68,7 @@ type sfuPeer struct {
 	downlink *webrtc.DataChannel
 	roomID string
 	xuid string
+	sourceID uuid.UUID
 	signalClose func() error
 	pcClosed chan struct{}
 
@@ -263,8 +268,15 @@ func (s *SFU) join(
 		s.registry.Revoke(admission.TokenID)
 		return nil, nil, err
 	}
+	sourceID, err := uuid.NewRandom()
+	if err != nil {
+		_ = pc.Close()
+		s.registry.Revoke(admission.TokenID)
+		return nil, nil, err
+	}
 	peer := &sfuPeer{
 		sfu: s, pc: pc, roomID: admission.RoomID, xuid: admission.XUID,
+		sourceID: sourceID,
 		admission: admission, signalClose: closeSignal, pcClosed: make(chan struct{}),
 	}
 	ordered := false
@@ -393,13 +405,18 @@ func (s *SFU) forward(sender *sfuPeer, frame []byte) {
 		s.mu.RUnlock()
 		return
 	}
+	// The source identifier is random, room-scoped for the lifetime of this peer,
+	// and unrelated to the participant's XUID or other account identity.
+	remoteFrame := make([]byte, voiceRemoteFrameBytes)
+	copy(remoteFrame[:voiceSourceIDBytes], sender.sourceID[:])
+	copy(remoteFrame[voiceSourceIDBytes:], frame)
 	for _, peer := range room.peers {
 		if peer == sender || peer.downlink == nil ||
 			peer.downlink.ReadyState() != webrtc.DataChannelStateOpen ||
-			peer.downlink.BufferedAmount() > maxBufferedVoiceBytes {
+			peer.downlink.BufferedAmount() > maxBufferedRemoteVoiceBytes {
 			continue
 		}
-		_ = peer.downlink.Send(frame)
+		_ = peer.downlink.Send(remoteFrame)
 	}
 	s.mu.RUnlock()
 }

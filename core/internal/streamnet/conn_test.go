@@ -8,7 +8,47 @@ import (
 	"net"
 	"testing"
 	"time"
+
+	"github.com/hashimthearab/rust-mcbe/core/internal/bridgecontract"
 )
+
+
+func TestVoiceFramedConnRejectsOversizedPayloadBeforeReadAllocation(t *testing.T) {
+	server, client := net.Pipe()
+	defer server.Close()
+	defer client.Close()
+	reader := NewFramedConnWithMax(server, bridgecontract.VoiceMaxFrameLen)
+
+	var header [4]byte
+	binary.BigEndian.PutUint32(header[:], uint32(bridgecontract.VoiceMaxFrameLen+1))
+	go func() { _, _ = client.Write(header[:]) }()
+	_, err := reader.ReadPacket()
+	if !errors.Is(err, ErrFrameTooLarge) {
+		t.Fatalf("ReadPacket() error = %v, want ErrFrameTooLarge", err)
+	}
+}
+
+func TestVoiceFramedConnAcceptsMaximumVoicePayload(t *testing.T) {
+	server, client := net.Pipe()
+	defer server.Close()
+	defer client.Close()
+	writer := NewFramedConnWithMax(client, bridgecontract.VoiceMaxFrameLen)
+	reader := NewFramedConnWithMax(server, bridgecontract.VoiceMaxFrameLen)
+	payload := make([]byte, bridgecontract.VoiceMaxFrameLen)
+
+	errC := make(chan error, 1)
+	go func() { _, err := writer.Write(payload); errC <- err }()
+	received, err := reader.ReadPacket()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(received) != len(payload) {
+		t.Fatalf("received %d bytes, want %d", len(received), len(payload))
+	}
+	if err := <-errC; err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestFrameOneByte(t *testing.T) {
 	server, client := net.Pipe()

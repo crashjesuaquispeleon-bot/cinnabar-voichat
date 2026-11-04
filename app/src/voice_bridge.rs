@@ -239,7 +239,7 @@ async fn run_voice_bridge(
                 };
                 match kind {
                     VOICE_IPC_KIND_REMOTE_AUDIO => {
-                        if payload.len() != VOICE_FRAME_BYTES + 1 {
+                        if payload.len() != VoiceRemotePlayback::REMOTE_FRAME_BYTES + 1 {
                             return Err(anyhow::anyhow!("invalid remote voice IPC frame"));
                         }
                         let _ = playback.ingest_frame(&payload[1..]);

@@ -10,18 +10,23 @@ The first release is a Cinnabar-client-only voice feature.
 - **Microphone modes:** open microphone and Push to Talk (PTT), selectable in Sound settings. Voice Chat is disabled by default; PTT is the default activation mode and the semantic PTT action defaults to V (remappable).
 - **User controls:** Sound settings expose enable/disable, activation mode, persisted microphone mute, input sensitivity (0–200%), microphone permission status/retry, and a transient selector for the system default or an enumerated input device. The separate in-game **Toggle Voice Mute** action is remappable (default **M**) and does not overwrite the saved mute preference. Per-player receive volume and remote participant indicators require the not-yet-built network voice stage.
 
-## Current prototype status (2026-11-03)
+## Current implementation status (2026-11-04)
 
-This branch is a **local microphone prototype**, not yet a multiplayer voice-chat release.
+Stage 1 (local microphone capture) is implemented as a prototype: CPAL input is owned by a persistent worker, uses bounded 48 kHz mono / 20 ms queues, supports Open Microphone and PTT, keeps local mute separate, and stops/clears on capture lifecycle changes. Device selection uses worker-owned handles and temporary catalog tokens. Physical-device qualification and platform-specific OS permission UX remain incomplete.
 
-Implemented in the client:
-- Native CPAL capture on a persistent owner worker, with device handles retained and opened/stopped/dropped on that worker.
-- Fixed 48 kHz mono, 20 ms PCM frames and bounded transmit/monitor queues. The callback avoids per-frame allocation and blocking.
-- Open Microphone / Push to Talk policy, local mute, a remappable quick-mute action, and capture shutdown on disconnect/session replacement.
-- Sound settings for enablement, activation mode, microphone mute, input sensitivity, microphone status/retry, and refresh/select of the current microphone list. Catalog tokens are temporary and are not persisted.
-- A local monitor/loopback path and deterministic mock tests for queue, device switching, stale selection, shutdown and session cleanup.
+Stage 2 now has a substantial code-level media path, but it is not enabled in the released Cinnabar core.
 
-Not implemented: voice encoding, signaling, authenticated room admission, a deployed media router/SFU, remote playback or remote participant controls. Two players therefore **cannot hear each other** in this preview. No microphone audio is transmitted to another player by this branch. The permission indicator is best-effort error classification, not a universal operating-system permission API. Real hardware behavior and Windows/macOS/Linux qualification remain required before release.
+Implemented:
+- Go core/voice verifies broker-signed Ed25519 admission tokens and maintains a room registry with one-use token IDs, expiry/renewal, participant caps, revocation, and room-to-session binding.
+- The Pion WebRTC SFU performs signaling and bounded, unordered DataChannel fan-out only between peers whose signed admissions resolve to the same room and authoritative session claim. It enforces the server-side transmit gate and rejects malformed, duplicate, stale, or over-rate frames.
+- core/cmd/voice-sfu is an independently deployable TLS service. It requires the broker public key and explicit operator-managed ICE/TURN configuration; it does not hold or generate the signing private key.
+- The native Rust app has a separate local IPC worker. It converts captured 48 kHz frames to the current 16 kHz PCM16 wire format, sends only after the Go bridge acknowledges the transmit gate, receives remote frames, and attaches them to the existing client audio mixer.
+- The bridge closes and requests fresh admission when the local WorldClock session generation or WorldStream actor session ID changes. Those values are local teardown discriminators only; they are never sent as proof of identity or partida membership.
+- Go tests cover signed admission and SFU room isolation. A new local-IPC/two-peer integration test exercises both audio directions, acknowledged PTT gating, and admission cleanup; its CI result is still pending.
+
+Not yet available in a live installation: the trusted Cinnabar broker/token issuer and a general authoritative partida-membership adapter are not present in this repository. The regular bedrock-core startup does not yet inject a production VoiceBridgeConfig, and no WSS SFU/TURN endpoint or broker public key is deployed/configured. Therefore the local app bridge safely remains inactive and two players still cannot talk in an ordinary running Cinnabar build.
+
+The current media profile is uncompressed PCM over WebRTC DataChannels for initial two-client validation. Opus/RTP, a jitter buffer, speaking indicators, per-player receive volume, participant UI, physical-device tests, and Windows/macOS/Linux qualification remain outstanding. The microphone permission indicator remains best-effort OS error classification, not a universal permission API.
 
 ## Repository facts confirmed during initial inspection
 
@@ -40,21 +45,11 @@ Not implemented: voice encoding, signaling, authenticated room admission, a depl
 
 The native CPAL capture path runs inside the persistent microphone owner worker. The worker retains CPAL Device handles in a generation-scoped catalog and creates, plays, stops and drops the exact selected Stream on that same thread. It requires an exact 48 kHz `f32` or `i16` configuration; the callback downmixes directly into fixed PCM frames without temporary vectors. `BoundedPcmQueue` uses the existing `crossbeam-queue` dependency's bounded `ArrayQueue`: 48 kHz mono, 20 ms / 960-sample frames, 15 slots by default (~300 ms), with non-blocking drop-newest overflow counters. The Sound settings panel persists Voice Chat enablement, local mute, activation mode and input sensitivity. It also renders a transient microphone list with explicit system-default/device selection and a best-effort permission status plus retry. Voice defaults disabled, Push to Talk is the activation default, and mute blocks transmission without disabling Voice Chat. The controller opens capture only when voice is enabled, permission permits probing and a multiplayer session is active; the transmit and monitor queues remain closed unless Open Microphone or a held PTT action permits transmission. The app's session-audio lifecycle adapter binds `session_active` to the presence of a `WorldStream` and resets capture when `(WorldClock::session_generation(), actor_session_id())` changes or the stream disappears. These values are local lifecycle discriminators only, never backend room authorization. Stop the producer before clearing the queue during lifecycle teardown so no callback can repopulate stale-session audio.
 
-## Proposed high-level media flow (not implemented)
+## Current staged media flow
 
-```text
-Cinnabar microphone
-  -> capture + permission gate
-  -> bounded audio-frame queue
-  -> voice codec (selection pending)
-  -> authenticated real-time voice transport
-  -> room media router / SFU (service ownership pending)
-  -> subscribed Cinnabar clients
-  -> decode + bounded jitter buffer
-  -> client-audio playback mixer
-```
+CPAL microphone -> local permission / enable / PTT gates -> bounded 48 kHz PCM queue -> native Rust voice worker (48 kHz to 16 kHz PCM16) -> dedicated Rust/Go voice IPC -> Go VoiceBridge (requires a trusted VoiceAdmissionSource) -> broker-signed short-lived room admission -> WSS signaling and Pion WebRTC SFU -> same-room / same-partida DataChannel fan-out -> Go IPC downlink -> VoiceRemotePlayback -> client audio mixer.
 
-A signaling/control plane must authenticate the Cinnabar account, bind the participant to the currently joined Minecraft session, admit it to that session's room, and revoke membership on disconnect or session change. Media routing must not trust client-supplied player identity or room membership.
+The Rust IPC client and the Go SFU/bridge layers now exist, but the Go core starts the voice endpoint only when an operator supplies a trusted VoiceBridgeConfig. The shipping bedrock-core command does not yet supply one. Do not wire a placeholder or local signing key to make the socket appear: the broker must independently authenticate the account and prove the active partida first.
 
 ### Existing local session signals (confirmed in source)
 
@@ -125,12 +120,17 @@ References:
 - [x] Add saved enablement, local mute, activation-mode and input-sensitivity controls to the existing Sound settings panel without changing game sound sliders.
 - [x] Add a transient microphone-device selector to the Sound panel. It refreshes native devices through the CPAL owner worker, supports explicit system-default or exact-device selection, rejects stale menu revisions, and clears old rows on worker/device failure. Opaque device IDs remain local and are never persisted.
 
-### Stage 2 — Authenticated global rooms
+### Stage 2 — Authenticated global rooms (partially implemented)
 
-- [ ] Implement server-side room admission bound to Cinnabar identity and the active game-session identity.
-- [ ] Implement signaling, media routing, participant lifecycle and reconnect behavior.
-- [ ] Add remote decode, jitter buffering, receive-volume controls and participant speaking/mute status.
-- [ ] Verify two-client and multi-client sessions, session isolation and cleanup under packet loss and reconnect.
+- [x] Implement SFU-side Ed25519 token verification and a room registry with one-use tokens, room/session binding, expiry, renewal, revocation, and participant caps.
+- [x] Implement Pion signaling and same-room media fan-out with server-side transmit gating and bounded PCM frames.
+- [x] Add a standalone TLS SFU executable with pinned broker public key and explicit ICE/TURN configuration.
+- [x] Connect the native Rust capture/playback path to the Go voice IPC bridge; close and re-admit when the local game-session lifecycle changes.
+- [x] Add Go two-peer SFU tests and a local IPC two-peer integration test (CI validation pending).
+- [ ] Implement/deploy the trusted broker issuer that derives XUID from the authenticated Cinnabar account and the partida UUID from an authoritative server-side adapter.
+- [ ] Inject the real VoiceAdmissionSource and deployed WSS/ICE/TURN settings into the production bedrock-core configuration. Until then, the IPC voice endpoint remains disabled by default.
+- [ ] Add jitter buffering, Opus/RTP evaluation, participant speaking state, per-player receive volume and multi-client UI.
+- [ ] Verify real two-client and multi-client sessions across separate installations, session transfers, packet loss, reconnect, and shutdown.
 
 ### Stage 3 — Product integration and qualification
 
@@ -196,7 +196,7 @@ The semantic input domain now includes `Action::PushToTalk` as a persistent held
 
 The app session-audio adapter reads only the finalized `SemanticInputSnapshot` phase for `Action::PushToTalk` and forwards its `held` value to `VoiceInputPolicy::set_push_to_talk_held()`. It runs after `ClientFrameSet::SemanticFinalize` and before `sync_voice_capture_with_policy`, so the controller observes the same frame's policy. Missing or cleared snapshots are neutral/released. The audio crate never reads Bevy keyboard state.
 
-Router and launcher tests cover PTT press/hold/release and remapping. Enablement, saved mute, activation mode and input sensitivity appear in Sound settings. The in-game quick-mute action is a separate remappable one-shot (default M) and does not rewrite the saved preference. A quick toggle resets to the saved Sound-panel preference on a game-session change; PTT must be physically released before it can transmit again after a privacy boundary. The device selector and best-effort permission/retry UI are implemented; OS-specific settings deep links and physical loopback qualification remain follow-up work. Network transport is still unimplemented.
+Router and launcher tests cover PTT press/hold/release and remapping. Enablement, saved mute, activation mode and input sensitivity appear in Sound settings. The in-game quick-mute action is a separate remappable one-shot (default M) and does not rewrite the saved preference. A quick toggle resets to the saved Sound-panel preference on a game-session change; PTT must be physically released before it can transmit again after a privacy boundary. The device selector and best-effort permission/retry UI are implemented; OS-specific settings deep links and physical loopback qualification remain follow-up work. The local IPC transport and SFU code are now implemented; production admission remains blocked on the trusted broker issuer and partida adapter.
 
 ## PTT-aware PCM privacy gate
 

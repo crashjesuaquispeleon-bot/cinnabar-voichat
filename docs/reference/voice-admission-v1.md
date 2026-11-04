@@ -43,6 +43,6 @@ The first Go relay implementation uses WebRTC DTLS-protected SCTP DataChannels, 
 - Native proxy joins can observe the authenticated upstream Minecraft XUID. That is useful identity evidence but does not prove arbitrary-server partida membership.
 - The FriendHost path has Xbox MPSD membership and per-member login nonces, but this proof is local to a FriendHost process. A production broker needs a trusted server-side adapter that can verify that membership; it cannot trust a nonce or room string submitted by an arbitrary client.
 - The existing core/webrelay control/play channels carry game control and Bedrock data. They are not the voice media plane.
-- Pion WebRTC is already present in the Go dependency graph, but no deployed Cinnabar SFU endpoint or broker public key is configured in this repository.
+- The repository now includes a standalone Pion SFU process at core/cmd/voice-sfu, with TLS, pinned broker public-key, and ICE/TURN configuration. No WSS endpoint is deployed and no broker public key is configured in the product core yet.
 
 Until the account service and a trusted partida adapter mint this signed contract, voice-room admission remains disabled. Do not create a fallback based on IP address, server name, client-provided XUID, or an unauthenticated room ID.

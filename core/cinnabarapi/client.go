@@ -381,19 +381,19 @@ func (c *Client) SendVoiceSignal(ctx context.Context, sessionID, signalType, pay
 }
 
 // ReceiveVoiceSignal waits for the other room member's broker-authorized signal.
-func (c *Client) ReceiveVoiceSignal(ctx context.Context) (VoiceSignal, error) {
-	if ctx == nil { return VoiceSignal{}, ErrVoiceUnavailable }
+func (c *Client) ReceiveVoiceSignal(ctx context.Context) (string, string, string, error) {
+	if ctx == nil { return "", "", "", ErrVoiceUnavailable }
 	c.mu.Lock()
 	s := c.live
 	c.mu.Unlock()
-	if s == nil { return VoiceSignal{}, ErrUnavailable }
+	if s == nil { return "", "", "", ErrUnavailable }
 	select {
 	case msg := <-s.voiceSignals:
-		return VoiceSignal{SessionID: msg.SessionID, SignalType: msg.SignalType, Payload: msg.Payload}, nil
+		return msg.SessionID, msg.SignalType, msg.Payload, nil
 	case <-s.closed:
-		return VoiceSignal{}, ErrUnavailable
+		return "", "", "", ErrUnavailable
 	case <-ctx.Done():
-		return VoiceSignal{}, ctx.Err()
+		return "", "", "", ctx.Err()
 	}
 }
 

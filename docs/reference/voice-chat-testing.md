@@ -1,57 +1,69 @@
-# Voice Chat preview — manual test guide
+# Voice Chat Alpha — prueba de integración con dos jugadores
 
-> **Preview only.** This branch tests local microphone capture and local monitoring. It does not connect two players: voice encoding, signaling, authenticated room admission, a media router/SFU and remote playback are not implemented.
+> **Estado:** las pruebas automatizadas del SFU ya cubren participantes Pion, audio bidireccional, aislamiento de salas, renovación y revocación. La prueba con dos instalaciones reales sigue pendiente hasta desplegar el Worker broker y el SFU en una máquina pública.
 
-## Get the source
+Esta guía corresponde a la implementación actual de la rama `feature/voice-chat-foundation`. El alcance admitido es **Cinnabar FriendHost**. No es una autorización genérica para servidores Bedrock de terceros.
 
-Use the feature branch:
+## Requisitos antes de iniciar
 
-```powershell
-git clone --depth 1 --branch feature/voice-chat-foundation https://github.com/crashjesuaquispeleon-bot/cinnabar-voichat.git
-cd cinnabar-voichat
-```
+1. Dos dispositivos con la misma compilación Alpha de Cinnabar (mismo commit), dos cuentas Microsoft/Xbox distintas y permiso de micrófono concedido.
+2. El Worker de Cinnabar API con el broker de voz de [cinnabar-api PR #1](https://github.com/crashjesuaquispeleon-bot/cinnabar-api/pull/1) desplegado y configurado. Los dos usuarios deben mantener una conexión autenticada y activa con la API.
+3. Un SFU accesible desde Internet en un host separado del servidor Bedrock, con certificado TLS válido y endpoint WSS.
+4. Entrada permitida hacia el SFU: TCP 8443 (o el puerto WSS elegido), UDP 19132 IPv4 y UDP 19133 IPv6. Si el servidor Bedrock vive en otra máquina, sus puertos no se modifican.
+5. El proceso nativo de cada cliente debe recibir la configuración de operador:
+   - `CINNABAR_VOICE_WSS_ENDPOINT=wss://<host>:8443/v1/voice`
+   - `CINNABAR_VOICE_ICE_SERVERS=<JSON STUN/TURN>`
+   El SFU usa la misma configuración ICE. No pegues tokens, claves privadas ni credenciales TURN permanentes en tickets o registros públicos.
+6. El broker y el SFU deben usar el mismo issuer, audience, clave Ed25519 pública y token de control. La clave privada de firma se queda únicamente en los secretos del Worker.
 
-This is source code, not a ready-to-run Windows installer.
+Consulta [Despliegue del SFU para Alpha](voice-chat-sfu-deployment.md) para preparar un host público.
 
-## Build on Windows
+## Prueba de dos jugadores
 
-Install Rust toolchain 1.99.0, Go, GNU Make, Git for Windows (including Bash), and Visual Studio C++ Build Tools with the Windows SDK. Ensure `cargo`, `rustup`, `go`, `make`, `bash` and PowerShell are available from the terminal.
+### A. Verificar servicios
 
-From the repository root, run:
+1. Abre `https://<host>:8443/healthz`. El SFU responde HTTP 204 sin devolver datos de jugadores.
+2. Comprueba que el Worker responde en su endpoint de salud y que los secretos del broker están configurados.
+3. Comprueba que los registros del servicio no muestran errores de certificado, ICE ni enlace UDP. Nunca copies tokens de admisión ni credenciales.
 
-```powershell
-make play
-```
+### B. Conectar a la misma partida
 
-The target prepares assets, builds the Go Bedrock core, Rust client and shader worker, and fetches the Windows DXC helper. First launch may download vanilla resources after you accept the Minecraft EULA.
+1. Instala la misma compilación Alpha en los dos dispositivos.
+2. Inicia sesión en Cinnabar y en Microsoft/Xbox con cuentas diferentes. Mantén abiertas ambas conexiones de Cinnabar API.
+3. El jugador anfitrión crea una partida FriendHost y el segundo jugador entra a esa misma partida.
+4. Comprueba que el anfitrión y el invitado aparecen en la lista de miembros validada por FriendHost. El cliente no debe enviar por su cuenta XUID, room ID ni session ID para obtener admisión.
+5. El broker crea la sala, guarda la lista completa de participantes y entrega una admisión corta a cada miembro autorizado.
+6. En ambos clientes abre Settings → Sound, activa Voice Chat, selecciona el micrófono y usa Push to Talk. La tecla inicial es V salvo que se haya cambiado en Controls.
 
-This branch has not been qualified on physical Windows 10 hardware. A successful build does not prove that a particular microphone, driver or OS privacy configuration works.
+### C. Audio en ambas direcciones
 
-## Test the local microphone path
+1. El jugador A mantiene PTT y habla durante 5–10 segundos. B debe oírlo sin eco local ni cortes persistentes.
+2. B habla mientras A escucha. A debe oír a B.
+3. Repite con PTT liberado, Voice Mute activado y desactivado, y cambio de micrófono.
+4. Comprueba que el audio no se reproduce al propio emisor y que dos salas distintas no reciben el audio una de otra.
 
-Use headphones to avoid acoustic feedback.
+### D. Salida y revocación
 
-1. Launch Cinnabar, sign in, and join an active multiplayer world/session.
-2. Open **Settings → Sound** and enable **Voice Chat**. It is disabled by default.
-3. Press **Refresh** under Microphone Input. Select **System default input** or one exact device from the current list. The selection token is temporary and is not saved as a hardware preference.
-4. Check microphone permission status. If it says **Denied**, allow desktop microphone access in Windows privacy settings, then press **Retry** in Cinnabar.
-5. Choose **Push to Talk** or **Open Microphone**. Push to Talk is the default; its action defaults to **V** and can be remapped under Controls.
-6. Leave **Input Sensitivity** at 100% initially. Adjust it between 0% and 200% to suit the input level.
-7. Speak while holding the PTT key (or while Open Microphone is enabled). When the local monitor/output path is available, you should hear your microphone locally. Release PTT or mute to close the PCM gate.
-8. Test **Toggle Voice Mute** (default **M**). It changes effective mute without rewriting the saved Sound setting.
-9. Refresh and select another microphone. Disconnect from the world and confirm capture stops; reconnect before testing again.
+1. Con ambos conectados, cierra el juego o desconecta al jugador B.
+2. A debe seguir conectado y conservar el audio de la sala; no debe cerrarse su sesión por la salida de B.
+3. Vuelve a conectar B y confirma que recibe una admisión nueva, no el token anterior.
+4. Cierra la partida FriendHost. Ambos clientes deben dejar de transmitir y reproducir audio de esa sala.
+5. Repite una vez con A como emisor y B como receptor.
 
-## What this preview proves
+## Evidencia que se debe registrar
 
-- It can exercise CPAL capture, current-device selection, sensitivity, PTT/open-mic gating, local mute, bounded PCM queues, local monitoring and session teardown.
-- It does not send microphone audio to another player or a voice server. A second Cinnabar client will not create a voice conversation.
-- The permission label is best-effort classification of the capture-open result, not a universal Windows permission API.
-- Capture currently accepts an exact 48 kHz `f32` or `i16` input format. A device/driver that cannot provide one may be rejected.
-- Refresh invalidates previous device rows; select again after refreshing or after a device disappears.
-- Microphone audio is not saved as a recording by this preview, and this branch has no remote voice transport.
+- SHA exacto de la compilación de Cinnabar en ambos dispositivos.
+- Versión de Windows/Android, tipo de red (Wi-Fi/datos móviles) y micrófono utilizado.
+- Resultado de A→B, B→A, PTT, mute, desconexión de B, reconexión y cierre de sala.
+- Estado del endpoint `/healthz` y errores de red relevantes, sin tokens, claves, XUID completos ni credenciales.
 
-## Report a test result
+Marca la prueba como **aprobada** solo si los dos clientes reales completan las secciones B, C y D. Una prueba Pion automatizada o una compilación exitosa no sustituye esta evidencia.
 
-Include the Cinnabar commit SHA, Windows version, microphone model/driver, selected input name, activation mode, permission label and exact reproduction steps. Do not share account credentials or authentication tokens.
+## Diagnóstico rápido
 
-A successful local test is Stage 1 evidence only. Remote voice remains blocked until the authenticated room-service and media-routing contracts documented in [voice-chat.md](voice-chat.md) exist.
+- WSS falla antes de crear la sesión: revisar DNS, certificado, endpoint y TCP del puerto de señalización.
+- WSS conecta pero ICE no establece conexión: revisar UDP 19132/19133, direcciones públicas, reglas del firewall y configuración STUN/TURN. STUN por sí solo no atraviesa todas las redes; algunas conexiones necesitan TURN.
+- El anfitrión no abre sala o el invitado no recibe admisión: revisar que ambos sockets de API estén autenticados y que el Worker tenga la clave de firma y el acceso HTTPS al SFU.
+- El invitado se conecta pero no oye: comprobar PTT, permiso del micrófono, canal de datos, ICE y que ambos pertenecen a la misma sala/sesión.
+
+No habilites fallback que acepte XUID, room ID, session ID o dirección de servidor suministrados por el cliente.

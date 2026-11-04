@@ -35,6 +35,11 @@ const (
 	typeVoiceHostMembers      = "voice_host_members"
 	typeVoiceHostClose        = "voice_host_close"
 	typeVoiceAdmissionRequest = "voice_admission_request"
+	typeVoicePeerSessionRequest = "voice_peer_session_request"
+	typeVoicePeerSession = "voice_peer_session"
+	typeVoiceSignal = "voice_signal"
+	typeVoiceSignalSent = "voice_signal_sent"
+	typeVoicePeerSignal = "voice_peer_signal"
 	typeVoiceRoom             = "voice_room"
 	typeVoiceMembersUpdated   = "voice_members_updated"
 	typeVoiceClosed           = "voice_closed"
@@ -108,6 +113,19 @@ type voiceAdmissionRequestMessage struct {
 	RequestID string `json:"request_id"`
 }
 
+type voicePeerSessionRequestMessage struct {
+	Type      string `json:"type"`
+	RequestID string `json:"request_id"`
+}
+
+type voiceSignalMessage struct {
+	Type       string `json:"type"`
+	RequestID  string `json:"request_id"`
+	SessionID  string `json:"session_id"`
+	SignalType string `json:"signal_type"`
+	Payload    string `json:"payload"`
+}
+
 // inbound is the union of server messages; absent fields stay zero and unknown ones are ignored.
 type inbound struct {
 	OwnedCosmetics  []string           `json:"owned_cosmetics"`
@@ -122,6 +140,9 @@ type inbound struct {
 	RequestID       string             `json:"request_id"`
 	RoomID          string             `json:"room_id"`
 	SessionID       string             `json:"session_id"`
+	Offerer          bool               `json:"offerer"`
+	SignalType       string             `json:"signal_type"`
+	Payload          string             `json:"payload"`
 	Token           string             `json:"token"`
 	ExpiresAt       int64              `json:"expires_at"`
 	Count           int                `json:"count"`

@@ -525,7 +525,11 @@ mod tests {
         let sequence_start = REMOTE_SOURCE_ID_BYTES;
         payload[sequence_start..sequence_start + REMOTE_SEQUENCE_BYTES]
             .copy_from_slice(&sequence.to_be_bytes());
-        for sample_bytes in payload[sequence_start + REMOTE_SEQUENCE_BYTES..].chunks_exact_mut(2) {
+        for sample_bytes in payload[sequence_start + REMOTE_SEQUENCE_BYTES..]
+            .as_chunks_mut::<2>()
+            .0
+            .iter_mut()
+        {
             sample_bytes.copy_from_slice(&sample.to_le_bytes());
         }
         payload

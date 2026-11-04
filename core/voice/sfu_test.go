@@ -151,7 +151,7 @@ func TestSFURevokeAdmissionClosesOnlyTheMatchingCurrentLease(t *testing.T) {
 	httpClient := &http.Client{Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // test server uses a self-signed certificate
 	}}
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
 	defer cancel()
 
 	firstToken := signedToken(t, private, firstClaims)
@@ -173,7 +173,24 @@ func TestSFURevokeAdmissionClosesOnlyTheMatchingCurrentLease(t *testing.T) {
 	if sfu.RevokeAdmission(uuid.NewString(), secondClaims.TokenID) {
 		t.Fatal("admission token revoked a participant outside its room")
 	}
-	if !sfu.RevokeAdmission(roomID, secondClaims.TokenID) {
+
+	// Renew the second peer in-place. Its former jti must no longer terminate the
+	// peer; only the newly active lease can revoke this connection.
+	renewedClaims := claimsAt(now)
+	renewedClaims.RoomID, renewedClaims.SessionID, renewedClaims.XUID = roomID, sessionID, secondClaims.XUID
+	renewedToken := signedToken(t, private, renewedClaims)
+	if err := second.RenewAdmission(ctx, renewedToken); err != nil {
+		t.Fatalf("renew second peer admission: %v", err)
+	}
+	if sfu.RevokeAdmission(roomID, secondClaims.TokenID) {
+		t.Fatal("stale pre-renewal token revoked a renewed participant")
+	}
+	select {
+	case <-second.Done():
+		t.Fatal("stale-token revoke closed the renewed peer")
+	default:
+	}
+	if !sfu.RevokeAdmission(roomID, renewedClaims.TokenID) {
 		t.Fatal("current admission was not revoked")
 	}
 	select {

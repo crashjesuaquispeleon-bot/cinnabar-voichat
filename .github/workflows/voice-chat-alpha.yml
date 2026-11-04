@@ -16,17 +16,6 @@ on:
       - "core/**"
       - "packaging/**"
       - "tools/**"
-  pull_request:
-    paths:
-      - ".github/workflows/voice-chat-alpha.yml"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "Makefile"
-      - "app/**"
-      - "crates/**"
-      - "core/**"
-      - "packaging/**"
-      - "tools/**"
   workflow_dispatch:
 
 concurrency:

@@ -1,5 +1,8 @@
 # Cinnabar Voice Chat
 
+For the current Windows installer and Android APK Alpha build, compatibility limits and installation steps, see [Voice Chat Alpha builds](voice-chat-alpha-builds.md).
+
+
 ## Product contract
 
 The first release is a Cinnabar-client-only voice feature.

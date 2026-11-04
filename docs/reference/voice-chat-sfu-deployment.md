@@ -18,7 +18,7 @@ Si no hay capacidad A1 en la región principal, no cambies a una máquina de pag
 
 ## Red y DNS
 
-Usa un nombre DNS que controles, por ejemplo `voice.tu-dominio.example`, con un registro A hacia la IPv4 pública de la VM. El nombre es necesario para obtener un certificado TLS que los clientes puedan validar. Si no tienes dominio, primero consigue un subdominio DNS que controles; no uses un certificado autofirmado para la prueba real.
+No compraremos ni registraremos un dominio. Usaremos **nip.io**, DNS público que resuelve automáticamente un hostname que contiene la IPv4, por ejemplo `203.0.113.10.nip.io` (solo ejemplo reservado; no lo copies). Cuando Oracle asigne la IP pública real, sustituye `IP_PUBLICA` por sus cuatro octetos en `IP_PUBLICA.nip.io`. No hay que crear un registro DNS manual. El hostname resultante sirve para solicitar un certificado TLS público. Si la IP pública cambia, también cambia el hostname: habrá que emitir el certificado otra vez y recompilar las dos aplicaciones.
 
 En la VCN/NSG o Security List de OCI y en el firewall Linux permite únicamente:
 
@@ -62,13 +62,13 @@ No ejecutes el binario hasta crear el archivo de configuración, instalar el cer
 Apunta el registro A de tu nombre al IPv4 público de la VM y permite temporalmente TCP 80 para la validación HTTP:
 
 ~~~sh
-sudo certbot certonly --standalone -d voice.tu-dominio.example
+sudo certbot certonly --standalone -d IP_PUBLICA.nip.io
 ~~~
 
 Los archivos esperados son:
 
-- `/etc/letsencrypt/live/voice.tu-dominio.example/fullchain.pem`
-- `/etc/letsencrypt/live/voice.tu-dominio.example/privkey.pem`
+- `/etc/letsencrypt/live/IP_PUBLICA.nip.io/fullchain.pem`
+- `/etc/letsencrypt/live/IP_PUBLICA.nip.io/privkey.pem`
 
 El servicio SFU debe poder leer el certificado y la clave privada. Mantén sus permisos restrictivos. Configura el timer de renovación de Certbot y un deploy hook que reinicie `cinnabar-voice-sfu` después de renovar el certificado, ya que el proceso carga los archivos TLS al arrancar.
 
@@ -99,7 +99,7 @@ Ese texto exacto se guarda como secreto `VOICE_SFU_ADMIN_TOKEN` del Worker. En e
 - Issuer: `https://api.cinnabar.gg/voice`
 - Audience: `cinnabar-voice-sfu`
 
-4. El Worker también necesita `VOICE_SFU_ADMIN_URL=https://voice.tu-dominio.example:8443`. Debe ser solo el origen HTTPS, sin `/v1/voice`, ruta ni query string.
+4. El Worker también necesita `VOICE_SFU_ADMIN_URL=https://IP_PUBLICA.nip.io:8443`. Debe ser solo el origen HTTPS, sin `/v1/voice`, ruta ni query string.
 
 La clave privada nunca se copia al SFU ni a los clientes. El SFU recibe solo la clave pública. El token administrativo jamás se distribuye a los clientes.
 
@@ -115,13 +115,13 @@ CINNABAR_VOICE_ISSUER=https://api.cinnabar.gg/voice
 CINNABAR_VOICE_AUDIENCE=cinnabar-voice-sfu
 CINNABAR_VOICE_BROKER_PUBLIC_KEY=BASE64_CLAVE_PUBLICA_ED25519
 CINNABAR_VOICE_CONTROL_TOKEN=BASE64_DE_LOS_32_CARACTERES_DEL_TOKEN
-CINNABAR_VOICE_ICE_SERVERS=[{"urls":["stun:STUN_OPERADO_POR_TI:3478"]}]
+CINNABAR_VOICE_ICE_SERVERS=[{"urls":["stun:stun.l.google.com:19302"]}]
 CINNABAR_VOICE_MAX_PARTICIPANTS=8
 CINNABAR_VOICE_UDP4_PORT=19132
 CINNABAR_VOICE_UDP6_PORT=19133
 ~~~
 
-La URL STUN del ejemplo es un marcador, no un servidor real. Sustitúyela por un servicio STUN/TURN que controles. Para una prueba inicial puede bastar STUN si ambas redes permiten conectividad directa; las redes con NAT/firewall restrictivo requieren TURN. No distribuyas credenciales TURN permanentes en una compilación pública. El flujo actual no emite credenciales TURN efímeras para jugadores; antes de una publicación abierta habrá que resolver esa gestión o usar una solución TURN de prueba con credenciales temporales y rotables.
+Para esta Alpha usaremos el servidor STUN público que Google documenta en su herramienta WebRTC: `stun:stun.l.google.com:19302`. Es solo una ayuda para descubrir direcciones reflejadas; no garantiza conexión en redes con NAT simétrico o firewall restrictivo. No tiene SLA y no equivale a TURN. El flujo actual no emite credenciales TURN efímeras para jugadores; para redes que necesiten relay habrá que implementar ese suministro seguro en el broker antes de una publicación abierta.
 
 ## Servicio systemd
 
@@ -133,9 +133,9 @@ sudo useradd --system --no-create-home --shell /usr/sbin/nologin cinnabar-voice
 sudo install -d -o root -g root -m 0711 /etc/cinnabar
 sudo install -d -o root -g cinnabar-voice -m 0750 /etc/cinnabar/tls
 sudo install -o root -g cinnabar-voice -m 0640 \\
-  /etc/letsencrypt/live/voice.tu-dominio.example/fullchain.pem /etc/cinnabar/tls/fullchain.pem
+  /etc/letsencrypt/live/IP_PUBLICA.nip.io/fullchain.pem /etc/cinnabar/tls/fullchain.pem
 sudo install -o root -g cinnabar-voice -m 0640 \\
-  /etc/letsencrypt/live/voice.tu-dominio.example/privkey.pem /etc/cinnabar/tls/privkey.pem
+  /etc/letsencrypt/live/IP_PUBLICA.nip.io/privkey.pem /etc/cinnabar/tls/privkey.pem
 sudo chown root:root /etc/cinnabar/voice-sfu.env
 sudo chmod 0600 /etc/cinnabar/voice-sfu.env
 ~~~
@@ -175,7 +175,7 @@ sudo install -d -o root -g root -m 0755 /etc/letsencrypt/renewal-hooks/deploy
 sudo tee /etc/letsencrypt/renewal-hooks/deploy/reload-cinnabar-voice-sfu >/dev/null <<'EOF'
 #!/bin/sh
 set -eu
-CERT=/etc/letsencrypt/live/voice.tu-dominio.example
+CERT=/etc/letsencrypt/live/IP_PUBLICA.nip.io
 install -o root -g cinnabar-voice -m 0640 "$CERT/fullchain.pem" /etc/cinnabar/tls/fullchain.pem
 install -o root -g cinnabar-voice -m 0640 "$CERT/privkey.pem" /etc/cinnabar/tls/privkey.pem
 systemctl restart cinnabar-voice-sfu.service
@@ -211,7 +211,7 @@ El broker de voz está implementado en la rama Draft `feature/voice-admission-br
 Después de desplegar esa versión, configura sus secretos en el entorno protegido de Cloudflare:
 
 - `VOICE_ADMISSION_PRIVATE_KEY`: PEM PKCS#8 privado Ed25519.
-- `VOICE_SFU_ADMIN_URL`: origen HTTPS del SFU, por ejemplo `https://voice.tu-dominio.example:8443`.
+- `VOICE_SFU_ADMIN_URL`: origen HTTPS del SFU, por ejemplo `https://IP_PUBLICA.nip.io:8443`.
 - `VOICE_SFU_ADMIN_TOKEN`: los 32 caracteres imprimibles generados anteriormente.
 - Opcionales `VOICE_ADMISSION_ISSUER` y `VOICE_ADMISSION_AUDIENCE`, solo si se desea sobrescribir los valores predeterminados coordinadamente.
 
@@ -221,8 +221,8 @@ No pegues ningún secreto aquí ni lo guardes en el repositorio. Si falta el sec
 
 Para que Go reciba estas variables tanto en Windows como en Android, el lanzador las incorpora al proceso hijo al compilar la Alpha. En el repositorio GitHub abre **Settings → Secrets and variables → Actions → Variables** y crea estas dos variables públicas:
 
-- `CINNABAR_VOICE_WSS_ENDPOINT` = `wss://voice.tu-dominio.example:8443/v1/voice`
-- `CINNABAR_VOICE_ICE_SERVERS` = `[{"urls":["stun:STUN_OPERADO_POR_TI:3478"]}]`
+- `CINNABAR_VOICE_WSS_ENDPOINT` = `wss://IP_PUBLICA.nip.io:8443/v1/voice`
+- `CINNABAR_VOICE_ICE_SERVERS` = `[{"urls":["stun:stun.l.google.com:19302"]}]`
 
 Después ejecuta el workflow **Voice Chat Alpha Builds** para producir el instalador Windows y la APK Android con la misma configuración. Las variables pueden contener únicamente la URL WSS y configuración STUN pública. Para la primera prueba usa STUN sin usuario ni contraseña. El código del lanzador rechaza los valores ICE con URL TURN, nombre de usuario o credencial antes de incorporarlos a la compilación.
 
@@ -231,7 +231,7 @@ Después ejecuta el workflow **Voice Chat Alpha Builds** para producir el instal
 ## Comprobación previa
 
 ~~~sh
-curl -i https://voice.tu-dominio.example:8443/healthz
+curl -i https://IP_PUBLICA.nip.io:8443/healthz
 sudo ss -lntup | grep -E '(:8443|:19132|:19133)'
 ~~~
 

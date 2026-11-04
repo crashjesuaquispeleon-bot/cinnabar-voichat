@@ -245,7 +245,6 @@ mod tests {
     }
 }
 
-
 /// Dedicated listener for low-latency voice frames, isolated from game and control I/O.
 pub struct VoiceListener {
     listener: Listener,
@@ -276,7 +275,10 @@ impl VoiceListener {
         }
         let lock_path = directory.join(crate::contract::VOICE_LOCK_FILE_NAME);
         if fs::symlink_metadata(&lock_path).is_ok_and(|m| !m.is_file()) {
-            return Err(super::invalid_endpoint(&lock_path, "lease is not a regular file"));
+            return Err(super::invalid_endpoint(
+                &lock_path,
+                "lease is not a regular file",
+            ));
         }
         let mut options = OpenOptions::new();
         options.read(true).write(true).create(true).truncate(false);

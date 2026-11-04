@@ -21,10 +21,9 @@ pub use cinnabar_api::{
 pub mod contract;
 pub use contract::{
     AuthState, Backend, CinnabarRelease, ConnectStage, ConnectTarget, GameMode, Lifecycle,
-    MAX_FRAME_LEN, VOICE_FRAME_BYTES, VOICE_IPC_KIND_AUDIO, VOICE_IPC_KIND_CLOSE,
-    VOICE_IPC_KIND_REMOTE_AUDIO, VOICE_IPC_KIND_STATUS, VOICE_IPC_KIND_TRANSMIT,
-    VOICE_MAX_FRAME_LEN, PackAcquisition, PackApplication, PackDownstreamOutcome, PackOffer, Transport,
-    WorldState,
+    MAX_FRAME_LEN, PackAcquisition, PackApplication, PackDownstreamOutcome, PackOffer, Transport,
+    VOICE_FRAME_BYTES, VOICE_IPC_KIND_AUDIO, VOICE_IPC_KIND_CLOSE, VOICE_IPC_KIND_REMOTE_AUDIO,
+    VOICE_IPC_KIND_STATUS, VOICE_IPC_KIND_TRANSMIT, VOICE_MAX_FRAME_LEN, WorldState,
 };
 #[cfg(not(target_arch = "wasm32"))]
 mod endpoint;

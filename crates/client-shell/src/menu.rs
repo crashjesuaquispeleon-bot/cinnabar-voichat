@@ -28,10 +28,10 @@ mod realm_membership;
 pub use join_requests::open_join_requests_from_key;
 pub mod launcher_account;
 mod launcher_core;
-mod minecraft_import;
-mod navigation;
 mod lifecycle;
 mod microphone;
+mod minecraft_import;
+mod navigation;
 mod presence_targets;
 mod reconnect;
 mod renderer;
@@ -75,8 +75,8 @@ pub use launcher_core::LauncherCoreSlot;
 use servers::{ServerWriter, load_servers};
 pub use video_settings::persist_video_settings;
 
-use std::path::PathBuf;
 use lifecycle::now_unix;
+use std::path::PathBuf;
 
 use bevy::prelude::{Commands, ResMut, Resource};
 
@@ -362,7 +362,6 @@ impl MenuRuntime {
     pub fn take_local_world_request(&mut self) -> Option<usize> {
         self.local_world_requested.take()
     }
-
 
     /// The queued join, once the saved account's check has settled (bounded) and any
     /// sign-in helper the join does not outlive has finished cleaning up.
@@ -977,8 +976,6 @@ impl MenuRuntime {
         }
     }
 }
-
-
 
 use client_state::{JoinIntent, SessionStatus};
 

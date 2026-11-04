@@ -33,7 +33,7 @@ export CINNABAR_VOICE_TLS_KEY_FILE='/run/secrets/voice.key'
 export CINNABAR_VOICE_ISSUER='https://api.cinnabar.gg/voice'
 export CINNABAR_VOICE_AUDIENCE='cinnabar-voice-sfu'
 export CINNABAR_VOICE_BROKER_PUBLIC_KEY='<base64 public key only>'
-export CINNABAR_VOICE_CONTROL_TOKEN='<base64 random 32-byte broker control secret>' # development only; prefer systemd LoadCredential
+export CINNABAR_VOICE_CONTROL_TOKEN_FILE='/run/secrets/voice-control-token' # file contains base64; prefer systemd LoadCredential
 export CINNABAR_VOICE_ICE_SERVERS='[{"urls":["turns:turn.example.net:5349"],"username":"<short-lived user>","credential":"<short-lived credential>"}]'
 export CINNABAR_VOICE_MAX_PARTICIPANTS='8'
 go run ./cmd/voice-sfu

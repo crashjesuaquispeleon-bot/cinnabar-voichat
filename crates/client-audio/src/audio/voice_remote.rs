@@ -73,8 +73,7 @@ impl VoiceRemotePlayback {
     }
 
     fn update_queue_gate(&self) {
-        let accepting = self.enabled.load(Ordering::Acquire)
-            && !self.muted.load(Ordering::Acquire);
+        let accepting = self.enabled.load(Ordering::Acquire) && !self.muted.load(Ordering::Acquire);
         self.queue.set_accepting(accepting);
     }
 
@@ -113,10 +112,7 @@ impl VoiceRemotePlayback {
         }
 
         let mut source = [0.0_f32; REMOTE_FRAME_SAMPLES];
-        for (index, bytes) in payload[REMOTE_SEQUENCE_BYTES..]
-            .chunks_exact(2)
-            .enumerate()
-        {
+        for (index, bytes) in payload[REMOTE_SEQUENCE_BYTES..].chunks_exact(2).enumerate() {
             let sample = i16::from_le_bytes([bytes[0], bytes[1]]);
             source[index] = f32::from(sample) / 32768.0;
         }
@@ -229,8 +225,16 @@ mod tests {
 
         playback.set_voice_session_enabled(true);
         assert_eq!(playback.ingest_frame(&test_frame(16_384)), Ok(()));
-        let frame = playback.queue().pop().expect("frame should enter the receive queue");
-        assert!(frame.samples().iter().all(|sample| (*sample - 0.5).abs() < 0.0001));
+        let frame = playback
+            .queue()
+            .pop()
+            .expect("frame should enter the receive queue");
+        assert!(
+            frame
+                .samples()
+                .iter()
+                .all(|sample| (*sample - 0.5).abs() < 0.0001)
+        );
     }
 
     #[test]
@@ -271,7 +275,12 @@ mod tests {
         playback.set_receive_volume_percent(200);
         assert_eq!(playback.ingest_frame(&test_frame(16_384)), Ok(()));
         let frame = playback.queue().pop().expect("frame should be queued");
-        assert!(frame.samples().iter().all(|sample| (*sample - 1.0).abs() < 0.0001));
+        assert!(
+            frame
+                .samples()
+                .iter()
+                .all(|sample| (*sample - 1.0).abs() < 0.0001)
+        );
     }
 
     #[test]

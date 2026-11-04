@@ -47,7 +47,6 @@ type SFU struct {
 	ctx context.Context
 	cancel context.CancelFunc
 	reaperDone chan struct{}
-	closeOnce sync.Once
 
 	mu sync.RWMutex
 	closed bool
@@ -481,29 +480,50 @@ func (peer *sfuPeer) done() <-chan struct{} {
 }
 
 func (peer *sfuPeer) close() {
-	peer.closeOnce.Do(func() {
-		peer.mu.Lock()
-		peer.closed = true
-		admission := peer.admission
+	peer.mu.Lock()
+	if peer.closed {
 		peer.mu.Unlock()
+		return
+	}
+	peer.closed = true
+	admission := peer.admission
+	peer.mu.Unlock()
+	peer.finishClose(admission)
+}
 
-		peer.sfu.mu.Lock()
-		if room := peer.sfu.rooms[peer.roomID]; room != nil {
-			if room.peers[peer.xuid] == peer {
-				delete(room.peers, peer.xuid)
-			}
-			if len(room.peers) == 0 {
-				delete(peer.sfu.rooms, peer.roomID)
-			}
+// closeIfAdmissionToken closes this peer only while the named lease is still current.
+// The admission comparison and closed transition share peer.mu with Renew, so a revoke
+// racing a successful renewal cannot accidentally terminate the replacement lease.
+func (peer *sfuPeer) closeIfAdmissionToken(tokenID string) bool {
+	peer.mu.Lock()
+	if peer.closed || peer.admission.TokenID != tokenID {
+		peer.mu.Unlock()
+		return false
+	}
+	peer.closed = true
+	admission := peer.admission
+	peer.mu.Unlock()
+	peer.finishClose(admission)
+	return true
+}
+
+func (peer *sfuPeer) finishClose(admission Admission) {
+	peer.sfu.mu.Lock()
+	if room := peer.sfu.rooms[peer.roomID]; room != nil {
+		if room.peers[peer.xuid] == peer {
+			delete(room.peers, peer.xuid)
 		}
-		peer.sfu.mu.Unlock()
-		peer.sfu.registry.Revoke(admission.TokenID)
-		_ = peer.pc.Close()
-		if peer.signalClose != nil {
-			_ = peer.signalClose()
+		if len(room.peers) == 0 {
+			delete(peer.sfu.rooms, peer.roomID)
 		}
-		close(peer.pcClosed)
-	})
+	}
+	peer.sfu.mu.Unlock()
+	peer.sfu.registry.Revoke(admission.TokenID)
+	_ = peer.pc.Close()
+	if peer.signalClose != nil {
+		_ = peer.signalClose()
+	}
+	close(peer.pcClosed)
 }
 
 // SweepExpired closes peers whose broker-issued admission lease was not renewed.
@@ -555,6 +575,30 @@ func (s *SFU) expireLoop() {
 			s.SweepExpired(now)
 		}
 	}
+}
+
+// RevokeAdmission closes one participant only when tokenID is the peer's current lease.
+// A stale token from before a successful renewal cannot revoke the replacement admission.
+func (s *SFU) RevokeAdmission(roomID, tokenID string) bool {
+	if !canonicalUUID(roomID) || !canonicalUUID(tokenID) {
+		return false
+	}
+	s.mu.RLock()
+	room := s.rooms[roomID]
+	var peers []*sfuPeer
+	if room != nil {
+		peers = make([]*sfuPeer, 0, len(room.peers))
+		for _, peer := range room.peers {
+			peers = append(peers, peer)
+		}
+	}
+	s.mu.RUnlock()
+	for _, peer := range peers {
+		if peer.closeIfAdmissionToken(tokenID) {
+			return true
+		}
+	}
+	return false
 }
 
 // Close tears down every active PeerConnection and revokes its current admission.

@@ -12,6 +12,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
+	"github.com/pion/ice/v4"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -41,12 +42,15 @@ type SFUConfig struct {
 	Admission VerifyConfig
 	ICEServers []webrtc.ICEServer
 	MaxParticipants int
+	UDPMux ice.UDPMux
 }
 
 // SFU accepts WebRTC offers only with a verified Cinnabar room admission.
 type SFU struct {
 	admission VerifyConfig
 	peerConfig webrtc.Configuration
+	api *webrtc.API
+	udpMux ice.UDPMux
 	registry *Registry
 
 	ctx context.Context
@@ -126,10 +130,17 @@ func NewSFU(config SFUConfig) (*SFU, error) {
 		return nil, err
 	}
 	config.Admission.PublicKey = append([]byte(nil), config.Admission.PublicKey...)
+	settingEngine := webrtc.SettingEngine{}
+	if config.UDPMux != nil {
+		settingEngine.SetICEUDPMux(config.UDPMux)
+	}
+	api := webrtc.NewAPI(webrtc.WithSettingEngine(settingEngine))
 	ctx, cancel := context.WithCancel(context.Background())
 	sfu := &SFU{
 		admission: config.Admission,
 		peerConfig: webrtc.Configuration{ICEServers: append([]webrtc.ICEServer(nil), config.ICEServers...)},
+		api: api,
+		udpMux: config.UDPMux,
 		registry: registry,
 		ctx: ctx,
 		cancel: cancel,
@@ -264,7 +275,7 @@ func (s *SFU) join(
 	if err := s.registry.Join(admission, time.Now()); err != nil {
 		return nil, nil, err
 	}
-	pc, err := webrtc.NewPeerConnection(s.peerConfig)
+	pc, err := s.api.NewPeerConnection(s.peerConfig)
 	if err != nil {
 		s.registry.Revoke(admission.TokenID)
 		return nil, nil, err
@@ -634,24 +645,26 @@ func (s *SFU) RevokeAdmission(roomID, tokenID string) bool {
 	return false
 }
 
-// Close tears down every active PeerConnection and revokes its current admission.
+// Close tears down every peer before releasing the shared ICE UDP sockets.
 func (s *SFU) Close() {
 	s.closeOnce.Do(func() {
 		s.mu.Lock()
 		s.closed = true
+		var peers []*sfuPeer
+		for _, room := range s.rooms {
+			for _, peer := range room.peers {
+				peers = append(peers, peer)
+			}
+		}
 		s.mu.Unlock()
+
 		s.cancel()
 		<-s.reaperDone
-	})
-	s.mu.RLock()
-	var peers []*sfuPeer
-	for _, room := range s.rooms {
-		for _, peer := range room.peers {
-			peers = append(peers, peer)
+		for _, peer := range peers {
+			peer.close()
 		}
-	}
-	s.mu.RUnlock()
-	for _, peer := range peers {
-		peer.close()
-	}
+		if s.udpMux != nil {
+			_ = s.udpMux.Close()
+		}
+	})
 }

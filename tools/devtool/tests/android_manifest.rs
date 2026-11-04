@@ -47,6 +47,8 @@ fn android_manifest_renders_and_unknown_tokens_still_fail() {
     let xml = fs::read_to_string(&output).unwrap();
     let mut reader = quick_xml::Reader::from_str(&xml);
     let mut saw_manifest = false;
+    let mut saw_record_audio = false;
+    let mut saw_optional_microphone = false;
     loop {
         match reader.read_event().unwrap() {
             quick_xml::events::Event::Start(tag) if tag.name().as_ref() == b"manifest" => {

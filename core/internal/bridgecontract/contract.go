@@ -89,6 +89,26 @@ const (
 	ControlWindowsEndpointName = "control.addr"
 	// SessionWindowsEndpointName: Session endpoint name on Windows.
 	SessionWindowsEndpointName = "session.addr"
+	// VoiceMaxFrameLen: Maximum payload size on the dedicated local voice bridge.
+	VoiceMaxFrameLen = 1024
+	// VoiceFrameBytes: Voice media frame bytes: sequence plus 16 kHz mono PCM16 samples.
+	VoiceFrameBytes = 648
+	// VoiceIPCKindAudio: Local voice IPC uplink media frame.
+	VoiceIPCKindAudio = 1
+	// VoiceIPCKindTransmit: Local voice IPC push-to-talk or open-microphone gate update.
+	VoiceIPCKindTransmit = 2
+	// VoiceIPCKindClose: Local voice IPC session close request.
+	VoiceIPCKindClose = 3
+	// VoiceIPCKindRemoteAudio: Local voice IPC downlink media frame.
+	VoiceIPCKindRemoteAudio = 129
+	// VoiceIPCKindStatus: Local voice IPC status or admission result.
+	VoiceIPCKindStatus = 130
+	// VoiceUnixEndpointName: Dedicated voice endpoint name on Unix.
+	VoiceUnixEndpointName = "voice.sock"
+	// VoiceWindowsEndpointName: Dedicated voice endpoint name on Windows.
+	VoiceWindowsEndpointName = "voice.addr"
+	// VoiceLockFileName: Exclusive owner lease for the voice endpoint.
+	VoiceLockFileName = "voice.lock"
 	// RealmTargetPrefix: Prefix for a Realm id target.
 	RealmTargetPrefix = "realm_id/"
 	// RealmCodePrefix: Prefix for a Realm invitation code target.

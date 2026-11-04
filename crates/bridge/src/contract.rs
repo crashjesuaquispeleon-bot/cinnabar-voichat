@@ -130,6 +130,35 @@ pub const CONTROL_WINDOWS_ENDPOINT_NAME: &str = "control.addr";
 
 /// Session endpoint name on Windows.
 pub const SESSION_WINDOWS_ENDPOINT_NAME: &str = "session.addr";
+/// Maximum payload size on the dedicated local voice bridge.
+pub const VOICE_MAX_FRAME_LEN: usize = 1024;
+
+/// Voice media frame bytes: sequence plus 16 kHz mono PCM16 samples.
+pub const VOICE_FRAME_BYTES: usize = 648;
+
+/// Local voice IPC uplink media frame.
+pub const VOICE_IPC_KIND_AUDIO: u8 = 1;
+
+/// Local voice IPC push-to-talk or open-microphone gate update.
+pub const VOICE_IPC_KIND_TRANSMIT: u8 = 2;
+
+/// Local voice IPC session close request.
+pub const VOICE_IPC_KIND_CLOSE: u8 = 3;
+
+/// Local voice IPC downlink media frame.
+pub const VOICE_IPC_KIND_REMOTE_AUDIO: u8 = 129;
+
+/// Local voice IPC status or admission result.
+pub const VOICE_IPC_KIND_STATUS: u8 = 130;
+
+/// Dedicated voice endpoint name on Unix.
+pub const VOICE_UNIX_ENDPOINT_NAME: &str = "voice.sock";
+
+/// Dedicated voice endpoint name on Windows.
+pub const VOICE_WINDOWS_ENDPOINT_NAME: &str = "voice.addr";
+
+/// Exclusive owner lease for the voice endpoint.
+pub const VOICE_LOCK_FILE_NAME: &str = "voice.lock";
 
 /// Prefix for a Realm id target.
 pub const REALM_TARGET_PREFIX: &str = "realm_id/";

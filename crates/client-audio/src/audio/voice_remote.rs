@@ -317,7 +317,7 @@ impl VoiceRemotePlayback {
         };
 
         let mut source = [0.0_f32; REMOTE_FRAME_SAMPLES];
-        for (index, bytes) in payload[sequence_end..].chunks_exact(2).enumerate() {
+        for (index, bytes) in payload[sequence_end..].as_chunks::<2>().0.iter().enumerate() {
             let sample = i16::from_le_bytes([bytes[0], bytes[1]]);
             source[index] = f32::from(sample) / 32768.0;
         }

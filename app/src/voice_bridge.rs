@@ -29,12 +29,15 @@ const AUDIO_TICK: Duration = Duration::from_millis(20);
 struct BridgeDesired {
     active: bool,
     transmit: bool,
+    /// Local lifecycle discriminator only; never sent as identity to the broker or SFU.
+    session: Option<(u64, u64)>,
 }
 
 impl BridgeDesired {
     const STOPPED: Self = Self {
         active: false,
         transmit: false,
+        session: None,
     };
 }
 
@@ -69,6 +72,8 @@ impl VoiceBridgeRuntime {
 pub(crate) fn drive_voice_bridge(
     network: Option<Res<NetworkHandle<PackApplication>>>,
     policy: Option<Res<VoiceInputPolicy>>,
+    world: Res<crate::runtime::world::ClientWorld>,
+    clock: Res<client_presentation::environment::WorldClock>,
     capture: Option<Res<VoiceCaptureController>>,
     playback: Option<Res<VoiceRemotePlayback>>,
     mut runtime: ResMut<VoiceBridgeRuntime>,
@@ -77,8 +82,16 @@ pub(crate) fn drive_voice_bridge(
         runtime.stop();
         return;
     };
-    let feature_enabled =
-        policy.enabled() && policy.session_active() && policy.mode() != MicrophoneMode::Unselected;
+    let session_identity = world.stream.as_ref().map(|stream| {
+        (
+            clock.session_generation(),
+            stream.authority().actor_session_id(),
+        )
+    });
+    let feature_enabled = policy.enabled()
+        && policy.session_active()
+        && policy.mode() != MicrophoneMode::Unselected
+        && session_identity.is_some();
     let Some(socket_dir) = network
         .as_deref()
         .and_then(|network| network.core_socket_dir())
@@ -89,16 +102,23 @@ pub(crate) fn drive_voice_bridge(
         return;
     };
 
+    let desired = BridgeDesired {
+        active: true,
+        transmit: policy.transmission_permitted(),
+        session: session_identity,
+    };
     let finished = runtime
         .active
         .as_ref()
         .is_some_and(|active| active.thread.is_finished());
-    let changed_session = runtime
-        .active
-        .as_ref()
-        .is_some_and(|active| active.socket_dir != socket_dir);
-    if finished || changed_session {
+    let changed_binding = runtime.active.as_ref().is_some_and(|active| {
+        active.socket_dir != socket_dir || active.desired.borrow().session != desired.session
+    });
+    if finished || changed_binding {
         if let Some(active) = runtime.active.take() {
+            // Close the previous room before requesting admission for the new
+            // local session. Never retain an old partida's receive path.
+            active.desired.send_replace(BridgeDesired::STOPPED);
             if finished {
                 let _ = active.thread.join();
             }
@@ -106,10 +126,6 @@ pub(crate) fn drive_voice_bridge(
         runtime.retry_at = Some(Instant::now() + BRIDGE_RETRY_DELAY);
     }
 
-    let desired = BridgeDesired {
-        active: true,
-        transmit: policy.transmission_permitted(),
-    };
     if let Some(active) = runtime.active.as_ref() {
         if *active.desired.borrow() != desired {
             active.desired.send_replace(desired);
@@ -304,4 +320,32 @@ async fn send_transmit_gate(writer: &bridge::FrameQueue, allowed: bool) -> anyho
         ]))
         .await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_new_local_partida_requires_a_fresh_voice_bridge() {
+        let active = BridgeDesired {
+            active: true,
+            transmit: true,
+            session: Some((12, 34)),
+        };
+        let transfer = BridgeDesired {
+            active: true,
+            transmit: false,
+            session: Some((13, 35)),
+        };
+        let ptt_release = BridgeDesired {
+            active: true,
+            transmit: false,
+            session: Some((12, 34)),
+        };
+
+        assert_ne!(active.session, transfer.session);
+        assert_eq!(active.session, ptt_release.session);
+        assert_eq!(BridgeDesired::STOPPED.session, None);
+    }
 }

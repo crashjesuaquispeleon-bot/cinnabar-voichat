@@ -63,6 +63,13 @@ pub(crate) fn configure_client_authority_systems(app: &mut App) {
             crate::ui_runtime::mob_effects::drive_mob_effect_screen_input,
             drive_chat_ui_actions.in_set(OrdinaryInputSet),
             drain_inventory_authority,
+        )
+            .chain()
+            .in_set(ClientFrameSet::UiAuthority),
+    )
+    .add_systems(
+        Update,
+        (
             drive_chat_keyboard_input
                 .in_set(OrdinaryInputSet)
                 .before(client_state::ShellFrameSet::MenuInput),
@@ -75,6 +82,7 @@ pub(crate) fn configure_client_authority_systems(app: &mut App) {
             synchronize_semantic_input_authority.after(client_state::ShellFrameSet::Focus),
         )
             .chain()
+            .after(drain_inventory_authority)
             .in_set(ClientFrameSet::UiAuthority),
     )
     .add_systems(

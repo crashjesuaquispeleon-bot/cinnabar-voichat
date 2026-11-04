@@ -136,18 +136,20 @@ func TestSessionCloseHandlerRequiresBrokerControlTokenAndCanonicalIDs(t *testing
 	token := []byte("0123456789abcdef0123456789abcdef")
 	roomID, sessionID := uuid.NewString(), uuid.NewString()
 	closed := 0
-	handler := sessionCloseHandler(token, func(room, session string) int {
-		if room != roomID || session != sessionID {
-			t.Fatalf("unexpected close binding room=%q session=%q", room, session)
-		}
-		closed++
-		return 2
-	})
+	mux := http.NewServeMux()
+	mux.Handle("POST /v1/admin/rooms/{roomID}/sessions/{sessionID}/close",
+		sessionCloseHandler(token, func(room, session string) int {
+			if room != roomID || session != sessionID {
+				t.Fatalf("unexpected close binding room=%q session=%q", room, session)
+			}
+			closed++
+			return 2
+		}))
 	path := "/v1/admin/rooms/" + roomID + "/sessions/" + sessionID + "/close"
 
 	request := httptest.NewRequest(http.MethodPost, path, nil)
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, request)
+	mux.ServeHTTP(response, request)
 	if response.Code != http.StatusUnauthorized || closed != 0 {
 		t.Fatalf("missing token response=%d closed=%d", response.Code, closed)
 	}
@@ -155,7 +157,7 @@ func TestSessionCloseHandlerRequiresBrokerControlTokenAndCanonicalIDs(t *testing
 	request = httptest.NewRequest(http.MethodPost, path, nil)
 	request.Header.Set("Authorization", "Bearer "+"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
 	response = httptest.NewRecorder()
-	handler.ServeHTTP(response, request)
+	mux.ServeHTTP(response, request)
 	if response.Code != http.StatusUnauthorized || closed != 0 {
 		t.Fatalf("wrong token response=%d closed=%d", response.Code, closed)
 	}
@@ -163,7 +165,7 @@ func TestSessionCloseHandlerRequiresBrokerControlTokenAndCanonicalIDs(t *testing
 	request = httptest.NewRequest(http.MethodPost, "/v1/admin/rooms/not-a-uuid/sessions/"+sessionID+"/close", nil)
 	request.Header.Set("Authorization", "Bearer "+string(token))
 	response = httptest.NewRecorder()
-	handler.ServeHTTP(response, request)
+	mux.ServeHTTP(response, request)
 	if response.Code != http.StatusBadRequest || closed != 0 {
 		t.Fatalf("invalid room response=%d closed=%d", response.Code, closed)
 	}
@@ -171,7 +173,7 @@ func TestSessionCloseHandlerRequiresBrokerControlTokenAndCanonicalIDs(t *testing
 	request = httptest.NewRequest(http.MethodPost, path, strings.NewReader("unexpected"))
 	request.Header.Set("Authorization", "Bearer "+string(token))
 	response = httptest.NewRecorder()
-	handler.ServeHTTP(response, request)
+	mux.ServeHTTP(response, request)
 	if response.Code != http.StatusBadRequest || closed != 0 {
 		t.Fatalf("body response=%d closed=%d", response.Code, closed)
 	}
@@ -179,7 +181,7 @@ func TestSessionCloseHandlerRequiresBrokerControlTokenAndCanonicalIDs(t *testing
 	request = httptest.NewRequest(http.MethodPost, path, nil)
 	request.Header.Set("Authorization", "Bearer "+string(token))
 	response = httptest.NewRecorder()
-	handler.ServeHTTP(response, request)
+	mux.ServeHTTP(response, request)
 	if response.Code != http.StatusNoContent || closed != 1 {
 		t.Fatalf("valid close response=%d closed=%d", response.Code, closed)
 	}

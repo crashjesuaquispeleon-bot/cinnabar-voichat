@@ -105,8 +105,10 @@ mod tests {
         let _ = encoder.encode(&frame, 1);
         let payload = encoder.encode(&frame, 2);
         let peak = payload[8..]
-            .chunks_exact(2)
-            .map(|bytes| i16::from_le_bytes([bytes[0], bytes[1]]).unsigned_abs())
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|bytes| i16::from_le_bytes(*bytes).unsigned_abs())
             .max()
             .unwrap_or_default();
         assert!(peak < 1_700, "Nyquist alias was not attenuated: {peak}");

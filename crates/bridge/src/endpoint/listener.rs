@@ -98,64 +98,83 @@ impl Drop for SessionListener {
 }
 
 /// Inspects an endpoint without following links, retaining its cleanup identity.
-fn identity(path: &Path) -> io::Result<Publication> {
+#[cfg(unix)]
+fn identity(path: &Path) -> Result<Publication, BridgeError> {
+    use std::os::unix::fs::{FileTypeExt, MetadataExt};
     let metadata = fs::symlink_metadata(path)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::MetadataExt;
-        Ok((metadata.dev(), metadata.ino()))
-    }
-    #[cfg(windows)]
-    {
-        fs::read(path)
-    }
-}
-
-/// Removes only a dead endpoint file that still looks like one we published.
-async fn prepare(path: &Path) -> Result<(), BridgeError> {
-    match fs::symlink_metadata(path) {
-        Ok(metadata) if metadata.file_type().is_socket() || metadata.is_file() => {
-            #[cfg(unix)]
-            if super::probe_unix(path).await.is_ok() {
-                return Err(super::invalid_endpoint(path, "endpoint is still listening"));
-            }
-            #[cfg(windows)]
-            if super::probe_windows(path).await.is_ok() {
-                return Err(super::invalid_endpoint(path, "endpoint is still listening"));
-            }
-            fs::remove_file(path)?;
-            Ok(())
-        }
-        Ok(_) => Err(super::invalid_endpoint(
+    if !metadata.file_type().is_socket() || metadata.uid() != rustix::process::geteuid().as_raw() {
+        return Err(super::invalid_endpoint(
             path,
-            "path exists and is not a socket or address file",
-        )),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(error.into()),
+            "endpoint is not an owned socket",
+        ));
     }
+    Ok((metadata.dev(), metadata.ino()))
 }
 
-/// Publishes a fresh listener and records the identity used for cleanup.
-async fn publish(path: &Path) -> Result<(Listener, Publication), BridgeError> {
+/// Reads only a regular, bounded loopback publication.
+#[cfg(windows)]
+fn identity(path: &Path) -> Result<Publication, BridgeError> {
+    let metadata = fs::symlink_metadata(path)?;
+    if !metadata.is_file() || metadata.len() > super::MAX_WINDOWS_PUBLICATION_BYTES as u64 {
+        return Err(super::invalid_endpoint(
+            path,
+            "invalid endpoint publication",
+        ));
+    }
+    let bytes = fs::read(path)?;
+    super::parse_windows_publication(path, &bytes)?;
+    Ok(bytes)
+}
+
+/// Reclaims only a proven stale endpoint; active or unrecognized files remain intact.
+async fn prepare(path: &Path) -> Result<(), BridgeError> {
+    if !path.try_exists()? {
+        return Ok(());
+    }
+    let before = identity(path)?;
     #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let listener = Listener::bind(path)?;
-        fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
-        let publication = identity(path)?;
-        return Ok((listener, publication));
-    }
+    let connected = tokio::net::UnixStream::connect(path).await.map(|_| ());
     #[cfg(windows)]
-    {
-        use std::io::Write;
-        let listener = Listener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).await?;
-        let publication = format!("{}\n", listener.local_addr()?).into_bytes();
-        let mut file = tempfile::NamedTempFile::new_in(path.parent().expect("endpoint directory"))?;
-        file.write_all(&publication)?;
-        file.as_file().sync_all()?;
-        file.persist_noclobber(path).map_err(|error| error.error)?;
-        Ok((listener, publication))
+    let connected =
+        tokio::net::TcpStream::connect(super::parse_windows_publication(path, &before)?)
+            .await
+            .map(|_| ());
+    match connected {
+        Err(error) if error.kind() == io::ErrorKind::ConnectionRefused => {}
+        Err(error) => return Err(error.into()),
+        Ok(()) => return Err(super::invalid_endpoint(path, "endpoint is active")),
     }
+    if identity(path)? != before {
+        return Err(super::invalid_endpoint(path, "endpoint changed"));
+    }
+    fs::remove_file(path)?;
+    Ok(())
+}
+
+/// Binds and secures the socket before it can be advertised as ready.
+#[cfg(unix)]
+async fn publish(path: &Path) -> Result<(Listener, Publication), BridgeError> {
+    use std::os::unix::fs::PermissionsExt;
+    let listener = Listener::bind(path)?;
+    let publication = identity(path)?;
+    if let Err(error) = fs::set_permissions(path, fs::Permissions::from_mode(0o600)) {
+        let _ = fs::remove_file(path);
+        return Err(error.into());
+    }
+    Ok((listener, publication))
+}
+
+/// Publishes a bound loopback listener without replacing an existing file.
+#[cfg(windows)]
+async fn publish(path: &Path) -> Result<(Listener, Publication), BridgeError> {
+    use std::io::Write;
+    let listener = Listener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).await?;
+    let publication = format!("{}\n", listener.local_addr()?).into_bytes();
+    let mut file = tempfile::NamedTempFile::new_in(path.parent().expect("endpoint directory"))?;
+    file.write_all(&publication)?;
+    file.as_file().sync_all()?;
+    file.persist_noclobber(path).map_err(|error| error.error)?;
+    Ok((listener, publication))
 }
 
 /// Dedicated listener for low-latency voice frames, isolated from game and control I/O.
@@ -213,7 +232,7 @@ impl VoiceListener {
         })
     }
 
-    /// Accepts one framed connection limited to the voice payload budget.
+    /// Accepts one bounded voice IPC connection.
     pub async fn accept(&self) -> Result<FramedStream, BridgeError> {
         let (stream, _) = self.listener.accept().await?;
         #[cfg(windows)]

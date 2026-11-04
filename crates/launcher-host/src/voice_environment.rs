@@ -90,7 +90,7 @@ fn public_stun_configuration(value: Option<&str>) -> Option<&str> {
 
 #[cfg(test)]
 mod tests {
-    use super::{apply_voice_environment, ICE_SERVERS, WSS_ENDPOINT};
+    use super::{ICE_SERVERS, WSS_ENDPOINT, apply_voice_environment};
     use std::{ffi::OsStr, process::Command};
 
     fn configured_value<'a>(command: &'a Command, name: &str) -> Option<&'a OsStr> {

@@ -48,6 +48,7 @@ Consulta [Despliegue del SFU para Alpha](voice-chat-sfu-deployment.md) para prep
 2. A debe seguir conectado y conservar el audio de la sala; no debe cerrarse su sesión por la salida de B.
 3. Vuelve a conectar B y confirma que recibe una admisión nueva, no el token anterior.
 4. Cierra la partida FriendHost. Ambos clientes deben dejar de transmitir y reproducir audio de esa sala.
+5. Mantén la partida abierta y simula una reconexión del socket de Cinnabar API del anfitrión. FriendHost debe recrear la sala del broker, volver a publicar el roster completo y permitir que ambos clientes obtengan admisiones nuevas sin reiniciar el mundo.
 5. Repite una vez con A como emisor y B como receptor.
 
 ## Evidencia que se debe registrar

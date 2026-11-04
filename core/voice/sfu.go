@@ -57,10 +57,11 @@ type SFU struct {
 	cancel     context.CancelFunc
 	reaperDone chan struct{}
 
-	mu     sync.RWMutex
-	closed bool
-	joinWG sync.WaitGroup
-	rooms  map[string]*sfuRoom
+	mu        sync.RWMutex
+	closed    bool
+	closeOnce sync.Once
+	joinWG    sync.WaitGroup
+	rooms     map[string]*sfuRoom
 }
 
 type sfuRoom struct {

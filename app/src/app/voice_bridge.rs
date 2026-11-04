@@ -115,7 +115,7 @@ pub(crate) fn drive_voice_bridge(
         active.socket_dir != socket_dir || active.desired.borrow().session != desired.session
     });
     if finished || changed_binding {
-        if let Some(active) = runtime.active.take() {
+        if let Some(mut active) = runtime.active.take() {
             // Close the previous room before requesting admission for the new
             // local session. Never retain an old partida's receive path.
             active.desired.send_replace(BridgeDesired::STOPPED);

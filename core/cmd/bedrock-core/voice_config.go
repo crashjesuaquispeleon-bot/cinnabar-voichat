@@ -34,8 +34,9 @@ func parseVoiceICEServers(raw string) ([]webrtc.ICEServer, error) {
 				!strings.HasPrefix(u, "turn:") && !strings.HasPrefix(u, "turns:") {
 				return nil, fmt.Errorf("ICE server %d has an unsupported URL scheme", i)
 			}
+			credential, credentialOK := server.Credential.(string)
 			if (strings.HasPrefix(u, "turn:") || strings.HasPrefix(u, "turns:")) &&
-				(strings.TrimSpace(server.Username) == "" || strings.TrimSpace(server.Credential) == "") {
+				(strings.TrimSpace(server.Username) == "" || !credentialOK || strings.TrimSpace(credential) == "") {
 				return nil, fmt.Errorf("TURN server %d requires username and credential", i)
 			}
 		}

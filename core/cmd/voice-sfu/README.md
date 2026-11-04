@@ -58,3 +58,9 @@ The broker integration and core bridge wiring are present in the development bra
 When a partida closes, the broker calls `POST /v1/admin/rooms/{roomID}/sessions/{sessionID}/close` so every peer in that exact room/session is removed immediately. When a player leaves the FriendHost roster or signs out, the broker calls `POST /v1/admin/rooms/{roomID}/admissions/{tokenID}/revoke` with that admission's current jti. The host refreshes the full roster on a 25-second cadence; the bridge requests a fresh admission token every 60 seconds and fails closed if renewal is rejected. The broker host lease and token expiry are additional safeguards, not substitutes for successful deployment tests.
 
 Both SFU admin operations require the separate control token, reject request bodies and return no participant data. The SFU does not record or persist audio. Never log admission tokens, the control token, TURN credentials, or media frames.
+
+
+## Operator runbooks
+
+- [Public SFU deployment for the two-player Alpha test](../../../docs/reference/voice-chat-sfu-deployment.md)
+- [Two-player real-client integration test](../../../docs/reference/voice-chat-testing.md)

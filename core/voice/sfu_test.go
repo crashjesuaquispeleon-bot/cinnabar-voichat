@@ -35,9 +35,10 @@ func TestVoiceFrameSequenceRequiresExactPcmFrameAndNewSequence(t *testing.T) {
 }
 
 func TestVoiceFrameFormatIsTwentyMillisecondsOfMonoPcm16(t *testing.T) {
-	if voiceSamplesPerFrame != 320 || voicePCMBytesPerFrame != 640 || voiceFrameBytes != 648 {
-		t.Fatalf("unexpected voice frame format: samples=%d pcm=%d payload=%d",
-			voiceSamplesPerFrame, voicePCMBytesPerFrame, voiceFrameBytes)
+	if voiceSamplesPerFrame != 320 || voicePCMBytesPerFrame != 640 || voiceFrameBytes != 648 ||
+		voiceSourceIDBytes != 16 || voiceRemoteFrameBytes != 664 {
+		t.Fatalf("unexpected voice frame format: samples=%d pcm=%d uplink=%d source=%d downlink=%d",
+			voiceSamplesPerFrame, voicePCMBytesPerFrame, voiceFrameBytes, voiceSourceIDBytes, voiceRemoteFrameBytes)
 	}
 }
 
@@ -106,8 +107,32 @@ func TestSFURelaysOnlyBetweenPeersWithTheSameSignedRoom(t *testing.T) {
 	}
 	select {
 	case received := <-second.ReceiveFrames():
-		if !bytes.Equal(received, frame) {
-			t.Fatal("second peer received a different voice frame")
+		if len(received) != voiceRemoteFrameBytes ||
+			bytes.Equal(received[:voiceSourceIDBytes], make([]byte, voiceSourceIDBytes)) ||
+			!bytes.Equal(received[voiceSourceIDBytes:], frame) {
+			t.Fatal("second peer received an invalid speaker-tagged voice frame")
+		}
+		firstSourceID := append([]byte(nil), received[:voiceSourceIDBytes]...)
+		// A second participant starts its own sequence at one. Its packet must
+		// remain independently identifiable instead of sharing the first stream's counter.
+		if err := second.SetTransmitAllowed(ctx, true); err != nil {
+			t.Fatalf("open second peer transmit gate: %v", err)
+		}
+		secondFrame := make([]byte, voiceFrameBytes)
+		binary.BigEndian.PutUint64(secondFrame[:voiceSequenceBytes], 1)
+		secondFrame[voiceSequenceBytes] = 0x5a
+		if err := second.SendFrame(secondFrame); err != nil {
+			t.Fatalf("send second participant's first frame: %v", err)
+		}
+		select {
+		case returned := <-first.ReceiveFrames():
+			if len(returned) != voiceRemoteFrameBytes ||
+				bytes.Equal(returned[:voiceSourceIDBytes], firstSourceID) ||
+				!bytes.Equal(returned[voiceSourceIDBytes:], secondFrame) {
+				t.Fatal("first peer did not receive a separately identified second speaker")
+			}
+		case <-ctx.Done():
+			t.Fatal("first peer did not receive the second participant's voice frame")
 		}
 	case <-ctx.Done():
 		t.Fatal("second peer did not receive the first peer's voice frame")

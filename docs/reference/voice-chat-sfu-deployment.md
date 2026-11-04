@@ -18,6 +18,33 @@ La creación depende de capacidad en la región principal; un error de capacidad
 
 Si no hay capacidad A1 en la región principal, no cambies a una máquina de pago sin revisar el costo. Una alternativa es un VPS económico con IPv4 e IPv6 públicas, pero ya no sería gratuito.
 
+## Crear la VM en Oracle Cloud (paso a paso)
+
+1. Abre [Oracle Cloud Free Tier](https://www.oracle.com/latam/cloud/free/) y crea una cuenta. Usa una sola cuenta personal, datos reales y un método de pago aceptado para la verificación. Oracle indica que puede hacer una retención temporal de autorización; revisa las condiciones antes de continuar.
+2. En la consola, confirma tu **Home Region**. Los recursos Always Free A1 deben crearse en esa región. Si no hay capacidad A1, no elijas una forma de pago ni aumentes la cuota sin revisar el costo.
+3. Abre **Networking → Virtual Cloud Networks → Start VCN Wizard** y elige **Create VCN with Internet Connectivity**. Habilita IPv6 durante el asistente. Conserva la subnet pública, Internet Gateway y ruta predeterminada hacia ese gateway.
+4. Ve a **Compute → Instances → Create instance**. Nombre: `cinnabar-voice-sfu`. Imagen: Ubuntu Server ARM64/AArch64 LTS y comprueba la etiqueta **Always Free eligible**.
+5. En Shape selecciona `VM.Standard.A1.Flex`. Para mantenernos dentro del límite técnico conservador, comienza con 2 OCPU y 12 GB de RAM como máximo. Oracle muestra actualmente límites distintos en su página comercial y en la referencia técnica de Always Free; manda la etiqueta y el consumo Always Free que aparezcan en tu consola, no aumentes recursos basándote solo en una página promocional.
+6. En **Networking / Primary VNIC** selecciona la VCN y subnet pública que creaste. Marca la asignación automática de IPv4 pública. En **Assign IPv6 addresses from subnet prefixes**, asigna una dirección del prefijo IPv6 global. No basta una IPv6 ULA privada. Adjunta tu clave SSH pública.
+7. Antes de crear la instancia, vuelve a revisar que el estimador indique solo recursos Always Free o un importe que aceptas. El volumen de arranque también consume la cuota de almacenamiento.
+8. Cuando la VM esté en estado Running, copia su IPv4 pública. El hostname que usaremos será esa dirección seguida de `.nip.io`, por ejemplo `IP_PUBLICA.nip.io`. Conéctate con el usuario `ubuntu` y la clave SSH privada que guardaste localmente.
+
+Oracle documenta el asistente de VCN, la elección de subred pública y la asignación de IPv4/IPv6 en sus [pasos para crear instancias](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/launchinginstance.htm) y la [guía de IPv6](https://docs.oracle.com/en-us/iaas/Content/Network/Concepts/ipv6.htm). En una subnet pública también se necesita una regla de ruta al Internet Gateway y reglas de seguridad que permitan el tráfico.
+
+### Reglas de entrada en OCI
+
+Agrega estas reglas en el NSG de la VNIC o en la Security List de la subnet. Usa reglas stateful:
+
+| Origen | Protocolo | Puerto de destino | Motivo |
+| --- | --- | ---: | --- |
+| Tu IPv4 pública con `/32` | TCP | 22 | Administración SSH |
+| `0.0.0.0/0` | TCP | 80 | Certbot HTTP-01 y renovación TLS |
+| `0.0.0.0/0` | TCP | 8443 | WSS del SFU y operaciones HTTPS del broker |
+| `0.0.0.0/0` | UDP | 19132 | ICE/WebRTC IPv4 |
+| `::/0` | UDP | 19133 | ICE/WebRTC IPv6 |
+
+No abras SSH a `0.0.0.0/0` ni a `::/0`. Si la Security List tiene salida restringida, permite también DNS y HTTPS para Certbot/descarga de Go y el tráfico UDP saliente requerido para ICE/STUN. La SFU y el servidor Bedrock siguen siendo máquinas distintas.
+
 ## Red y DNS
 
 No compraremos ni registraremos un dominio. Usaremos **nip.io**, DNS público que resuelve automáticamente un hostname que contiene la IPv4, por ejemplo `203.0.113.10.nip.io` (solo ejemplo reservado; no lo copies). Cuando Oracle asigne la IP pública real, sustituye `IP_PUBLICA` por sus cuatro octetos en `IP_PUBLICA.nip.io`. No hay que crear un registro DNS manual. El hostname resultante sirve para solicitar un certificado TLS público. Si la IP pública cambia, también cambia el hostname: habrá que emitir el certificado otra vez y recompilar las dos aplicaciones.

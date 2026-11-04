@@ -1,64 +1,63 @@
-# Cinnabar Voice Chat — P2P Alpha plan
+# Cinnabar Voice Chat — P2P Alpha
 
-Status: **P2P implementation in progress; not yet qualified for release or real-device use**.
+Status (2026-11-04): **P2P implementation is present; CI and real-device qualification are still in progress. Not approved for public release.**
 
 ## Goal
 
-Provide a no-VPS, two-player voice path for Windows and Android using WebRTC peer-to-peer media. Keep the existing SFU transport available as a separate mode and do not remove or weaken its admission checks.
+Provide a no-VPS, two-player voice path for Windows and Android using direct WebRTC media. Keep the existing SFU transport available as a separate mode and do not remove or weaken its admission checks.
 
-## Trust and room authority
+## Implemented
 
-- Reuse the authenticated Cinnabar API WebSocket and the existing FriendHost-scoped room broker.
-- The broker remains the only authority for room IDs, game-session IDs, participant XUIDs, admission leases and membership changes.
-- Never accept a client-selected room ID, XUID, session ID or peer identity as proof of membership.
-- The current FriendHost roster trust limitation remains: the API checks live authenticated accounts but does not independently attest arbitrary third-party Bedrock servers.
-- Signaling messages must be authorized against the current stored membership on every message and must be bounded, rate-limited, and rejected after lease expiry or disconnect.
+### API broker and signaling
 
-## Proposed two-peer flow
-
-1. FriendHost opens a broker-generated room and reports its authenticated roster using the existing protocol.
-2. Each participant requests its current peer-session role over its already authenticated Cinnabar API connection. P2P does not require an SFU admission token.
-3. The broker designates one participant as offerer deterministically from server-side room state; the other is answerer. Clients cannot nominate an arbitrary peer.
-4. The broker relays bounded SDP offer/answer and ICE candidate messages only between the two currently authenticated members of that exact room/session.
-5. WebRTC carries the audio DataChannel directly between peers. Use configured public STUN servers for candidate discovery.
-6. If direct connectivity fails, the client reports a clear connection failure. TURN fallback is a separate deployment requirement; public STUN alone cannot guarantee traversal of restrictive/symmetric NATs.
-7. The native bridge rechecks membership every 15 seconds; account disconnect, host lease expiry, room close, or peer disconnect causes the local bridge to close. This is not instantaneous revocation of an already established direct media path.
-
-## Transport compatibility
-
-- Implement explicit transport selection (p2p or sfu); P2P is the default when no transport is configured, while SFU requires its own WSS endpoint.
-- Keep the current SFU implementation and its PTT acknowledgement, frame bounds, sequence validation, backpressure and revocation behavior unchanged.
-- The P2P path uses the existing 20 ms mono PCM16 frame format, source tags, receive mixer, local PTT gate and bounded queues.
-- Do not silently fall back from a failed P2P connection to an untrusted endpoint or an unauthenticated room.
-
-## Required implementation slices
-
-### API broker
-- Add authenticated voice_signal message schemas and strict validation.
-- Relay only offer/answer/candidate messages between exactly two active members.
-- Enforce room/session membership, per-socket message limits, candidate/SDP byte limits, rate limits and lease checks.
-- Clear pending signaling state on room close, membership removal, account offline and host lease expiry.
-- Add Vitest coverage for unauthorized senders, cross-room isolation, oversized/malformed SDP, candidate floods, stale sessions, disconnect cleanup and exactly-two-peer behavior.
+- Reuses the authenticated Cinnabar API WebSocket and the FriendHost-scoped room broker.
+- The broker generates room/session UUIDs and derives the offerer role from stored membership; clients cannot choose a room, target XUID, peer identity or role.
+- Signaling is accepted only for the sender's current stored room/session, a live host lease and exactly two live members.
+- The FriendHost owner is the offerer; only the guest may send an answer. Offers, answers and bounded ICE candidate messages are relayed only to the other room member.
+- SDP/ICE payloads are bounded to 8 KiB. Existing authenticated WebSocket frame and per-socket flood limits also apply.
+- Broker-only P2P room creation and closure do not require SFU credentials. SFU admission issuance remains separately gated.
+- Vitest coverage includes two-member offer/answer/candidate exchange, outsider rejection, wrong-role rejection, stale-session rejection, oversized payload rejection and P2P room lifecycle without SFU credentials.
 
 ### Native Go transport
-- Add a P2P peer role and signaling adapter without coupling the transport to client-supplied identity.
-- Implement offerer/answerer negotiation and bounded ICE candidate exchange.
-- Reuse existing PCM framing, transmit gate and receive queue contracts.
-- Add integration tests with two in-process Pion peers and a broker relay fake; prove bidirectional audio, mute, teardown, renewal and cross-room isolation.
 
-### Packaging and qualification
-- Extend the Alpha workflow to build the P2P-capable Windows x64 setup and Android arm64 APK.
-- Add automated smoke tests and artifact checks.
-- Complete physical Windows-to-Android and Android-to-Windows microphone/speaker tests before calling the Alpha functional.
+- Adds a Pion WebRTC peer with broker-derived offerer/answerer role and a binary DataChannel.
+- Uses the existing 20 ms mono PCM16 frame format, source IDs, monotonic sequence checks, bounded receive queue, transmit gate and backpressure handling.
+- The Go bridge negotiates using the authenticated API signaling adapter, forwards local IPC PCM frames and sends remote frames back through IPC.
+- The bridge rechecks membership/session role every 15 seconds and closes when the peer or local room is lost.
+- Public Google STUN is configured as best-effort discovery when no custom ICE configuration is supplied. TURN is not included.
+- Go tests cover two in-process Pion peers exchanging audio both ways and a two-bridge IPC integration test. The IPC disconnect test was corrected after CI exposed a stale write to the already-closed remote endpoint; the correction is awaiting a successful rerun.
 
-## Acceptance criteria
-- Exactly two authorized clients can establish a direct WebRTC connection and exchange audio in both directions.
-- A third or removed account cannot signal or receive audio.
-- Closing the host room or either authenticated account tears down the session.
-- PTT release closes the local P2P transmit gate immediately; P2P mode does not claim a media-server acknowledgement. SFU mode retains its existing server-acknowledged gate.
-- Windows x64 EXE and Android arm64 APK are produced by CI and verified.
-- Direct connectivity failure is reported honestly; TURN coverage is not claimed until a TURN relay is deployed and tested.
+### Application integration and packaging
 
-## Current known limitations
+- P2P is the default native transport when Cinnabar API is available. SFU remains selectable explicitly with `CINNABAR_VOICE_TRANSPORT=sfu`.
+- FriendHost maintains the authenticated guest roster and renews the broker room lease using full snapshots.
+- Windows x64 setup EXE and Android arm64 APK workflow jobs are defined for this branch.
+- Android declares optional microphone hardware and requests the runtime microphone permission without blocking gameplay when declined.
+- Local microphone capture, PTT, mute and remote playback are connected through the native IPC bridge.
 
-This branch adds the API relay, native Pion peer and Go IPC bridge, but CI for the latest native changes is still pending. No Cloudflare deployment, production secrets, TURN server, verified Windows installer, verified APK or physical-device result is claimed. Public STUN is best-effort only; direct connectivity cannot be guaranteed through restrictive/symmetric NATs.
+## Trust and lifecycle limits
+
+- The broker remains the authority for room IDs, session IDs, participant XUIDs, signaling roles and membership changes.
+- The current FriendHost roster trust limitation remains: the API verifies authenticated live accounts but does not independently attest arbitrary third-party Bedrock servers. The supported path is Cinnabar FriendHost.
+- The native bridge rechecks membership every 15 seconds. Revocation is therefore not instantaneous for an already established direct media path; peer/room closure and lease expiry are also enforced.
+- Public STUN alone cannot guarantee connectivity through restrictive or symmetric NATs. A TURN service is required for broader coverage. Direct-connect failure must be reported honestly; the client must not fall back to an unauthenticated endpoint.
+
+## Latest validation snapshot
+
+- API CI passed on commit `391b6cbfed996cb5d9b3fdcbfe37a64055ced567`, including `pnpm typecheck` and `pnpm test`.
+- Client formatting passed on the current code line after the Bevy `SystemParam` derive was qualified; latest observed run: [CI run 41917825868](https://github.com/crashjesuaquispeleon-bot/cinnabar-voichat/actions/runs/41917825868).
+- Latest client CI is still running its preflight/browser checks; Go and Rust tests have not yet completed on the newest commit.
+- Latest Windows and Android packaging run is still compiling; it has not uploaded verified artifacts: [Alpha build run 41917817335](https://github.com/crashjesuaquispeleon-bot/cinnabar-voichat/actions/runs/41917817335).
+- There is no verified EXE/APK download and no physical Windows-to-Android microphone/speaker test yet.
+- API and client PRs remain Draft. No Worker deployment, production secret configuration or PR merge is included in this work.
+
+## Remaining qualification
+
+1. Complete client Go tests, Rust tests, clippy/architecture checks and browser checks on the latest commit.
+2. Build the Windows installer, smoke-test its layout and upload the artifact.
+3. Build the Android arm64 APK, verify its signature and upload the artifact.
+4. Install the same commit on two physical devices with separate Cinnabar accounts and test Windows-to-Android and Android-to-Windows audio.
+5. Test microphone permission denial/retry, PTT release, quick mute, disconnect, reconnect, host closure, member removal, and NATs that require TURN.
+6. After the API PR is merged and deployed to a test environment with explicit authorization, verify real broker signaling before considering a public Alpha.
+
+No production deployment or release approval is implied by a passing CI build.

@@ -654,12 +654,6 @@ func (s *SFU) Close() {
 	s.closeOnce.Do(func() {
 		s.mu.Lock()
 		s.closed = true
-		var peers []*sfuPeer
-		for _, room := range s.rooms {
-			for _, peer := range room.peers {
-				peers = append(peers, peer)
-			}
-		}
 		s.mu.Unlock()
 
 		s.cancel()

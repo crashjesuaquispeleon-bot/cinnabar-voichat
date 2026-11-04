@@ -174,10 +174,10 @@ func serveVoiceIPCConnection(ctx context.Context, raw net.Conn, config VoiceBrid
 				remoteDone <- ErrVoiceClientClosed
 				return
 			case frame := <-client.ReceiveFrames():
-				if len(frame) != bridgecontract.VoiceFrameBytes {
+				if len(frame) != voiceRemoteFrameBytes {
 					continue
 				}
-				payload := make([]byte, bridgecontract.VoiceFrameBytes+1)
+				payload := make([]byte, voiceRemoteFrameBytes+1)
 				payload[0] = bridgecontract.VoiceIPCKindRemoteAudio
 				copy(payload[1:], frame)
 				if _, err := ipc.Write(payload); err != nil {

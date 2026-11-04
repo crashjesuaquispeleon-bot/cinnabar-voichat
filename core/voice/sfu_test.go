@@ -121,7 +121,9 @@ func TestSFURelaysOnlyBetweenPeersWithTheSameSignedRoom(t *testing.T) {
 type testVoicePeer struct {
 	pc *webrtc.PeerConnection
 	uplink *webrtc.DataChannel
+	control *webrtc.DataChannel
 	downlinkOpen chan struct{}
+	controlOpen chan struct{}
 	frames chan []byte
 	signal *websocket.Conn
 }
@@ -139,6 +141,7 @@ func connectTestVoicePeer(t *testing.T, endpoint, token string) *testVoicePeer {
 	t.Helper()
 	peer := &testVoicePeer{
 		downlinkOpen: make(chan struct{}),
+		controlOpen: make(chan struct{}),
 		frames: make(chan []byte, 8),
 	}
 	pc, err := webrtc.NewPeerConnection(webrtc.Configuration{})
@@ -156,6 +159,15 @@ func connectTestVoicePeer(t *testing.T, endpoint, token string) *testVoicePeer {
 		t.Fatal(err)
 	}
 	peer.uplink = uplink
+	control, err := pc.CreateDataChannel(voiceControlLabel, nil)
+	if err != nil {
+		peer.close()
+		t.Fatal(err)
+	}
+	peer.control = control
+	control.OnOpen(func() {
+		close(peer.controlOpen)
+	})
 	pc.OnDataChannel(func(channel *webrtc.DataChannel) {
 		if channel.Label() != voiceDownlinkLabel {
 			_ = channel.Close()
@@ -225,6 +237,21 @@ func connectTestVoicePeer(t *testing.T, endpoint, token string) *testVoicePeer {
 	if err := pc.SetRemoteDescription(*answer.Answer); err != nil {
 		peer.close()
 		t.Fatalf("set SFU answer: %v", err)
+	}
+	select {
+	case <-peer.controlOpen:
+	case <-time.After(10 * time.Second):
+		peer.close()
+		t.Fatal("client control channel did not open")
+	}
+	controlMessage, err := json.Marshal(peerControlSignal{Type: "transmit", Allowed: true})
+	if err != nil {
+		peer.close()
+		t.Fatal(err)
+	}
+	if err := peer.control.SendText(string(controlMessage)); err != nil {
+		peer.close()
+		t.Fatalf("open server-side transmit gate: %v", err)
 	}
 	return peer
 }

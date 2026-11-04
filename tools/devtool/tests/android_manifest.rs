@@ -69,9 +69,7 @@ fn android_manifest_renders_and_unknown_tokens_still_fail() {
             }
             quick_xml::events::Event::Empty(tag) if tag.name().as_ref() == b"uses-feature" => {
                 if let Some(feature) = tag.try_get_attribute("android:name").unwrap() {
-                    let name = feature
-                        .decode_and_unescape_value(reader.decoder())
-                        .unwrap();
+                    let name = feature.decode_and_unescape_value(reader.decoder()).unwrap();
                     if name == "android.hardware.microphone" {
                         let required = tag
                             .try_get_attribute("android:required")
@@ -88,7 +86,10 @@ fn android_manifest_renders_and_unknown_tokens_still_fail() {
         }
     }
     assert!(saw_manifest);
-    assert!(saw_record_audio, "Android voice alpha must declare RECORD_AUDIO");
+    assert!(
+        saw_record_audio,
+        "Android voice alpha must declare RECORD_AUDIO"
+    );
     assert!(
         saw_optional_microphone,
         "microphone hardware must remain optional for non-voice gameplay"

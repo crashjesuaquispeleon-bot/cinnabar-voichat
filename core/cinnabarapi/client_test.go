@@ -399,6 +399,30 @@ func TestFriendHostVoiceBrokerMessages(t *testing.T) {
 		t.Fatalf("opened room = %+v", openedResult)
 	}
 
+	// Repeated health checks during this host-world lifecycle must reuse the
+	// same open request ID and room instead of rotating the SFU session.
+	reopenedSame := make(chan result, 1)
+	go func() {
+		room, gameSession, err := client.OpenVoiceRoom(ctx)
+		reopenedSame <- result{room: room, session: gameSession, err: err}
+	}()
+	var repeatedOpen struct {
+		Type string `json:"type"`
+		RequestID string `json:"request_id"`
+	}
+	session.receive(t, &repeatedOpen)
+	if repeatedOpen.Type != typeVoiceHostOpen || repeatedOpen.RequestID != open.RequestID {
+		t.Fatalf("repeated open = %+v, want request ID %q", repeatedOpen, open.RequestID)
+	}
+	session.send(t, map[string]any{
+		"type": typeVoiceRoom, "request_id": repeatedOpen.RequestID,
+		"room_id": roomID, "session_id": sessionID,
+	})
+	repeatedResult := receive(t, reopenedSame)
+	if repeatedResult.err != nil || repeatedResult.room != roomID || repeatedResult.session != sessionID {
+		t.Fatalf("repeated open room = %+v", repeatedResult)
+	}
+
 	updated := make(chan error, 1)
 	go func() { updated <- client.UpdateVoiceMembers(ctx, []string{"2535400000000002"}) }()
 	var members struct {
@@ -450,8 +474,45 @@ func TestFriendHostVoiceBrokerMessages(t *testing.T) {
 	if closeRequest.Type != typeVoiceHostClose {
 		t.Fatalf("close request = %+v", closeRequest)
 	}
-	session.send(t, map[string]any{"type": typeVoiceClosed, "request_id": closeRequest.RequestID, "sfu_closed": true})
-	if err := receive(t, closed); err != nil {
+	// The broker confirms local teardown even though the remote SFU admin
+	// endpoint is offline. The client must still retire the old open key.
+	session.send(t, map[string]any{"type": typeVoiceClosed, "request_id": closeRequest.RequestID, "sfu_closed": false})
+	if err := receive(t, closed); !errors.Is(err, ErrVoiceUnavailable) {
+		t.Fatalf("close with unavailable SFU = %v, want ErrVoiceUnavailable", err)
+	}
+
+	reopenedNew := make(chan result, 1)
+	go func() {
+		room, gameSession, err := client.OpenVoiceRoom(ctx)
+		reopenedNew <- result{room: room, session: gameSession, err: err}
+	}()
+	var newOpen struct {
+		Type string `json:"type"`
+		RequestID string `json:"request_id"`
+	}
+	session.receive(t, &newOpen)
+	if newOpen.Type != typeVoiceHostOpen || !ValidUUID(newOpen.RequestID) || newOpen.RequestID == open.RequestID {
+		t.Fatalf("new lifecycle open = %+v, want a fresh request ID", newOpen)
+	}
+	newRoomID, newSessionID := "20112233-4455-6677-8899-aabbccddeeff", "30112233-4455-6677-8899-aabbccddeeff"
+	session.send(t, map[string]any{
+		"type": typeVoiceRoom, "request_id": newOpen.RequestID,
+		"room_id": newRoomID, "session_id": newSessionID,
+	})
+	newResult := receive(t, reopenedNew)
+	if newResult.err != nil || newResult.room != newRoomID || newResult.session != newSessionID {
+		t.Fatalf("new lifecycle room = %+v", newResult)
+	}
+
+	closedAgain := make(chan error, 1)
+	go func() { closedAgain <- client.CloseVoiceRoom(ctx) }()
+	var closeAgain struct {
+		Type string `json:"type"`
+		RequestID string `json:"request_id"`
+	}
+	session.receive(t, &closeAgain)
+	session.send(t, map[string]any{"type": typeVoiceClosed, "request_id": closeAgain.RequestID, "sfu_closed": true})
+	if err := receive(t, closedAgain); err != nil {
 		t.Fatal(err)
 	}
 }

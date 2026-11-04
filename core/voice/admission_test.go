@@ -144,6 +144,9 @@ func TestRegistryRevokesExpiresAndClosesOnlyMatchingSession(t *testing.T) {
 	if err := r.Join(first, now); err != nil { t.Fatal(err) }
 	if err := r.Join(second, now); err != nil { t.Fatal(err) }
 	if !r.Revoke(first.TokenID) || r.Revoke(first.TokenID) { t.Fatal("revoke must be idempotent") }
+	if err := r.Join(first, now); !errors.Is(err, ErrAdmissionAlreadyUsed) {
+		t.Fatalf("revoked token replay error = %v", err)
+	}
 	if got := r.CloseSession(roomID, uuid.NewString()); len(got) != 0 { t.Fatal("wrong session closed a room") }
 	if got := r.CloseSession(roomID, sessionID); len(got) != 1 || got[0].XUID != second.XUID { t.Fatalf("closed participants = %#v", got) }
 	expiring := admissionFor(t, now, roomID, sessionID, "2003")

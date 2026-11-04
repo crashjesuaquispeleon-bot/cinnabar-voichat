@@ -31,7 +31,7 @@ Tokens are limited to 4 KiB and five minutes; the broker should issue them for a
 
 ## Revocation
 
-The SFU removes a participant on WebRTC peer close, token expiry, explicit broker revocation by jti, account sign-out, membership removal, or session/partida close. Closing a session revokes every participant bound to its exact room_id and session_id pair. Reconnect requires a newly issued token; a previous token cannot be replayed.
+An active peer must renew its lease before exp (recommended interval: 60 seconds). Renewal uses a newly signed jti for the same account, XUID, room and partida; it replaces the lease without replacing the media connection. The SFU closes peers whose lease expires. It also removes a participant on WebRTC peer close, explicit broker revocation, account sign-out, membership removal, or session/partida close. Closing a session revokes every participant bound to its exact room_id and session_id pair. Reconnect requires a newly issued token; a previous token cannot be replayed.
 
 ## Audio plane
 

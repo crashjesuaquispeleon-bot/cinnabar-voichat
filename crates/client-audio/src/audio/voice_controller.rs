@@ -133,7 +133,7 @@ impl VoiceCaptureController {
             .as_mut()
             .ok_or_else(|| "microphone capture worker is not active".to_owned())?;
         stream
-            .lock()
+            .get_mut()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .refresh_input_devices()
     }
@@ -149,7 +149,7 @@ impl VoiceCaptureController {
             .as_mut()
             .ok_or_else(|| "microphone capture worker is not active".to_owned())?;
         stream
-            .lock()
+            .get_mut()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .select_input_device(selection)
     }
@@ -159,8 +159,8 @@ impl VoiceCaptureController {
         let Some(stream) = self.stream.as_mut() else {
             return Vec::new();
         };
-        let mut stream = stream
-            .lock()
+        let stream = stream
+            .get_mut()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let mut events = Vec::new();
         while let Some(event) = stream.try_recv_input_event() {

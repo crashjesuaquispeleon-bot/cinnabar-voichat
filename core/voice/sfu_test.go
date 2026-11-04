@@ -131,6 +131,67 @@ func TestSFURelaysOnlyBetweenPeersWithTheSameSignedRoom(t *testing.T) {
 	}
 }
 
+func TestSFURevokeAdmissionClosesOnlyTheMatchingCurrentLease(t *testing.T) {
+	now := time.Now()
+	private, verify := verifier(t)
+	roomID, sessionID := uuid.NewString(), uuid.NewString()
+	firstClaims := claimsAt(now)
+	firstClaims.RoomID, firstClaims.SessionID, firstClaims.XUID = roomID, sessionID, "10001"
+	secondClaims := claimsAt(now)
+	secondClaims.RoomID, secondClaims.SessionID, secondClaims.XUID = roomID, sessionID, "10002"
+
+	sfu, err := NewSFU(SFUConfig{Admission: verify, MaxParticipants: 4})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewTLSServer(http.HandlerFunc(sfu.ServeHTTP))
+	defer server.Close()
+	defer sfu.Close()
+	endpoint := "wss" + strings.TrimPrefix(server.URL, "https")
+	httpClient := &http.Client{Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // test server uses a self-signed certificate
+	}}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	firstToken := signedToken(t, private, firstClaims)
+	secondToken := signedToken(t, private, secondClaims)
+	first, err := DialClient(ctx, ClientConfig{Endpoint: endpoint, AdmissionToken: firstToken, HTTPClient: httpClient})
+	if err != nil {
+		t.Fatalf("connect first voice client: %v", err)
+	}
+	defer first.Close()
+	second, err := DialClient(ctx, ClientConfig{Endpoint: endpoint, AdmissionToken: secondToken, HTTPClient: httpClient})
+	if err != nil {
+		t.Fatalf("connect second voice client: %v", err)
+	}
+	defer second.Close()
+
+	if sfu.RevokeAdmission(roomID, uuid.NewString()) {
+		t.Fatal("unknown admission token unexpectedly revoked a participant")
+	}
+	if sfu.RevokeAdmission(uuid.NewString(), secondClaims.TokenID) {
+		t.Fatal("admission token revoked a participant outside its room")
+	}
+	if !sfu.RevokeAdmission(roomID, secondClaims.TokenID) {
+		t.Fatal("current admission was not revoked")
+	}
+	select {
+	case <-second.Done():
+	case <-ctx.Done():
+		t.Fatal("revoked peer did not close")
+	}
+	select {
+	case <-first.Done():
+		t.Fatal("revoking the second participant closed the first participant")
+	default:
+	}
+	participants := sfu.registry.Participants(roomID)
+	if len(participants) != 1 || participants[0].XUID != firstClaims.XUID {
+		t.Fatalf("room participants after scoped revoke = %#v, want only first participant", participants)
+	}
+}
+
 func TestVoiceFrameRateLimiterAllowsShortBurstAndCapsSustainedRate(t *testing.T) {
 	peer := &sfuPeer{}
 	now := time.Unix(1_800_000_000, 0)

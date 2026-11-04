@@ -119,7 +119,11 @@ mod tests {
             "[]",
         ] {
             let mut command = Command::new("bedrock-core");
-            apply_voice_environment(&mut command, Some("wss://voice.example.test/v1/voice"), Some(value));
+            apply_voice_environment(
+                &mut command,
+                Some("wss://voice.example.test/v1/voice"),
+                Some(value),
+            );
             assert_eq!(configured_value(&command, ICE_SERVERS), None, "accepted {value}");
         }
     }

@@ -423,8 +423,24 @@ fn default_bindings() -> Vec<ActionBinding> {
         (LookDown, touch::LOOK_DOWN, Gameplay),
         (LookLeft, touch::LOOK_LEFT, Gameplay),
         (LookRight, touch::LOOK_RIGHT, Gameplay),
+        (PushToTalk, touch::VOICE_PTT, Gameplay),
     ] {
         bind(&mut bindings, action, context, TouchControl(hit_id));
     }
     bindings
+}
+
+
+#[cfg(test)]
+mod voice_touch_binding_tests {
+    use super::*;
+
+    #[test]
+    fn touch_voice_button_is_the_default_push_to_talk_binding() {
+        assert!(ControlSettings::builtin().bindings().iter().any(|binding| {
+            binding.action == Action::PushToTalk
+                && binding.context == InputContext::Gameplay
+                && binding.chord.control == PhysicalControl::TouchControl(touch::VOICE_PTT)
+        }));
+    }
 }

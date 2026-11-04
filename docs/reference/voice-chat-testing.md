@@ -33,13 +33,13 @@ Consulta [Despliegue del SFU para Alpha](voice-chat-sfu-deployment.md) para prep
 3. El jugador anfitrión crea una partida FriendHost y el segundo jugador entra a esa misma partida.
 4. Comprueba que el anfitrión y el invitado aparecen en la lista de miembros validada por FriendHost. El cliente no debe enviar por su cuenta XUID, room ID ni session ID para obtener admisión.
 5. El broker crea la sala, guarda la lista completa de participantes y entrega una admisión corta a cada miembro autorizado.
-6. En ambos clientes abre Settings → Sound, activa Voice Chat, selecciona el micrófono y usa Push to Talk. La tecla inicial es V salvo que se haya cambiado en Controls.
+6. En ambos clientes abre Settings → Sound, activa Voice Chat y selecciona el micrófono. En Windows usa Push to Talk con la tecla V (o la tecla remapeada). En Android selecciona **Push to Talk** y mantén presionado el botón táctil **PTT**; al levantar el dedo debe detenerse la transmisión.
 
 ### C. Audio en ambas direcciones
 
-1. El jugador A mantiene PTT y habla durante 5–10 segundos. B debe oírlo sin eco local ni cortes persistentes.
+1. El jugador A mantiene PTT (tecla V en PC o botón táctil PTT en Android) y habla durante 5–10 segundos. B debe oírlo sin eco local ni cortes persistentes.
 2. B habla mientras A escucha. A debe oír a B.
-3. Repite con PTT liberado, Voice Mute activado y desactivado, y cambio de micrófono.
+3. Repite con PTT liberado, Voice Mute activado y desactivado, y cambio de micrófono. En Android comprueba también que cambiar de aplicación, abrir un menú que capture el foco o perder el foco del juego libera PTT y deja de transmitir.
 4. Comprueba que el audio no se reproduce al propio emisor y que dos salas distintas no reciben el audio una de otra.
 
 ### D. Salida y revocación

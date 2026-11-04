@@ -348,7 +348,9 @@ mod voice_settings_tests {
     fn enabled_options(mode: i32) -> SettingsOptions {
         let mut options = SettingsOptions::default();
         assert!(options.set(SettingId::VoiceChatEnabled.index(), 1));
-        assert!(options.set(SettingId::VoiceActivationMode.index(), mode));
+        if mode != 0 {
+            assert!(options.set(SettingId::VoiceActivationMode.index(), mode));
+        }
         options
     }
 

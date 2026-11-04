@@ -133,6 +133,16 @@ func loadConfig(getenv func(string) string) (config, error) {
 
 	controlText := strings.TrimSpace(getenv("CINNABAR_VOICE_CONTROL_TOKEN"))
 	if controlText == "" {
+		credentialFile := strings.TrimSpace(getenv("CINNABAR_VOICE_CONTROL_TOKEN_FILE"))
+		if credentialFile != "" {
+			credential, readErr := os.ReadFile(credentialFile)
+			if readErr != nil {
+				return config{}, errors.New("voice SFU: broker control token credential file is unavailable")
+			}
+			controlText = strings.TrimSpace(string(credential))
+		}
+	}
+	if controlText == "" {
 		return config{}, errors.New("voice SFU: broker control token is required")
 	}
 	controlToken, err := decodeControlToken(controlText)

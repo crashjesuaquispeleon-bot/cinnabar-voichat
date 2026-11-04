@@ -45,7 +45,7 @@
     {"rust_name": "CONTROL_WINDOWS_ENDPOINT_NAME", "go_name": "ControlWindowsEndpointName", "value": "control.addr", "rust_type": "str", "doc": "Control endpoint name on Windows."},
     {"rust_name": "SESSION_WINDOWS_ENDPOINT_NAME", "go_name": "SessionWindowsEndpointName", "value": "session.addr", "rust_type": "str", "doc": "Session endpoint name on Windows."},
     {"rust_name":"VOICE_MAX_FRAME_LEN","go_name":"VoiceMaxFrameLen","value":1024,"rust_type":"usize","doc":"Maximum payload size on the dedicated local voice bridge."},
-    {"rust_name":"VOICE_FRAME_BYTES","go_name":"VoiceFrameBytes","value":648,"rust_type":"usize","doc":"Voice media frame bytes: sequence plus 16 kHz mono PCM16 samples."},
+    {"rust_name":"VOICE_FRAME_BYTES","go_name":"VoiceFrameBytes","value":648,"rust_type":"usize","doc":"Uplink voice frame bytes: sequence plus 16 kHz mono PCM16 samples; downlink adds a 16-byte opaque source ID."},
     {"rust_name":"VOICE_IPC_KIND_AUDIO","go_name":"VoiceIPCKindAudio","value":1,"rust_type":"u8","doc":"Local voice IPC uplink media frame."},
     {"rust_name":"VOICE_IPC_KIND_TRANSMIT","go_name":"VoiceIPCKindTransmit","value":2,"rust_type":"u8","doc":"Local voice IPC push-to-talk or open-microphone gate update."},
     {"rust_name":"VOICE_IPC_KIND_CLOSE","go_name":"VoiceIPCKindClose","value":3,"rust_type":"u8","doc":"Local voice IPC session close request."},

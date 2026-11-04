@@ -1,6 +1,6 @@
 # Cinnabar Voice Chat — P2P Alpha plan
 
-Status: implementation plan; **not yet an operational transport**.
+Status: **P2P implementation in progress; not yet qualified for release or real-device use**.
 
 ## Goal
 
@@ -17,18 +17,18 @@ Provide a no-VPS, two-player voice path for Windows and Android using WebRTC pee
 ## Proposed two-peer flow
 
 1. FriendHost opens a broker-generated room and reports its authenticated roster using the existing protocol.
-2. Each participant requests a short-lived voice admission over its authenticated Cinnabar API connection.
+2. Each participant requests its current peer-session role over its already authenticated Cinnabar API connection. P2P does not require an SFU admission token.
 3. The broker designates one participant as offerer deterministically from server-side room state; the other is answerer. Clients cannot nominate an arbitrary peer.
-4. The broker relays bounded SDP offer/answer and ICE candidate messages only between the two currently admitted members of that exact room/session.
+4. The broker relays bounded SDP offer/answer and ICE candidate messages only between the two currently authenticated members of that exact room/session.
 5. WebRTC carries the audio DataChannel directly between peers. Use configured public STUN servers for candidate discovery.
 6. If direct connectivity fails, the client reports a clear connection failure. TURN fallback is a separate deployment requirement; public STUN alone cannot guarantee traversal of restrictive/symmetric NATs.
-7. Membership removal, account disconnect, host lease expiry, room close, token renewal failure, or peer disconnect closes the signaling session and media peer.
+7. The native bridge rechecks membership every 15 seconds; account disconnect, host lease expiry, room close, or peer disconnect causes the local bridge to close. This is not instantaneous revocation of an already established direct media path.
 
 ## Transport compatibility
 
-- Introduce an explicit transport selection (p2p or sfu) with fail-closed validation.
+- Implement explicit transport selection (p2p or sfu); P2P is the default when no transport is configured, while SFU requires its own WSS endpoint.
 - Keep the current SFU implementation and its PTT acknowledgement, frame bounds, sequence validation, backpressure and revocation behavior unchanged.
-- The P2P path must preserve the same PCM frame format, source isolation, receive mixer, mute/PTT policy and bounded queues.
+- The P2P path uses the existing 20 ms mono PCM16 frame format, source tags, receive mixer, local PTT gate and bounded queues.
 - Do not silently fall back from a failed P2P connection to an untrusted endpoint or an unauthenticated room.
 
 ## Required implementation slices
@@ -55,10 +55,10 @@ Provide a no-VPS, two-player voice path for Windows and Android using WebRTC pee
 - Exactly two authorized clients can establish a direct WebRTC connection and exchange audio in both directions.
 - A third or removed account cannot signal or receive audio.
 - Closing the host room or either authenticated account tears down the session.
-- PTT release stops transmission immediately; opening transmission requires a server acknowledgement.
+- PTT release closes the local P2P transmit gate immediately; P2P mode does not claim a media-server acknowledgement. SFU mode retains its existing server-acknowledged gate.
 - Windows x64 EXE and Android arm64 APK are produced by CI and verified.
 - Direct connectivity failure is reported honestly; TURN coverage is not claimed until a TURN relay is deployed and tested.
 
 ## Current known limitations
 
-This branch starts from the existing SFU-capable foundation. The P2P relay and native peer-role implementation are not yet present. No Cloudflare deployment, production secrets, TURN server, Windows installer, APK or physical-device result is created by this planning commit.
+This branch adds the API relay, native Pion peer and Go IPC bridge, but CI for the latest native changes is still pending. No Cloudflare deployment, production secrets, TURN server, verified Windows installer, verified APK or physical-device result is claimed. Public STUN is best-effort only; direct connectivity cannot be guaranteed through restrictive/symmetric NATs.

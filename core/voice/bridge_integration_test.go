@@ -147,12 +147,15 @@ func TestServeBridgeRelaysBothDirectionsAndHonoursTheAcknowledgedTransmitGate(t 
 	if err != nil {
 		t.Fatalf("read remote audio from local IPC: %v", err)
 	}
-	if len(remotePayload) != bridgecontract.VoiceFrameBytes+1 ||
+	if len(remotePayload) != voiceRemoteFrameBytes+1 ||
 		remotePayload[0] != bridgecontract.VoiceIPCKindRemoteAudio {
 		t.Fatalf("remote IPC payload has invalid kind or length: %d bytes", len(remotePayload))
 	}
-	if string(remotePayload[1:]) != string(inbound) {
+	if string(remotePayload[1+voiceSourceIDBytes:]) != string(inbound) {
 		t.Fatal("local IPC received a different frame from the second peer")
+	}
+	if string(remotePayload[1:1+voiceSourceIDBytes]) == string(make([]byte, voiceSourceIDBytes)) {
+		t.Fatal("local IPC received a remote frame without its opaque speaker ID")
 	}
 
 	if _, err := ipc.Write([]byte{bridgecontract.VoiceIPCKindTransmit, 0}); err != nil {

@@ -12,6 +12,7 @@ The following environment variables are required:
 - `CINNABAR_VOICE_TLS_KEY_FILE`: matching TLS private-key file.
 - `CINNABAR_VOICE_ISSUER`: exact HTTPS issuer claim used by the broker.
 - `CINNABAR_VOICE_BROKER_PUBLIC_KEY`: base64-encoded 32-byte Ed25519 public key; never provide the private key here.
+- `CINNABAR_VOICE_CONTROL_TOKEN`: base64-encoded random 32-byte bearer secret used only by the trusted broker to request room-session teardown. Keep it in the deployment secret store and never distribute it to clients.
 - `CINNABAR_VOICE_ICE_SERVERS`: JSON array of Pion ICE server objects with operator-managed STUN/TURN URLs and, for TURN, short-lived credentials.
 
 Optional variables:
@@ -29,6 +30,7 @@ export CINNABAR_VOICE_TLS_KEY_FILE='/run/secrets/voice.key'
 export CINNABAR_VOICE_ISSUER='https://api.cinnabar.gg/voice'
 export CINNABAR_VOICE_AUDIENCE='cinnabar-voice-sfu'
 export CINNABAR_VOICE_BROKER_PUBLIC_KEY='<base64 public key only>'
+export CINNABAR_VOICE_CONTROL_TOKEN='<base64 random 32-byte broker control secret>'
 export CINNABAR_VOICE_ICE_SERVERS='[{"urls":["turns:turn.example.net:5349"],"username":"<short-lived user>","credential":"<short-lived credential>"}]'
 export CINNABAR_VOICE_MAX_PARTICIPANTS='8'
 go run ./cmd/voice-sfu
@@ -40,4 +42,4 @@ Point the native core's operator-managed `VoiceBridgeConfig.Endpoint` at `wss://
 
 This executable does not create admissions. The trusted broker must authenticate the Cinnabar account, obtain authoritative membership in one active Minecraft partida, mint a room UUID, and sign the short-lived token. It must renew and revoke those tokens on account/session lifecycle events. Until that server-side issuer and partida adapter are deployed and configured in the core, the core intentionally leaves `VoiceBridgeConfig` unset and multiplayer voice admission remains disabled.
 
-Use a deployment firewall and rate-limited TLS ingress. Configure TURN for clients behind restrictive NATs; STUN-only deployments will not connect every pair of networks. The SFU does not record or persist audio. Never log admission tokens, TURN credentials, or media frames.
+Use a deployment firewall and rate-limited TLS ingress. Configure TURN for clients behind restrictive NATs; STUN-only deployments will not connect every pair of networks. When a partida closes, the broker calls the authenticated room-session close endpoint so every peer in that exact room/session is removed immediately; lease expiry remains a backup. The SFU does not record or persist audio. Never log admission tokens, the control token, TURN credentials, or media frames.

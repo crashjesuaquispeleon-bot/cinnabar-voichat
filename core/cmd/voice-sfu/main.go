@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/ed25519"
+	"crypto/subtle"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -19,6 +20,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hashimthearab/rust-mcbe/core/voice"
 	"github.com/pion/webrtc/v4"
 )
@@ -39,6 +41,7 @@ type config struct {
 	Issuer        string
 	Audience      string
 	PublicKey     ed25519.PublicKey
+	ControlToken  []byte
 	ICEServers    []webrtc.ICEServer
 	MaxParticipants int
 }
@@ -102,6 +105,16 @@ func loadConfig(getenv func(string) string) (config, error) {
 	}
 	cfg.PublicKey = publicKey
 
+	controlText := strings.TrimSpace(getenv("CINNABAR_VOICE_CONTROL_TOKEN"))
+	if controlText == "" {
+		return config{}, errors.New("voice SFU: broker control token is required")
+	}
+	controlToken, err := decodeControlToken(controlText)
+	if err != nil {
+		return config{}, fmt.Errorf("voice SFU: invalid broker control token: %w", err)
+	}
+	cfg.ControlToken = controlToken
+
 	iceText := strings.TrimSpace(getenv("CINNABAR_VOICE_ICE_SERVERS"))
 	if iceText == "" {
 		return config{}, errors.New("voice SFU: explicit STUN/TURN ICE server configuration is required")
@@ -150,6 +163,52 @@ func decodePublicKey(encoded string) (ed25519.PublicKey, error) {
 	return nil, errors.New("expected a base64-encoded 32-byte Ed25519 public key")
 }
 
+func decodeControlToken(encoded string) ([]byte, error) {
+	decoders := []*base64.Encoding{
+		base64.StdEncoding,
+		base64.RawStdEncoding,
+		base64.RawURLEncoding,
+	}
+	for _, decoder := range decoders {
+		decoded, err := decoder.DecodeString(encoded)
+		if err == nil && len(decoded) == 32 {
+			return decoded, nil
+		}
+	}
+	return nil, errors.New("expected a base64-encoded 32-byte broker control token")
+}
+
+// sessionCloseHandler exposes one broker-only room teardown operation. The route is
+// separately authenticated from WebRTC admission and never returns participant data.
+func sessionCloseHandler(token []byte, closeSession func(roomID, sessionID string) int) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Pragma", "no-cache")
+		provided := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if len(provided) != len(token) || subtle.ConstantTimeCompare([]byte(provided), token) != 1 {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		roomID := r.PathValue("roomID")
+		sessionID := r.PathValue("sessionID")
+		room, roomErr := uuid.Parse(roomID)
+		session, sessionErr := uuid.Parse(sessionID)
+		if roomErr != nil || sessionErr != nil || room.String() != roomID || session.String() != sessionID {
+			http.Error(w, "invalid room or session identifier", http.StatusBadRequest)
+			return
+		}
+		if r.ContentLength > 0 {
+			http.Error(w, "request body must be empty", http.StatusBadRequest)
+			return
+		}
+		if closeSession(roomID, sessionID) < 0 {
+			http.Error(w, "session close failed", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+}
+
 func run(ctx context.Context, cfg config) error {
 	sfu, err := voice.NewSFU(voice.SFUConfig{
 		Admission: voice.VerifyConfig{
@@ -165,6 +224,8 @@ func run(ctx context.Context, cfg config) error {
 
 	mux := http.NewServeMux()
 	mux.Handle("/v1/voice", sfu)
+	mux.Handle("POST /v1/admin/rooms/{roomID}/sessions/{sessionID}/close",
+		sessionCloseHandler(cfg.ControlToken, sfu.CloseSession))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

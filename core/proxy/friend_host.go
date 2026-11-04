@@ -469,10 +469,22 @@ func (h *FriendHost) runVoiceMembership() {
 		delay = min(delay*2, 30*time.Second)
 	}
 	update := func() {
+		// Re-open idempotently before every roster refresh. If the last authenticated
+		// API socket was offline, the broker may have retired this room; the retained
+		// open request ID recreates it without rotating a still-live room.
+		openCtx, cancelOpen := context.WithTimeout(h.ctx, 10*time.Second)
+		_, _, openErr := h.voiceBroker.OpenVoiceRoom(openCtx)
+		cancelOpen()
+		if openErr != nil {
+			if h.ctx.Err() == nil {
+				h.log.Debug("friends: voice room refresh unavailable")
+			}
+			return
+		}
 		members := h.voiceRoster()
-		updateCtx, cancel := context.WithTimeout(h.ctx, 10*time.Second)
+		updateCtx, cancelUpdate := context.WithTimeout(h.ctx, 10*time.Second)
 		err := h.voiceBroker.UpdateVoiceMembers(updateCtx, members)
-		cancel()
+		cancelUpdate()
 		if err != nil && h.ctx.Err() == nil {
 			h.log.Debug("friends: voice roster update unavailable")
 		}

@@ -59,6 +59,30 @@ fn android_manifest_renders_and_unknown_tokens_still_fail() {
                 );
                 saw_manifest = true;
             }
+            quick_xml::events::Event::Empty(tag) if tag.name().as_ref() == b"uses-permission" => {
+                if let Some(permission) = tag.try_get_attribute("android:name").unwrap() {
+                    saw_record_audio |= permission
+                        .decode_and_unescape_value(reader.decoder())
+                        .unwrap()
+                        == "android.permission.RECORD_AUDIO";
+                }
+            }
+            quick_xml::events::Event::Empty(tag) if tag.name().as_ref() == b"uses-feature" => {
+                if let Some(feature) = tag.try_get_attribute("android:name").unwrap() {
+                    let name = feature
+                        .decode_and_unescape_value(reader.decoder())
+                        .unwrap();
+                    if name == "android.hardware.microphone" {
+                        let required = tag
+                            .try_get_attribute("android:required")
+                            .unwrap()
+                            .expect("microphone feature must declare whether it is required")
+                            .decode_and_unescape_value(reader.decoder())
+                            .unwrap();
+                        saw_optional_microphone = required == "false";
+                    }
+                }
+            }
             quick_xml::events::Event::Eof => break,
             _ => {}
         }

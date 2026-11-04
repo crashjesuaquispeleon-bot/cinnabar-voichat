@@ -35,7 +35,7 @@ An active peer must renew its lease before exp (recommended interval: 60 seconds
 
 ## Audio plane
 
-The media plane is separate from Bedrock packet framing and the current Rust/Go control channel. It must use WebRTC DTLS-SRTP with operator-managed ICE/TURN configuration, bounded packet/jitter buffers, a strict audio-only codec profile, per-room bitrate and participant limits, and no disk recording. The SFU forwards only within one verified room. PTT release, mute, permission loss and disconnect must close the sender gate before the next frame is accepted.
+The first Go relay implementation uses WebRTC DTLS-protected SCTP DataChannels, separate from Bedrock packet framing and the Rust/Go control channel. The client creates an unordered, zero-retransmit uplink named cinnabar-voice-uplink-v1; the SFU creates a matching downlink. A frame is exactly 648 bytes: an unsigned 64-bit big-endian sequence followed by 320 little-endian signed PCM16 mono samples at 16 kHz (20 ms). The SFU rejects other sizes, string messages, duplicate/out-of-order sequences and frames that would exceed the small per-peer buffered-byte budget. This is an initial uncompressed transport for two-client validation, not the final bandwidth-efficient Opus/RTP profile. Configure operator-managed ICE/TURN, participant limits and no disk recording. The SFU forwards only within one verified room. PTT release, mute, permission loss and disconnect must close the sender gate before the next frame is accepted.
 
 ## Known integration blockers
 

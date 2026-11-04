@@ -36,13 +36,28 @@ fn apply_voice_environment(
 fn public_wss_endpoint(value: Option<&str>) -> Option<&str> {
     let value = value.map(str::trim).filter(|value| !value.is_empty())?;
     let authority = value.strip_prefix("wss://")?.split('/').next()?;
-    (!authority.is_empty()
+    let safe_authority = !authority.is_empty()
         && !authority.contains('@')
-        && !authority.bytes().any(|byte| byte == 92)
-        && !value.contains('?')
+        && !authority.contains('\\\\');
+    let safe_url = !value.contains('?')
         && !value.contains('#')
-        && !value.chars().any(char::is_whitespace))
-    .then_some(value)
+        && !value.chars().any(char::is_whitespace);
+    (safe_authority && safe_url).then_some(value)
+}
+
+fn safe_public_stun_url(value: &str) -> bool {
+    let value = value.trim().to_ascii_lowercase();
+    let Some(authority) = value
+        .strip_prefix("stun:")
+        .or_else(|| value.strip_prefix("stuns:"))
+    else {
+        return false;
+    };
+    !authority.is_empty()
+        && !authority.chars().any(|character| {
+            character.is_whitespace()
+                || matches!(character, '@' | '/' | '?' | '#' | '\\\\')
+        })
 }
 
 /// Only public STUN URLs may enter a packaged client; TURN credentials are runtime secrets.
@@ -69,22 +84,7 @@ fn public_stun_configuration(value: Option<&str>) -> Option<&str> {
                 .map(serde_json::Value::as_str)
                 .collect::<Option<Vec<_>>>()?
         };
-        if urls.is_empty()
-            || urls.iter().any(|url| {
-                let url = url.trim().to_ascii_lowercase();
-                let authority = url
-                    .strip_prefix("stun:")
-                    .or_else(|| url.strip_prefix("stuns:"));
-                authority.is_none_or(|authority| {
-                    authority.is_empty()
-                        || authority.chars().any(|character| {
-                            character.is_whitespace()
-                                || matches!(character, '@' | '/' | '?' | '#')
-                                || character as u32 == 92
-                        })
-                })
-            })
-        {
+        if urls.is_empty() || urls.iter().any(|url| !safe_public_stun_url(url)) {
             return None;
         }
     }

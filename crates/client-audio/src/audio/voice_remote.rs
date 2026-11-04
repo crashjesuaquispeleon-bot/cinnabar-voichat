@@ -33,7 +33,7 @@ const REMOTE_QUEUE_CAPACITY: usize = 5;
 const REMOTE_STARTUP_BUFFER_FRAMES: usize = 2;
 const REMOTE_SOURCE_IDLE_TIMEOUT: Duration = Duration::from_secs(5);
 
-type RemoteQueues = Arc<[SharedPcmQueue; MAX_REMOTE_SOURCES]>;
+pub type RemoteQueues = Arc<[SharedPcmQueue; MAX_REMOTE_SOURCES]>;
 type RemoteSourceSlots = [Option<RemoteSourceState>; MAX_REMOTE_SOURCES];
 
 #[derive(Clone, Copy)]

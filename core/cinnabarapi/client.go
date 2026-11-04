@@ -246,9 +246,10 @@ func (c *Client) LookupLimit() int {
 // CacheTTLMS returns the current server's answer lifetime for the roster cache.
 func (c *Client) CacheTTLMS() int64 { c.mu.Lock(); defer c.mu.Unlock(); return c.parameters.CacheTTLMS }
 
-// OpenVoiceRoom asks the authenticated account to open its FriendHost room. The
-// request ID survives timeouts/reconnects until a server reply confirms the room,
-// so a retried call cannot accidentally rotate a room that was already created.
+// OpenVoiceRoom ensures this authenticated account's FriendHost room exists.
+// The idempotency key is retained for the whole host-world lifecycle, so reconnects
+// and periodic health checks can reopen a room retired while the API socket was offline.
+// CloseVoiceRoom rotates the key before the next hosted-world lifecycle.
 func (c *Client) OpenVoiceRoom(ctx context.Context) (roomID, sessionID string, err error) {
 	c.voiceOpenMu.Lock()
 	defer c.voiceOpenMu.Unlock()
@@ -266,11 +267,6 @@ func (c *Client) OpenVoiceRoom(ctx context.Context) (roomID, sessionID string, e
 	if reply.Type != typeVoiceRoom || !ValidUUID(reply.RoomID) || !ValidUUID(reply.SessionID) {
 		return "", "", ErrVoiceUnavailable
 	}
-	c.mu.Lock()
-	if c.voiceOpenRequestID == requestID {
-		c.voiceOpenRequestID = ""
-	}
-	c.mu.Unlock()
 	return reply.RoomID, reply.SessionID, nil
 }
 
@@ -307,14 +303,24 @@ func (c *Client) UpdateVoiceMembers(ctx context.Context, members []string) error
 	return nil
 }
 
-// CloseVoiceRoom closes the exact room owned by this authenticated account.
+// CloseVoiceRoom closes the room and retires its idempotency key. Even when the
+// SFU admin endpoint is unavailable, a voice_closed response confirms that the
+// broker removed its local room, so the next host-world lifecycle needs a fresh key.
 func (c *Client) CloseVoiceRoom(ctx context.Context) error {
+	c.voiceOpenMu.Lock()
+	defer c.voiceOpenMu.Unlock()
 	requestID := uuid.NewString()
 	reply, err := c.requestVoice(ctx, requestID, voiceHostCloseMessage{Type: typeVoiceHostClose, RequestID: requestID})
 	if err != nil {
 		return err
 	}
-	if reply.Type != typeVoiceClosed || !reply.SFUClosed {
+	if reply.Type != typeVoiceClosed {
+		return ErrVoiceUnavailable
+	}
+	c.mu.Lock()
+	c.voiceOpenRequestID = ""
+	c.mu.Unlock()
+	if !reply.SFUClosed {
 		return ErrVoiceUnavailable
 	}
 	return nil

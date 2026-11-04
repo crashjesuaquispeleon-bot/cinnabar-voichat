@@ -163,7 +163,6 @@ impl MicrophoneBackend for CpalMicrophoneBackend {
     }
 }
 
-
 mod worker;
 pub use worker::{
     MicrophoneSelection, MicrophoneSelectionError, MicrophoneWorker, MicrophoneWorkerBackend,

@@ -35,7 +35,14 @@ fn apply_voice_environment(
 
 fn public_wss_endpoint(value: Option<&str>) -> Option<&str> {
     let value = value.map(str::trim).filter(|value| !value.is_empty())?;
-    (value.starts_with("wss://") && !value.chars().any(char::is_whitespace)).then_some(value)
+    let authority = value.strip_prefix("wss://")?.split('/').next()?;
+    (!authority.is_empty()
+        && !authority.contains('@')
+        && !authority.bytes().any(|byte| byte == 92)
+        && !value.contains('?')
+        && !value.contains('#')
+        && !value.chars().any(char::is_whitespace))
+    .then_some(value)
 }
 
 /// Only public STUN URLs may enter a packaged client; TURN credentials are runtime secrets.
@@ -48,7 +55,9 @@ fn public_stun_configuration(value: Option<&str>) -> Option<&str> {
     }
     for server in servers {
         let object = server.as_object()?;
-        if object.contains_key("username") || object.contains_key("credential") {
+        // The only permitted field is `urls`; reject unknown fields to avoid accidentally
+        // packaging future credential-bearing Pion fields or operator metadata.
+        if object.len() != 1 || !object.contains_key("urls") {
             return None;
         }
         let urls = object.get("urls")?;
@@ -63,7 +72,17 @@ fn public_stun_configuration(value: Option<&str>) -> Option<&str> {
         if urls.is_empty()
             || urls.iter().any(|url| {
                 let url = url.trim().to_ascii_lowercase();
-                !(url.starts_with("stun:") || url.starts_with("stuns:"))
+                let authority = url
+                    .strip_prefix("stun:")
+                    .or_else(|| url.strip_prefix("stuns:"));
+                authority.is_none_or(|authority| {
+                    authority.is_empty()
+                        || authority.chars().any(|character| {
+                            character.is_whitespace()
+                                || matches!(character, '@' | '/' | '?' | '#')
+                                || character as u32 == 92
+                        })
+                })
             })
         {
             return None;
@@ -115,6 +134,9 @@ mod tests {
             r#"[{"urls":["turn:turn.example.test:3478"],"username":"user","credential":"secret"}]"#,
             r#"[{"urls":["turns:turn.example.test:5349"]}]"#,
             r#"[{"urls":["https://not-stun.example.test"]}]"#,
+            r#"[{"urls":["stun:user:secret@stun.example.test:3478"]}]"#,
+            r#"[{"urls":["stun:stun.example.test:3478?username=leak"]}]"#,
+            r#"[{"urls":["stun:stun.example.test:3478"],"password":"secret"}]"#,
             "not-json",
             "[]",
         ] {
@@ -129,8 +151,15 @@ mod tests {
     }
 
     #[test]
-    fn non_wss_endpoints_are_not_embedded() {
-        for endpoint in ["http://voice.example.test", "ws://voice.example.test", ""] {
+    fn non_wss_or_secret_bearing_endpoints_are_not_embedded() {
+        for endpoint in [
+            "http://voice.example.test",
+            "ws://voice.example.test",
+            "wss://user:password@voice.example.test/v1/voice",
+            "wss://voice.example.test/v1/voice?token=secret",
+            "wss:///v1/voice",
+            "",
+        ] {
             let mut command = Command::new("bedrock-core");
             apply_voice_environment(&mut command, Some(endpoint), None);
             assert_eq!(configured_value(&command, WSS_ENDPOINT), None);

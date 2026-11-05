@@ -2,6 +2,7 @@ use super::world::{
     Difficulty, Generator, NewWorld, Prefs, Setup, SetupState, UnavailableReason, World,
     WorldStatus, WorldUpdate,
 };
+use crate::graphics_backend::Platform;
 use bridge::{Backend, GameMode, WorldState};
 use std::path::PathBuf;
 

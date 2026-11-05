@@ -290,17 +290,12 @@ pub(crate) fn drive_gameplay_touch_targets(
     let ptt_held = presentation.voice_ptt_available()
         && held.iter().any(|contact| contact.hit_id == Some(touch::VOICE_PTT));
     if ptt_held {
-        if let Some(policy) = voice_policy.as_deref_mut() {
-            if policy.mode() == MicrophoneMode::Unselected {
-                // Android preselects this mode when the authorized button appears.
-                // Other touch devices require a fresh press after the mode change.
-                policy.set_mode(MicrophoneMode::PushToTalk);
-                policy.set_push_to_talk_held(false);
-            } else {
-                policy.set_enabled(true);
-                policy.set_push_to_talk_held(true);
-                *voice_ptt_active = true;
-            }
+        if let Some(policy) = voice_policy.as_deref_mut()
+            && policy.mode() == MicrophoneMode::PushToTalk
+        {
+            policy.set_enabled(true);
+            policy.set_push_to_talk_held(true);
+            *voice_ptt_active = true;
         }
     } else if *voice_ptt_active {
         if let Some(policy) = voice_policy.as_deref_mut() {

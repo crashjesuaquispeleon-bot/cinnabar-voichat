@@ -437,6 +437,38 @@ mod tests {
         assert!(router.finalize().unwrap().movement[1] > 0.0);
     }
 
+    /// The voice control stays held across frames and is released without routing to gameplay.
+    #[test]
+    fn voice_ptt_is_a_held_touch_control() {
+        let button = |_| {
+            Some(TouchControlRegion {
+                hit_id: touch::VOICE_PTT,
+                bounds: TouchBounds {
+                    min: [0.0; 2],
+                    max: [1.0; 2],
+                },
+            })
+        };
+        let mut state = TouchControlState::default();
+        let pressed = apply_touch_events(
+            &mut state,
+            [(7, TouchPhase::Started, [0.5; 2])],
+            button,
+        )
+        .unwrap();
+        assert_eq!(pressed.pressed, [touch::VOICE_PTT]);
+        assert_eq!(state.sample()[0].hit_id, Some(touch::VOICE_PTT));
+
+        let released = apply_touch_events(
+            &mut state,
+            [(7, TouchPhase::Ended, [0.5; 2])],
+            button,
+        )
+        .unwrap();
+        assert_eq!(released.lifted[0].hit_id, Some(touch::VOICE_PTT));
+        assert!(state.sample().is_empty());
+    }
+
     /// A Use tap that starts and lifts within one frame still reports its press, which opens a
     /// held book.
     #[test]

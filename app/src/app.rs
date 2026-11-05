@@ -227,8 +227,7 @@ pub(crate) fn configure_client_production_frame_systems(app: &mut App) {
         .add_systems(
             Update,
             voice_bridge::drive_voice_bridge
-                .after(client_audio::audio::voice_controller::sync_voice_capture_with_policy)
-                .after(client_audio::audio::voice_remote::sync_remote_voice_playback),
+                .after(client_audio::audio::voice_controller::sync_voice_capture_with_policy),
         );
     #[cfg(feature = "tracy")]
     app.init_resource::<crate::tracy::PhysicsEnd>().add_systems(

@@ -140,7 +140,7 @@ pub(crate) fn drive_gameplay_touch_targets(
     mut state: Local<TouchControlState>,
     mut mod_button_epoch: Local<u64>,
     world: Option<Res<crate::runtime::world::ClientWorld>>,
-    voice_policy: Option<ResMut<VoiceInputPolicy>>,
+    mut voice_policy: Option<ResMut<VoiceInputPolicy>>,
     mut voice_ptt_active: Local<bool>,
 ) {
     targets.release_all();

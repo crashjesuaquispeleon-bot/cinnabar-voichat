@@ -47,6 +47,7 @@ class WindowsPermissionTests(unittest.TestCase):
             for node in bundle.findall("util:RegistrySearch", ns)
         }
         expected = {
+            "VCRedistX64Installed": "Installed",
             "VCRedistX64Major": "Major",
             "VCRedistX64Minor": "Minor",
             "VCRedistX64Build": "Bld",
@@ -72,6 +73,7 @@ class WindowsPermissionTests(unittest.TestCase):
         self.assertEqual(redist.attrib["Permanent"], "yes")
         self.assertEqual(redist.attrib["Vital"], "yes")
         self.assertEqual(redist.attrib["InstallArguments"], "/install /quiet /norestart")
+        self.assertIn("VCRedistX64Installed = 1", redist.attrib["DetectCondition"])
         self.assertIn("VCRedistX64Major", redist.attrib["DetectCondition"])
         for variable in ("VcRedistMajor", "VcRedistMinor", "VcRedistBuild", "VcRedistRevision"):
             self.assertIn(f"$({variable})", redist.attrib["DetectCondition"])

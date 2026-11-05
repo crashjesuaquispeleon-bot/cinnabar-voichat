@@ -134,7 +134,10 @@ fn available_registry_matches_all_platform_candidates_including_android_gles() {
         let supported = platform.backends();
         assert!(supported.iter().all(|api| Backend::AVAILABLE.contains(api)));
         assert_eq!(candidates(supported, supported, None, None, &[]), supported);
-        assert_eq!(supported.contains(&Backend::Gl), platform == Platform::Android);
+        assert_eq!(
+            supported.contains(&Backend::Gl),
+            platform == Platform::Android
+        );
     }
     for api in Backend::ALL {
         assert_eq!(

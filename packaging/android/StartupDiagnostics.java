@@ -8,8 +8,6 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.os.Build;
 import android.widget.Toast;
-import org.json.JSONException;
-import org.json.JSONObject;
 import java.io.FileOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -83,10 +81,11 @@ final class StartupDiagnostics {
         File data = new File(filesDir, "data");
         File choice = new File(data, "renderer-choice.json");
         try {
-            JSONObject saved = new JSONObject(
-                    new String(java.nio.file.Files.readAllBytes(choice.toPath()), StandardCharsets.UTF_8));
-            JSONObject working = saved.optJSONObject("working");
-            if (working == null || !"vulkan".equals(working.optString("backend", ""))) return false;
+            String saved = new String(
+                    java.nio.file.Files.readAllBytes(choice.toPath()), StandardCharsets.UTF_8);
+            // serde serializes Attempt.backend as the first field within Recovery.working.
+            if (!Pattern.compile("\\\"working\\\"\\s*:\\s*\\{\\s*\\\"backend\\\"\\s*:\\s*\\\"vulkan\\\"")
+                    .matcher(saved).find()) return false;
             if (!data.isDirectory() && !data.mkdirs()) {
                 throw new IOException("cannot create renderer recovery directory");
             }
@@ -98,7 +97,7 @@ final class StartupDiagnostics {
             android.util.Log.w("@PRODUCT_NAME@",
                     "Native crash followed a successful Vulkan session; next launch will try GLES");
             return true;
-        } catch (IOException | JSONException | RuntimeException error) {
+        } catch (IOException | RuntimeException error) {
             android.util.Log.w("@PRODUCT_NAME@", "Cannot record renderer crash fallback", error);
             return false;
         }

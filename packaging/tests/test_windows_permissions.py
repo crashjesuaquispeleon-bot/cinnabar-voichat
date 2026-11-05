@@ -70,6 +70,7 @@ class WindowsPermissionTests(unittest.TestCase):
         redist = packages[0]
         self.assertEqual(redist.attrib["Id"], "VCRedistX64")
         self.assertEqual(redist.attrib["SourceFile"], "$(VcRedist)")
+        self.assertEqual(redist.attrib["PerMachine"], "yes")
         self.assertEqual(redist.attrib["Permanent"], "yes")
         self.assertEqual(redist.attrib["Vital"], "yes")
         self.assertEqual(redist.attrib["InstallArguments"], "/install /quiet /norestart")

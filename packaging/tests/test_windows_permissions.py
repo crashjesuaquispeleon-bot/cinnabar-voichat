@@ -44,7 +44,7 @@ class WindowsPermissionTests(unittest.TestCase):
         bundle = ET.parse(WINDOWS / "setup.wxs").getroot()
         searches = {
             node.attrib["Variable"]: node
-            for node in bundle.findall("util:RegistrySearch", ns)
+            for node in bundle.findall(".//util:RegistrySearch", ns)
         }
         expected = {
             "VCRedistX64Installed": "Installed",
@@ -62,7 +62,7 @@ class WindowsPermissionTests(unittest.TestCase):
                 self.assertEqual(search.attrib["Value"], value)
                 self.assertEqual(search.attrib["Bitness"], "always64")
 
-        chain = bundle.find("w:Chain", ns)
+        chain = bundle.find(".//w:Chain", ns)
         self.assertIsNotNone(chain)
         packages = list(chain)
         self.assertEqual([node.tag.rsplit("}", 1)[-1] for node in packages],

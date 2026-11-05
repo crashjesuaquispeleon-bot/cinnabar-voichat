@@ -641,6 +641,22 @@ fn accept_eula_outside_the_eula_screen_does_nothing() {
 }
 
 #[test]
+fn android_create_defaults_to_flat_dragonfly_when_translated_bds_is_unavailable() {
+    let available = default_create_form(true, Platform::Android);
+    assert_eq!(available.backend, Backend::Bds);
+    assert_eq!(available.generator, Generator::Normal);
+
+    let fallback = default_create_form(false, Platform::Android);
+    assert_eq!(fallback.backend, Backend::Dragonfly);
+    assert_eq!(fallback.generator, Generator::Flat);
+
+    // Desktop creation remains BDS-first so its existing Docker/EULA flow is preserved.
+    let desktop = default_create_form(false, Platform::Linux);
+    assert_eq!(desktop.backend, Backend::Bds);
+    assert_eq!(desktop.generator, Generator::Normal);
+}
+
+#[test]
 fn create_defaults_to_bds_and_normal_independent_of_bds_availability() {
     for state in [SetupState::Ready, SetupState::Unsupported] {
         let mut menu = loaded(&[]);

@@ -20,7 +20,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /** Unpacks the prep kit and prepares game assets behind Android dialogs, then starts the game. */
 public final class BootstrapActivity extends Activity {
-    static { System.loadLibrary("@CLIENT_LIBRARY@"); }
+    private volatile boolean nativeLibraryLoaded;
 
     private static final String RESOURCES = "resources";
 
@@ -44,6 +44,21 @@ public final class BootstrapActivity extends Activity {
     }
 
     private void start() {
+        if (!nativeLibraryLoaded) {
+            String loadError = NativeLibraryLoader.load("@CLIENT_LIBRARY@");
+            if (loadError != null) {
+                android.util.Log.e("@PRODUCT_NAME@", "Unable to load the native client library: " + loadError);
+                new AlertDialog.Builder(this)
+                        .setTitle("@PRODUCT_NAME@ could not start")
+                        .setMessage("The native client library could not be loaded.\\n\\n" + loadError)
+                        .setPositiveButton("Retry", (dialog, which) -> start())
+                        .setNegativeButton("Close", (dialog, which) -> finish())
+                        .setOnCancelListener(dialog -> finish())
+                        .show();
+                return;
+            }
+            nativeLibraryLoaded = true;
+        }
         showProgress("Preparing @PRODUCT_NAME@");
         long current = ATTEMPTS.incrementAndGet();
         attempt = current;
@@ -61,7 +76,7 @@ public final class BootstrapActivity extends Activity {
                     result = prepare(getFilesDir().getAbsolutePath(),
                             getApplicationInfo().nativeLibraryDir, current);
                 }
-            } catch (Exception error) {
+            } catch (Exception | LinkageError error) {
                 result = error.toString();
             }
         }
@@ -165,7 +180,7 @@ public final class BootstrapActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
-        cancel(attempt);
+        if (nativeLibraryLoaded) cancel(attempt);
         CountDownLatch answer = consentAnswer;
         if (answer != null) answer.countDown();
         if (progress != null) progress.dismiss();

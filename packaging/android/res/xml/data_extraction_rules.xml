@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <!-- Cloud backup restores only worlds, never credentials, logs or runtime caches. -->
+    <cloud-backup>
+        <include domain="file" path="data/worlds/" />
+    </cloud-backup>
+    <!-- Device-to-device transfer preserves worlds without copying private credentials. -->
+    <device-transfer>
+        <include domain="file" path="data/worlds/" />
+    </device-transfer>
+</data-extraction-rules>

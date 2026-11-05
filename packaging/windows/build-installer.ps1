@@ -105,8 +105,9 @@ if ($env:WINDOWS_CERT_PFX_BASE64) {
 }
 & (Join-Path $PSScriptRoot "sign.ps1") -Path $setup
 $bundleCheck = Join-Path $outPath "bundle-check"
-& (Join-Path $PSScriptRoot "check-setup.ps1") -Setup $setup -Msi $msi -Out $bundleCheck
+$bundleCheckBA = Join-Path $outPath "bundle-check-bootstrapper"
+& (Join-Path $PSScriptRoot "check-setup.ps1") -Setup $setup -Msi $msi -Out $bundleCheck -OutBA $bundleCheckBA
 if ($LASTEXITCODE -ne 0) { throw "setup bundle verification failed" }
-Remove-Item -LiteralPath $bundleCheck -Recurse -Force
+Remove-Item -LiteralPath $bundleCheck, $bundleCheckBA -Recurse -Force
 Write-Output $msi
 Write-Output $setup

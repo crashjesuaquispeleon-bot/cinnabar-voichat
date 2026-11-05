@@ -478,9 +478,13 @@ pub fn sync_remote_voice_playback(
     policy: Res<super::voice_input::VoiceInputPolicy>,
     playback: Res<VoiceRemotePlayback>,
 ) {
-    let enabled = policy.enabled()
-        && policy.session_active()
-        && policy.mode() != super::voice_input::MicrophoneMode::Unselected;
+    // The voice bridge owns authenticated room enablement. Keep an already-authorized
+    // downlink alive independently of local microphone capture and PTT state; bridge teardown
+    // explicitly closes this gate when the room is revoked or the world ends.
+    let enabled = playback.is_enabled()
+        || (policy.enabled()
+            && policy.session_active()
+            && policy.mode() != super::voice_input::MicrophoneMode::Unselected);
     playback.set_voice_session_enabled(enabled);
 }
 

@@ -124,9 +124,9 @@ pub(crate) fn drive_voice_bridge(
     let desired = BridgeDesired {
         active: true,
         transmit: policy.transmission_permitted(),
-        receive: policy.enabled()
-            && policy.session_active()
-            && policy.mode() != MicrophoneMode::Unselected,
+        // Receiving an authorized room is independent of local microphone consent.
+        // PTT and mute only gate outbound PCM; they must never prevent hearing the peer.
+        receive: policy.session_active(),
         session: Some(session),
     };
     let finished = runtime

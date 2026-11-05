@@ -160,15 +160,32 @@ impl Translation {
         if platform.os != "android" || platform.arch != "arm64" {
             return None;
         }
-        let helper = core.with_file_name(&android_runtime().bds_translation.helper_library);
         let pin = &android_runtime().bds_translation;
-        (helper.is_file()
-            && pin
-                .native_runtime
-                .libraries
-                .iter()
-                .all(|library| helper.with_file_name(&library.packaged).is_file()))
-        .then(|| Self::new(helper, cache, android_runtime().bds_translation.clone()))
+        let helper = core.with_file_name(&pin.helper_library);
+        if !helper.is_file() {
+            tracing::warn!(
+                "Android local-world BDS translation unavailable: packaged helper {} is missing",
+                pin.helper_library
+            );
+            return None;
+        }
+        if let Some(missing) = pin
+            .native_runtime
+            .libraries
+            .iter()
+            .find(|library| !helper.with_file_name(&library.packaged).is_file())
+        {
+            tracing::error!(
+                "Android local-world BDS translation unavailable: packaged runtime library {} is missing",
+                missing.packaged
+            );
+            return None;
+        }
+        tracing::info!(
+            "Android local-world BDS translation ready: helper and {} native runtime libraries are present",
+            pin.native_runtime.libraries.len()
+        );
+        Some(Self::new(helper, cache, pin.clone()))
     }
 
     /// A complete packaged runtime makes BDS available as the default backend.

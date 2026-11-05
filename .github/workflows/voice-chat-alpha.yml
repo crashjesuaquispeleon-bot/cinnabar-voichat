@@ -58,6 +58,7 @@ jobs:
         run: |
           dotnet tool install --global wix --version 5.0.2
           & "$env:USERPROFILE\\.dotnet\\tools\\wix.exe" extension add -g WixToolset.BootstrapperApplications.wixext/5.0.2
+          & "$env:USERPROFILE\\.dotnet\\tools\\wix.exe" extension add -g WixToolset.Util.wixext/5.0.2
           choco install imagemagick --no-progress -y
           if (-not (Get-Command make -ErrorAction SilentlyContinue)) { choco install make --no-progress -y }
           $magick = Get-ChildItem "$env:ProgramFiles\\ImageMagick*" -Directory | Select-Object -First 1
@@ -80,6 +81,16 @@ jobs:
           $log = Join-Path $env:RUNNER_TEMP "cinnabar-alpha-layout.log"
           $process = Start-Process -FilePath $setup.FullName -ArgumentList @('/layout', ('"' + $layout + '"'), '/quiet', '/norestart', '/log', ('"' + $log + '"')) -WindowStyle Hidden -Wait -PassThru
           if ($process.ExitCode -ne 0) { if (Test-Path $log) { Get-Content $log }; throw "Setup layout failed: $($process.ExitCode)" }
+          $layoutFiles = @(Get-ChildItem -LiteralPath $layout -Recurse -File)
+          $redist = @($layoutFiles | Where-Object { $_.Name -ieq "vc_redist.x64.exe" })
+          $msi = @($layoutFiles | Where-Object { $_.Extension -ieq ".msi" })
+          if ($redist.Count -ne 1 -or $msi.Count -ne 1) {
+            throw "Setup layout must contain exactly one VC++ x64 redistributable and one MSI"
+          }
+          $signature = Get-AuthenticodeSignature -LiteralPath $redist[0].FullName
+          if ($signature.Status -ne "Valid" -or $signature.SignerCertificate.Subject -notmatch "Microsoft Corporation") {
+            throw "Bundled VC++ redistributable signature is invalid"
+          }
       - uses: actions/upload-artifact@v7
         with:
           name: cinnabar-voice-alpha-windows-x64

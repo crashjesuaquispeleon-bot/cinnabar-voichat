@@ -473,20 +473,8 @@ impl VoiceRemoteAttachment {
     }
 }
 
-/// Mirrors Voice Chat enablement/session state without requiring local microphone permission.
-pub fn sync_remote_voice_playback(
-    policy: Res<super::voice_input::VoiceInputPolicy>,
-    playback: Res<VoiceRemotePlayback>,
-) {
-    // The voice bridge owns authenticated room enablement. Keep an already-authorized
-    // downlink alive independently of local microphone capture and PTT state; bridge teardown
-    // explicitly closes this gate when the room is revoked or the world ends.
-    let enabled = playback.is_enabled()
-        || (policy.enabled()
-            && policy.session_active()
-            && policy.mode() != super::voice_input::MicrophoneMode::Unselected);
-    playback.set_voice_session_enabled(enabled);
-}
+/// Remote playback is enabled only by the native voice bridge after authenticated room admission.
+/// The bridge also closes this gate on revocation, worker exit, and local world/session teardown.
 
 /// Attach one multi-speaker source to the existing output device. It never opens a
 /// separate OS output device; disable/session end cancels the shared mixer source.

@@ -77,6 +77,11 @@ impl VoiceBridgeRuntime {
     }
 }
 
+/// Room playback does not depend on local microphone consent or transmission state.
+fn receive_audio_enabled(policy: &VoiceInputPolicy) -> bool {
+    policy.session_active()
+}
+
 /// Probes the trusted room while joined, but opens no microphone until the user presses PTT.
 /// The mobile control is exposed only after the API authorizes the two-player Cinnabar room.
 pub(crate) fn drive_voice_bridge(
@@ -126,7 +131,7 @@ pub(crate) fn drive_voice_bridge(
         transmit: policy.transmission_permitted(),
         // Receiving an authorized room is independent of local microphone consent.
         // PTT and mute only gate outbound PCM; they must never prevent hearing the peer.
-        receive: policy.session_active(),
+        receive: receive_audio_enabled(policy),
         session: Some(session),
     };
     let finished = runtime
@@ -380,6 +385,16 @@ async fn send_transmit_gate(writer: &bridge::FrameQueue, allowed: bool) -> anyho
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_authorized_session_can_receive_before_local_microphone_activation() {
+        let mut policy = VoiceInputPolicy::default();
+        policy.set_session_active(true);
+
+        assert!(!policy.enabled());
+        assert!(!policy.transmission_permitted());
+        assert!(receive_audio_enabled(&policy));
+    }
 
     #[test]
     fn a_new_local_partida_requires_a_fresh_voice_bridge() {

@@ -68,6 +68,41 @@ fn utility_row_keeps_chat_between_utilities_and_pause() {
     }
 }
 
+/// The voice button appears only for an authorized room and uses its own touch hit region.
+#[test]
+fn voice_ptt_button_is_hidden_until_room_admission() {
+    let Some(mut presentation) = pack_harness::engine_presentation() else {
+        return;
+    };
+    presentation.enable_touch_controls(true);
+    let player = player_state::PlayerState::new(1);
+    let runtime = pack_harness::menu_runtime();
+    let size = [1280, 720];
+    let window = size.map(|value| value as f32);
+    let center = [0.925, 0.25];
+
+    presentation.set_voice_ptt_available(false);
+    paint(&mut presentation, &player, &runtime, size);
+    assert_ne!(
+        presentation.gameplay_touch_region(center, window).map(|hit| hit.hit_id),
+        Some(touch::VOICE_PTT)
+    );
+
+    presentation.set_voice_ptt_available(true);
+    paint(&mut presentation, &player, &runtime, size);
+    assert_eq!(
+        presentation.gameplay_touch_region(center, window).map(|hit| hit.hit_id),
+        Some(touch::VOICE_PTT)
+    );
+
+    presentation.set_voice_ptt_available(false);
+    paint(&mut presentation, &player, &runtime, size);
+    assert_ne!(
+        presentation.gameplay_touch_region(center, window).map(|hit| hit.hit_id),
+        Some(touch::VOICE_PTT)
+    );
+}
+
 /// Changing touch enablement refreshes retained HUD bindings and removes obsolete geometry.
 #[test]
 fn inventory_access_tracks_the_painted_hotbar_and_touch_enablement() {

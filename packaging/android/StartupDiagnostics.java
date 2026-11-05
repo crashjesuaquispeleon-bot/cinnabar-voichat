@@ -8,6 +8,9 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.os.Build;
 import android.widget.Toast;
+import org.json.JSONException;
+import org.json.JSONObject;
+import java.io.FileOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -33,6 +36,7 @@ final class StartupDiagnostics {
             ApplicationExitInfo exit = exits.get(0);
             if (!activity.getApplicationInfo().processName.equals(exit.getProcessName())) return false;
             if (!unexpected(exit.getReason(), exit.getStatus())) return false;
+            recordRendererCrashIfApplicable(activity.getFilesDir(), exit.getReason());
             android.content.SharedPreferences preferences = activity.getPreferences(0);
             if (exit.getTimestamp() <= preferences.getLong("reported-exit", 0)) return false;
             preferences.edit().putLong("reported-exit", exit.getTimestamp()).apply();
@@ -65,6 +69,37 @@ final class StartupDiagnostics {
             return true;
         } catch (RuntimeException error) {
             android.util.Log.w("@PRODUCT_NAME@", "Cannot read previous process exit", error);
+            return false;
+        }
+    }
+
+    /**
+     * Records a one-launch GLES fallback only when Android says the process had a native crash
+     * and the last successfully presented renderer was Vulkan. This is a recovery heuristic, not
+     * proof that the GPU caused the crash; the next launch logs the fallback decision.
+     */
+    static boolean recordRendererCrashIfApplicable(File filesDir, int reason) {
+        if (reason != ApplicationExitInfo.REASON_CRASH_NATIVE) return false;
+        File data = new File(filesDir, "data");
+        File choice = new File(data, "renderer-choice.json");
+        try {
+            JSONObject saved = new JSONObject(
+                    new String(java.nio.file.Files.readAllBytes(choice.toPath()), StandardCharsets.UTF_8));
+            JSONObject working = saved.optJSONObject("working");
+            if (working == null || !"vulkan".equals(working.optString("backend", ""))) return false;
+            if (!data.isDirectory() && !data.mkdirs()) {
+                throw new IOException("cannot create renderer recovery directory");
+            }
+            File marker = new File(data, "renderer-native-crash.flag");
+            try (FileOutputStream output = new FileOutputStream(marker, false)) {
+                output.write(Long.toString(System.currentTimeMillis()).getBytes(StandardCharsets.UTF_8));
+                output.flush();
+            }
+            android.util.Log.w("@PRODUCT_NAME@",
+                    "Native crash followed a successful Vulkan session; next launch will try GLES");
+            return true;
+        } catch (IOException | JSONException | RuntimeException error) {
+            android.util.Log.w("@PRODUCT_NAME@", "Cannot record renderer crash fallback", error);
             return false;
         }
     }

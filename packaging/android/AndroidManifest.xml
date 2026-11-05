@@ -12,7 +12,9 @@
         android:label="@PRODUCT_NAME@"
         android:icon="@mipmap/ic_launcher"
         android:hasCode="true"
-        android:allowBackup="false"
+        android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:extractNativeLibs="true"
         android:theme="@style/StartupTheme">
         <activity

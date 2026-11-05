@@ -92,13 +92,6 @@ pub fn open(layout: &InstallLayout) -> Result<Manager, WorldError> {
         (docker::detect_runtime(platform, docker::DOCKER, &[]), false)
     };
     store.set_default_backend(manager::default_backend(&runtime));
-    if platform.os == "android" {
-        tracing::info!(
-            "Android local-world capability: translated BDS={}, flat Dragonfly helper={}",
-            translation.is_some(),
-            local_server_available
-        );
-    }
     let provisioner = Arc::new(provision::Provisioner::new(
         layout.bds_dir(),
         pin.server_version.clone(),
@@ -118,6 +111,13 @@ pub fn open(layout: &InstallLayout) -> Result<Manager, WorldError> {
     let mut parts = manager::Parts::new(store);
     let local_server = local_server_path(&layout.core_executable, platform);
     let local_server_available = local_server.is_file();
+    if platform.os == "android" {
+        tracing::info!(
+            "Android local-world capability: translated BDS={}, flat Dragonfly helper={}",
+            translation.is_some(),
+            local_server_available
+        );
+    }
     if local_server_available {
         tracing::info!("local-world Dragonfly helper is available for this platform");
         parts.runners.dragonfly = Some(Arc::new(process::ProcessRunner::new(local_server)));

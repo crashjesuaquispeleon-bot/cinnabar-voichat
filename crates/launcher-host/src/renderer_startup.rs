@@ -111,7 +111,7 @@ impl StartupGuard {
         } else if native_crash.exists() {
             if let Some(working) = recovery.working.clone() {
                 tracing::warn!(
-                    "Android reported a native process crash after the last successful frame;                      excluding the previously selected graphics backend {:?} for this launch",
+                    "Android reported a native process crash after the last successful frame; excluding backend {:?} for this launch",
                     working.backend
                 );
                 recovery.recover(&working);

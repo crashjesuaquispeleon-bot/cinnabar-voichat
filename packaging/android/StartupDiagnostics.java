@@ -34,7 +34,10 @@ final class StartupDiagnostics {
             ApplicationExitInfo exit = exits.get(0);
             if (!activity.getApplicationInfo().processName.equals(exit.getProcessName())) return false;
             if (!unexpected(exit.getReason(), exit.getStatus())) return false;
-            recordRendererCrashIfApplicable(activity.getFilesDir(), exit.getReason());
+            if (recordRendererCrashIfApplicable(activity.getFilesDir(), exit.getReason())) {
+                android.util.Log.w("@PRODUCT_NAME@",
+                        "Native crash followed a successful Vulkan session; next launch will try GLES");
+            }
             android.content.SharedPreferences preferences = activity.getPreferences(0);
             if (exit.getTimestamp() <= preferences.getLong("reported-exit", 0)) return false;
             preferences.edit().putLong("reported-exit", exit.getTimestamp()).apply();
@@ -94,11 +97,8 @@ final class StartupDiagnostics {
                 output.write(Long.toString(System.currentTimeMillis()).getBytes(StandardCharsets.UTF_8));
                 output.flush();
             }
-            android.util.Log.w("@PRODUCT_NAME@",
-                    "Native crash followed a successful Vulkan session; next launch will try GLES");
             return true;
         } catch (IOException | RuntimeException error) {
-            android.util.Log.w("@PRODUCT_NAME@", "Cannot record renderer crash fallback", error);
             return false;
         }
     }

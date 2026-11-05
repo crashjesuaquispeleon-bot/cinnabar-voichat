@@ -29,7 +29,7 @@
       <ExePackage Id="VCRedistX64" SourceFile="$(VcRedist)"
                   InstallArguments="/install /quiet /norestart"
                   RepairArguments="/repair /quiet /norestart"
-                  DetectCondition="VCRedistX64Installed = 1 AND ((VCRedistX64Major &gt; $(VcRedistMajor)) OR (VCRedistX64Major = $(VcRedistMajor) AND VCRedistX64Minor &gt; $(VcRedistMinor)) OR (VCRedistX64Major = $(VcRedistMajor) AND VCRedistX64Minor = $(VcRedistMinor) AND VCRedistX64Build &gt; $(VcRedistBuild)) OR (VCRedistX64Major = $(VcRedistMajor) AND VCRedistX64Minor = $(VcRedistMinor) AND VCRedistX64Build = $(VcRedistBuild) AND VCRedistX64Revision &gt;= $(VcRedistRevision)))
+                  DetectCondition="VCRedistX64Installed = 1 AND ((VCRedistX64Major &gt; $(VcRedistMajor)) OR (VCRedistX64Major = $(VcRedistMajor) AND VCRedistX64Minor &gt; $(VcRedistMinor)) OR (VCRedistX64Major = $(VcRedistMajor) AND VCRedistX64Minor = $(VcRedistMinor) AND VCRedistX64Build &gt; $(VcRedistBuild)) OR (VCRedistX64Major = $(VcRedistMajor) AND VCRedistX64Minor = $(VcRedistMinor) AND VCRedistX64Build = $(VcRedistBuild) AND VCRedistX64Revision &gt;= $(VcRedistRevision)))"
                   PerMachine="yes" Permanent="yes" Vital="yes" />
       <MsiPackage SourceFile="$(Msi)" Compressed="yes" Visible="no" />
     </Chain>

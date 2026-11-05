@@ -99,10 +99,29 @@ impl StartupGuard {
         let mut interrupted =
             load::<Sentinel>(&root.join(SENTINEL_FILE))?.map(|sentinel| sentinel.attempt);
         let mut recovery = Self::saved(root)?;
+        let native_crash = root.join(NATIVE_RENDERER_CRASH_FILE);
         if recovery.version != version {
             recovery.reset();
             recovery.version = version.to_owned();
             interrupted = None;
+            // A crash marker from a previous client version must not change this version's renderer.
+            if native_crash.exists() {
+                fs::remove_file(&native_crash)?;
+            }
+        } else if native_crash.exists() {
+            if let Some(working) = recovery.working.clone() {
+                tracing::warn!(
+                    "Android reported a native process crash after the last successful frame;                      excluding the previously selected graphics backend {:?} for this launch",
+                    working.backend
+                );
+                recovery.recover(&working);
+            } else {
+                tracing::warn!(
+                    "Android reported a native process crash, but there is no saved renderer choice to fall back from"
+                );
+            }
+            save(&root.join(CHOICE_FILE), &recovery)?;
+            fs::remove_file(&native_crash)?;
         }
         if let Some(attempt) = &interrupted {
             recovery.recover(attempt);
@@ -220,6 +239,8 @@ impl StartupGuard {
 }
 
 const SENTINEL_FILE: &str = "renderer-startup.json";
+/// Android writes this after a native process crash so the next launch can avoid the last renderer.
+const NATIVE_RENDERER_CRASH_FILE: &str = "renderer-native-crash.flag";
 const LOCK_FILE: &str = "renderer-startup.lock";
 const CHOICE_FILE: &str = "renderer-choice.json";
 const MAX_FILE_BYTES: u64 = 64 * 1024;

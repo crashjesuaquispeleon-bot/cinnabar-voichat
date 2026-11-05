@@ -288,7 +288,9 @@ pub(crate) fn drive_gameplay_touch_targets(
         held.retain(|contact| contact.hit_id != Some(touch::VOICE_PTT));
     }
     let ptt_held = presentation.voice_ptt_available()
-        && held.iter().any(|contact| contact.hit_id == Some(touch::VOICE_PTT));
+        && held
+            .iter()
+            .any(|contact| contact.hit_id == Some(touch::VOICE_PTT));
     if ptt_held {
         if let Some(policy) = voice_policy.as_deref_mut()
             && policy.mode() == MicrophoneMode::PushToTalk
@@ -450,21 +452,13 @@ mod tests {
             })
         };
         let mut state = TouchControlState::default();
-        let pressed = apply_touch_events(
-            &mut state,
-            [(7, TouchPhase::Started, [0.5; 2])],
-            button,
-        )
-        .unwrap();
+        let pressed =
+            apply_touch_events(&mut state, [(7, TouchPhase::Started, [0.5; 2])], button).unwrap();
         assert_eq!(pressed.pressed, [touch::VOICE_PTT]);
         assert_eq!(state.sample()[0].hit_id, Some(touch::VOICE_PTT));
 
-        let released = apply_touch_events(
-            &mut state,
-            [(7, TouchPhase::Ended, [0.5; 2])],
-            button,
-        )
-        .unwrap();
+        let released =
+            apply_touch_events(&mut state, [(7, TouchPhase::Ended, [0.5; 2])], button).unwrap();
         assert_eq!(released.lifted[0].hit_id, Some(touch::VOICE_PTT));
         assert!(state.sample().is_empty());
     }

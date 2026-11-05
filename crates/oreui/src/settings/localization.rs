@@ -110,14 +110,20 @@ fn spanish_text(key: &str, latin_american: bool) -> Option<&'static str> {
         }
 
         "menu.settings" | "hbui.Settings.title" => {
-            if latin_american { "Configuración" } else { "Ajustes" }
+            if latin_american {
+                "Configuración"
+            } else {
+                "Ajustes"
+            }
         }
         "menu.video.tab.title" | "options.video" => "Vídeo",
         "menu.video.tab.description" => "Ajusta los gráficos y la calidad visual.",
         "menu.video.group.general" => "General",
         "menu.video.group.general.description" => "Ajustes de vídeo comunes.",
         "menu.video.group.performance" => "Gráficos, rendimiento y diseño",
-        "menu.video.group.performance.description" => "Controla cómo se ve y cómo funciona Minecraft.",
+        "menu.video.group.performance.description" => {
+            "Controla cómo se ve y cómo funciona Minecraft."
+        }
         "menu.video.group.customization" => "Personalización de la vista",
         "menu.video.group.customization.description" => {
             "Construye, transmite o toma capturas sin distracciones."
@@ -146,13 +152,21 @@ fn spanish_text(key: &str, latin_american: bool) -> Option<&'static str> {
         }
 
         "menu.keyboardAndMouse.tab.title" | "options.keyboardAndMouse" => {
-            if latin_american { "Teclado y mouse" } else { "Teclado y ratón" }
+            if latin_american {
+                "Teclado y mouse"
+            } else {
+                "Teclado y ratón"
+            }
         }
         "menu.keyboardAndMouse.tab.description" => {
             "Ajusta las opciones de entrada y la asignación de teclas."
         }
         "menu.keyboardAndMouse.tab.mappings.title" => {
-            if latin_american { "Asignación de teclado y mouse" } else { "Asignación de teclado y ratón" }
+            if latin_american {
+                "Asignación de teclado y mouse"
+            } else {
+                "Asignación de teclado y ratón"
+            }
         }
         "menu.keyboardAndMouse.tab.mappings.description" => {
             "Cambia la asignación de las teclas y los botones del mouse para jugar a tu manera."
@@ -164,7 +178,11 @@ fn spanish_text(key: &str, latin_american: bool) -> Option<&'static str> {
         "options.commandMacro.placeholder" => "Comando que se ejecutará",
 
         "menu.controller.tab.title" | "options.controller" => {
-            if latin_american { "Control" } else { "Mando" }
+            if latin_american {
+                "Control"
+            } else {
+                "Mando"
+            }
         }
         "menu.controller.tab.description" => {
             "Opciones de entrada, sensibilidad y asignación de botones del control."
@@ -175,7 +193,9 @@ fn spanish_text(key: &str, latin_american: bool) -> Option<&'static str> {
         }
 
         "menu.general.tab.title" | "options.general" => "General",
-        "menu.general.tab.description" => "Opciones generales, desde la red hasta los créditos del juego.",
+        "menu.general.tab.description" => {
+            "Opciones generales, desde la red hasta los créditos del juego."
+        }
         "menu.general.tab.pause.title" => "Pausa",
         "menu.general.tab.pause.description" => "Tómate un descanso mientras juegas en solitario.",
         "menu.general.tab.network.title" => "Configuración de red",
@@ -196,7 +216,9 @@ fn spanish_text(key: &str, latin_american: bool) -> Option<&'static str> {
         "menu.account.manageAccount.title" => "Administrar cuenta",
         "menu.account.signOutOfMicrosoft.title" => "Cerrar sesión de tu cuenta Microsoft",
         "menu.account.signIn.title" => "Iniciar sesión gratis",
-        "menu.account.changeGamertag.buttonLabel" | "menu.account.manageAccount.buttonLabel" => "Abrir",
+        "menu.account.changeGamertag.buttonLabel" | "menu.account.manageAccount.buttonLabel" => {
+            "Abrir"
+        }
         "menu.account.signOutOfMicrosoft.buttonLabel" => "Cerrar sesión",
         "menu.account.signIn.buttonLabel" => "Iniciar sesión",
         "menu.account.clearSignInData.buttonLabel" => "Borrar datos",

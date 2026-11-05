@@ -89,10 +89,26 @@ fn spanish_locales_translate_cinnabar_settings_and_keep_regional_terms() {
     let cases = [
         ("es_ES", "options.fullscreen", "Pantalla completa"),
         ("es_MX", "options.fullscreen", "Pantalla completa"),
-        ("es_ES", "options.cinnabar.worldsFolder", "Carpeta de mundos"),
-        ("es_MX", "options.cinnabar.worldsFolder", "Carpeta de mundos"),
-        ("es_ES", "menu.keyboardAndMouse.tab.title", "Teclado y ratón"),
-        ("es_MX", "menu.keyboardAndMouse.tab.title", "Teclado y mouse"),
+        (
+            "es_ES",
+            "options.cinnabar.worldsFolder",
+            "Carpeta de mundos",
+        ),
+        (
+            "es_MX",
+            "options.cinnabar.worldsFolder",
+            "Carpeta de mundos",
+        ),
+        (
+            "es_ES",
+            "menu.keyboardAndMouse.tab.title",
+            "Teclado y ratón",
+        ),
+        (
+            "es_MX",
+            "menu.keyboardAndMouse.tab.title",
+            "Teclado y mouse",
+        ),
         ("es_ES", "menu.settings", "Ajustes"),
         ("es_MX", "menu.settings", "Configuración"),
         ("es_ES", "menu.touch.tab.title", "Controles táctiles"),

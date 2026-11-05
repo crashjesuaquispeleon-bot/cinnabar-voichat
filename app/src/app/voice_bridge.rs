@@ -167,8 +167,7 @@ pub(crate) fn drive_voice_bridge(
             active.desired.send_replace(desired);
         }
         let authorized = active.authorized.load(Ordering::Acquire);
-        if authorized && cfg!(target_os = "android")
-            && policy.mode() == MicrophoneMode::Unselected
+        if authorized && cfg!(target_os = "android") && policy.mode() == MicrophoneMode::Unselected
         {
             // Select PTT before showing the mobile button. This is not microphone consent:
             // VoiceInputPolicy remains disabled until the player presses the button.
@@ -219,9 +218,7 @@ pub(crate) fn drive_voice_bridge(
             };
             worker_authorized.store(false, Ordering::Release);
             if result.is_err() {
-                bevy::log::debug!(
-                    "voice IPC worker stopped; the next session tick may retry"
-                );
+                bevy::log::debug!("voice IPC worker stopped; the next session tick may retry");
             }
         });
     match worker {

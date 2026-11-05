@@ -84,21 +84,27 @@ fn voice_ptt_button_is_hidden_until_room_admission() {
     presentation.set_voice_ptt_available(false);
     paint(&mut presentation, &player, &runtime, size);
     assert_ne!(
-        presentation.gameplay_touch_region(center, window).map(|hit| hit.hit_id),
+        presentation
+            .gameplay_touch_region(center, window)
+            .map(|hit| hit.hit_id),
         Some(touch::VOICE_PTT)
     );
 
     presentation.set_voice_ptt_available(true);
     paint(&mut presentation, &player, &runtime, size);
     assert_eq!(
-        presentation.gameplay_touch_region(center, window).map(|hit| hit.hit_id),
+        presentation
+            .gameplay_touch_region(center, window)
+            .map(|hit| hit.hit_id),
         Some(touch::VOICE_PTT)
     );
 
     presentation.set_voice_ptt_available(false);
     paint(&mut presentation, &player, &runtime, size);
     assert_ne!(
-        presentation.gameplay_touch_region(center, window).map(|hit| hit.hit_id),
+        presentation
+            .gameplay_touch_region(center, window)
+            .map(|hit| hit.hit_id),
         Some(touch::VOICE_PTT)
     );
 }

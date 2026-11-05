@@ -59,7 +59,7 @@ mod tests {
     fn native_language_order_and_names_come_from_the_pack() {
         assert_eq!(
             parse_choices(
-                br#"[["de_DE","Deutsch"],["en_US","English"],["es_ES","Español (España)"],["es_MX","Español (México)"],["bad","Bad"]]"#,
+                r#"[["de_DE","Deutsch"],["en_US","English"],["es_ES","Español (España)"],["es_MX","Español (México)"],["bad","Bad"]]"#.as_bytes(),
             ),
             vec![
                 ("de_DE".into(), "Deutsch".into()),

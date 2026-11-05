@@ -7,6 +7,7 @@ use bevy::{
     window::{PrimaryWindow, Window},
 };
 use semantic_input::{TouchContact, TouchControlRegion, TouchControlState, touch};
+use client_audio::audio::voice_input::{MicrophoneMode, VoiceInputPolicy};
 
 use crate::semantic_controls::SemanticTouchTargets;
 use client_shell::{
@@ -139,6 +140,8 @@ pub(crate) fn drive_gameplay_touch_targets(
     mut state: Local<TouchControlState>,
     mut mod_button_epoch: Local<u64>,
     world: Option<Res<crate::runtime::world::ClientWorld>>,
+    voice_policy: Option<ResMut<VoiceInputPolicy>>,
+    mut voice_ptt_active: Local<bool>,
 ) {
     targets.release_all();
     // Every event is consumed each frame, so none replays once gameplay regains input.
@@ -148,6 +151,12 @@ pub(crate) fn drive_gameplay_touch_targets(
         .unwrap_or_default();
     let Some(mut presentation) = presentation.filter(|view| view.touch_controls_enabled()) else {
         state.clear();
+        if *voice_ptt_active {
+            if let Some(policy) = voice_policy.as_deref_mut() {
+                policy.set_push_to_talk_held(false);
+            }
+            *voice_ptt_active = false;
+        }
         return;
     };
     let gameplay = match (player.as_deref(), windows.single()) {
@@ -159,6 +168,12 @@ pub(crate) fn drive_gameplay_touch_targets(
     };
     let (Some(window), Some(mut player)) = (gameplay, player) else {
         state.clear();
+        if *voice_ptt_active {
+            if let Some(policy) = voice_policy.as_deref_mut() {
+                policy.set_push_to_talk_held(false);
+            }
+            *voice_ptt_active = false;
+        }
         presentation.set_touch_contacts(Vec::new());
         presentation.close_touch_utilities();
         return;
@@ -240,11 +255,17 @@ pub(crate) fn drive_gameplay_touch_targets(
                 touches.clear_just_pressed(id);
             }
             state.clear();
+            if *voice_ptt_active {
+                if let Some(policy) = voice_policy.as_deref_mut() {
+                    policy.set_push_to_talk_held(false);
+                }
+                *voice_ptt_active = false;
+            }
             presentation.set_touch_contacts(Vec::new());
             return;
         }
     };
-    for hit_id in pressed {
+    for hit_id in pressed.into_iter().filter(|id| *id != touch::VOICE_PTT) {
         targets.press(hit_id);
     }
     if mod_buttons_covered {
@@ -254,7 +275,39 @@ pub(crate) fn drive_gameplay_touch_targets(
             presentation.complete_mod_touch_tap(hit_id);
         }
     }
-    let held = state.sample();
+    let mut held = state.sample();
+    if !presentation.voice_ptt_available() {
+        let stale_ptt_contacts: Vec<_> = held
+            .iter()
+            .filter(|contact| contact.hit_id == Some(touch::VOICE_PTT))
+            .map(|contact| contact.contact_id)
+            .collect();
+        for contact in &stale_ptt_contacts {
+            state.release(*contact);
+        }
+        held.retain(|contact| contact.hit_id != Some(touch::VOICE_PTT));
+    }
+    let ptt_held = presentation.voice_ptt_available()
+        && held.iter().any(|contact| contact.hit_id == Some(touch::VOICE_PTT));
+    if ptt_held {
+        if let Some(policy) = voice_policy.as_deref_mut() {
+            if policy.mode() == MicrophoneMode::Unselected {
+                // Android preselects this mode when the authorized button appears.
+                // Other touch devices require a fresh press after the mode change.
+                policy.set_mode(MicrophoneMode::PushToTalk);
+                policy.set_push_to_talk_held(false);
+            } else {
+                policy.set_enabled(true);
+                policy.set_push_to_talk_held(true);
+                *voice_ptt_active = true;
+            }
+        }
+    } else if *voice_ptt_active {
+        if let Some(policy) = voice_policy.as_deref_mut() {
+            policy.set_push_to_talk_held(false);
+        }
+        *voice_ptt_active = false;
+    }
     presentation.set_touch_contacts(held.clone());
     let look_scaled = |sample: TouchContact| {
         if sample.hit_id == Some(touch::LOOK_SURFACE) {
@@ -271,14 +324,21 @@ pub(crate) fn drive_gameplay_touch_targets(
     };
     for sample in held
         .iter()
-        .filter(|sample| !sample.hit_id.is_some_and(completes_on_release))
+        .filter(|sample| {
+            sample.hit_id != Some(touch::VOICE_PTT)
+                && !sample.hit_id.is_some_and(completes_on_release)
+        })
         .cloned()
         .map(look_scaled)
     {
         targets.set_sample(&sample);
     }
     // A lifted contact whose id already carries a new press routes as that press instead.
-    for sample in lifted.into_iter().map(look_scaled) {
+    for sample in lifted
+        .into_iter()
+        .filter(|sample| sample.hit_id != Some(touch::VOICE_PTT))
+        .map(look_scaled)
+    {
         if !held
             .iter()
             .any(|other| other.contact_id == sample.contact_id)

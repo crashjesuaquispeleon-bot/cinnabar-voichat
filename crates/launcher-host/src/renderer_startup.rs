@@ -115,6 +115,8 @@ impl StartupGuard {
                     working.backend
                 );
                 recovery.recover(&working);
+                // Unlike a probe error, a native process crash must not trigger a retry of this API.
+                recovery.crashed_choice = Some(working.backend);
             } else {
                 tracing::warn!(
                     "Android reported a native process crash, but there is no saved renderer choice to fall back from"

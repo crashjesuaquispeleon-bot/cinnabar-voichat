@@ -263,9 +263,6 @@ fn spanish_text(key: &str, latin_american: bool) -> Option<&'static str> {
         | "options.sound.resetSettings.buttonLabel"
         | "options.key.reset.buttonLabel" => "Restablecer",
         "controllerLayoutScreen.unassigned" => "Sin asignar",
-        "options.dev_clearAllCache" => "Borrar toda la caché",
-        "options.dev_clearDownloadeCache.name" => "Borrar caché de descargas",
-        "options.dev_deleteLocalScreenshots" => "Eliminar capturas de pantalla locales",
         "playscreen.fileSize.GB" => "GB",
         "playscreen.fileSize.MB" => "MB",
         _ => return None,

@@ -56,6 +56,10 @@ import java.util.Arrays;
 import java.util.zip.ZipInputStream;
 public final class DiagnosticsFixture {
     public static void main(String[] args) throws Exception {
+        String nativeLoadFailure = NativeLibraryLoader.load("cinnabar_missing_library_fixture");
+        if (nativeLoadFailure == null || !nativeLoadFailure.contains("cinnabar_missing_library_fixture"))
+            throw new AssertionError("native library load failure was not returned to the activity");
+
         for (int reason : new int[] {ApplicationExitInfo.REASON_CRASH,
                 ApplicationExitInfo.REASON_CRASH_NATIVE, ApplicationExitInfo.REASON_ANR,
                 ApplicationExitInfo.REASON_LOW_MEMORY}) {

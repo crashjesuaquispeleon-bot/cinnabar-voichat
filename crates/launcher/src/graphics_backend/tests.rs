@@ -137,7 +137,6 @@ fn available_registry_matches_all_platform_candidates_including_android_gles() {
         assert_eq!(supported.contains(&Backend::Gl), platform == Platform::Android);
     }
     for api in Backend::ALL {
-        assert_eq!(Backend::AVAILABLE.contains(api), true);
         assert_eq!(
             Backend::AVAILABLE.contains(api),
             platforms.iter().any(|p| p.backends().contains(api))

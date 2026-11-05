@@ -262,8 +262,35 @@ impl Manager {
     pub fn create(&self, world: &NewWorld) -> Result<World, WorldError> {
         let mut world = world.clone();
         world.name = validate_name(&world.name)?;
-        let backend = self.creatable_backend(world.backend)?;
+        let backend = match self.creatable_backend(world.backend) {
+            Ok(backend) => backend,
+            Err(error) => {
+                if let Some(setup) = &self.inner.setup {
+                    let (status, unavailable) = setup.status();
+                    tracing::error!(
+                        "local world creation rejected: requested_backend={:?}, runtime={}, setup={:?}, reason={:?}, unavailable={:?}, error={}",
+                        world.backend,
+                        status.runtime,
+                        status.state,
+                        status.reason,
+                        unavailable,
+                        error
+                    );
+                } else {
+                    tracing::error!(
+                        "local world creation rejected: requested_backend={:?}, no setup manager, error={}",
+                        world.backend,
+                        error
+                    );
+                }
+                return Err(error);
+            }
+        };
         if !world.generator.supports_backend(backend) {
+            tracing::warn!(
+                "local world creation rejected: backend={backend:?} does not support generator={:?}",
+                world.generator
+            );
             return Err(WorldError::Invalid(NATURAL_TERRAIN_REQUIRES_BDS.to_owned()));
         }
         world.backend = Some(backend);

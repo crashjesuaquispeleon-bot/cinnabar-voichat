@@ -96,6 +96,9 @@ pub(crate) fn drive_voice_bridge(
 ) {
     let Some(policy) = policy.as_deref_mut() else {
         runtime.stop();
+        if let Some(playback) = playback.as_deref() {
+            playback.set_voice_session_enabled(false);
+        }
         if let Some(presentation) = presentation.as_deref_mut() {
             presentation.set_voice_ptt_available(false);
         }
@@ -116,6 +119,9 @@ pub(crate) fn drive_voice_bridge(
         policy.set_enabled(false);
         policy.set_mode(MicrophoneMode::Unselected);
         runtime.stop();
+        if let Some(playback) = playback.as_deref() {
+            playback.set_voice_session_enabled(false);
+        }
         if let Some(presentation) = presentation.as_deref_mut() {
             presentation.set_voice_ptt_available(false);
         }
@@ -167,6 +173,10 @@ pub(crate) fn drive_voice_bridge(
             active.desired.send_replace(desired);
         }
         let authorized = active.authorized.load(Ordering::Acquire);
+        if let Some(playback) = playback.as_deref() {
+            // The room can be heard while the local PTT microphone remains disabled.
+            playback.set_voice_session_enabled(authorized);
+        }
         if authorized && cfg!(target_os = "android") && policy.mode() == MicrophoneMode::Unselected
         {
             // Select PTT before showing the mobile button. This is not microphone consent:
@@ -180,6 +190,9 @@ pub(crate) fn drive_voice_bridge(
         return;
     }
 
+    if let Some(playback) = playback.as_deref() {
+        playback.set_voice_session_enabled(false);
+    }
     if let Some(presentation) = presentation.as_deref_mut() {
         presentation.set_voice_ptt_available(false);
     }

@@ -71,7 +71,24 @@ wix build -arch x64 -d Version=$version -d Payload=$payload -d Icon=$icon -o $ms
 if ($LASTEXITCODE -ne 0) { throw "wix build failed" }
 & (Join-Path $PSScriptRoot "sign.ps1") -Path $msi
 $setup = Join-Path $outPath "Cinnabar-$version-x64-setup.exe"
-wix build -arch x64 -ext WixToolset.BootstrapperApplications.wixext -ext WixToolset.Util.wixext ` -d Version=$version -d Msi=$msi -d VcRedist=$vcRedist ` -d VcRedistMajor=$($vcVersion.Major) -d VcRedistMinor=$($vcVersion.Minor) ` -d VcRedistBuild=$($vcVersion.Build) -d VcRedistRevision=$($vcVersion.Revision) ` -d Icon=$icon -d Logo=$logo -o $setup (Join-Path $PSScriptRoot "setup.wxs")
+$wixArgs = @(
+    "build",
+    "-arch", "x64",
+    "-ext", "WixToolset.BootstrapperApplications.wixext",
+    "-ext", "WixToolset.Util.wixext",
+    "-d", "Version=$version",
+    "-d", "Msi=$msi",
+    "-d", "VcRedist=$vcRedist",
+    "-d", "VcRedistMajor=$($vcVersion.Major)",
+    "-d", "VcRedistMinor=$($vcVersion.Minor)",
+    "-d", "VcRedistBuild=$($vcVersion.Build)",
+    "-d", "VcRedistRevision=$($vcVersion.Revision)",
+    "-d", "Icon=$icon",
+    "-d", "Logo=$logo",
+    "-o", $setup,
+    (Join-Path $PSScriptRoot "setup.wxs")
+)
+& wix @wixArgs
 if ($LASTEXITCODE -ne 0) { throw "setup bundle build failed" }
 & (Join-Path $PSScriptRoot "execution-level.ps1") -Executable $setup
 $engine = Join-Path $outPath "setup-engine.exe"

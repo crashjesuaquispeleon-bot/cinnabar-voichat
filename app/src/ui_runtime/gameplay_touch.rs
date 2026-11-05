@@ -6,8 +6,8 @@ use bevy::{
     prelude::{Local, Query, Res, ResMut, With},
     window::{PrimaryWindow, Window},
 };
-use semantic_input::{TouchContact, TouchControlRegion, TouchControlState, touch};
 use client_audio::audio::voice_input::{MicrophoneMode, VoiceInputPolicy};
+use semantic_input::{TouchContact, TouchControlRegion, TouchControlState, touch};
 
 use crate::semantic_controls::SemanticTouchTargets;
 use client_shell::{

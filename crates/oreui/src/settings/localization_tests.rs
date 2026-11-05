@@ -85,6 +85,47 @@ fn french_settings_text_preserves_accents_and_punctuation() {
 }
 
 #[test]
+fn spanish_locales_translate_cinnabar_settings_and_keep_regional_terms() {
+    let cases = [
+        ("es_ES", "options.fullscreen", "Pantalla completa"),
+        ("es_MX", "options.fullscreen", "Pantalla completa"),
+        ("es_ES", "options.cinnabar.worldsFolder", "Carpeta de mundos"),
+        ("es_MX", "options.cinnabar.worldsFolder", "Carpeta de mundos"),
+        ("es_ES", "menu.keyboardAndMouse.tab.title", "Teclado y ratón"),
+        ("es_MX", "menu.keyboardAndMouse.tab.title", "Teclado y mouse"),
+        ("es_ES", "menu.settings", "Ajustes"),
+        ("es_MX", "menu.settings", "Configuración"),
+        ("es_ES", "menu.touch.tab.title", "Controles táctiles"),
+        ("es_MX", "menu.touch.tab.title", "Controles táctiles"),
+    ];
+    for (locale, key, expected) in cases {
+        assert_eq!(
+            localization::word(key, Some(locale), &|_| None),
+            expected,
+            "{locale}: {key}"
+        );
+    }
+}
+
+#[test]
+fn spanish_localization_keeps_mojang_catalog_fallbacks_for_unmapped_keys() {
+    let translate = |key: &str| match key {
+        "catalog.only" => Some(Arc::<str>::from("Texto del catálogo oficial")),
+        _ => None,
+    };
+    for locale in ["es_ES", "es_MX"] {
+        assert_eq!(
+            localization::word("catalog.only", Some(locale), &translate),
+            "Texto del catálogo oficial"
+        );
+        assert_eq!(
+            localization::word("unknown.setting", Some(locale), &translate),
+            "unknown.setting"
+        );
+    }
+}
+
+#[test]
 fn settings_text_preserves_catalog_and_fallback_resolution() {
     let translate = |key: &str| match key {
         "options.fullscreen" => Some(Arc::<str>::from("Vollbild")),

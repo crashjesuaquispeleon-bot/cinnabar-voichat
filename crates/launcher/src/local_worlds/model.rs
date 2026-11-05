@@ -3,6 +3,7 @@ use super::world::{
     WorldStatus, WorldUpdate,
 };
 use bridge::{Backend, GameMode, WorldState};
+use crate::graphics_backend::Platform;
 use std::path::PathBuf;
 
 use super::form::{CreateForm, EditForm, validate_name};
@@ -432,7 +433,7 @@ impl WorldsMenu {
         self.pending = None;
         match pending {
             Pending::Create => {
-                self.create = CreateForm::default();
+                self.create = default_create_form(self.bds_can_run(), Platform::current());
                 self.option_text.clear();
                 self.tab = Tab::General;
                 self.form_error = None;
@@ -979,6 +980,16 @@ impl WorldsMenu {
             }
         }
     }
+}
+
+/// Android can host flat local worlds without the translated BDS runtime.
+fn default_create_form(bds_can_run: bool, platform: Platform) -> CreateForm {
+    let mut form = CreateForm::default();
+    if platform == Platform::Android && !bds_can_run {
+        form.backend = Backend::Dragonfly;
+        form.generator = Generator::Flat;
+    }
+    form
 }
 
 /// Includes only fields that differ from the saved world, using the validated name.

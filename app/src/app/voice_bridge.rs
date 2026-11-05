@@ -9,6 +9,10 @@ use bytes::Bytes;
 use futures::StreamExt;
 use std::{
     path::PathBuf,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     thread::{self, JoinHandle},
     time::{Duration, Instant},
 };
@@ -21,6 +25,7 @@ use client_audio::audio::{
     voice_wire::Pcm16VoiceFrameEncoder,
 };
 use client_runtime::network::NetworkHandle;
+use client_shell::ui_resources::UiPresentationResource;
 
 const BRIDGE_RETRY_DELAY: Duration = Duration::from_secs(2);
 const AUDIO_TICK: Duration = Duration::from_millis(20);
@@ -29,6 +34,7 @@ const AUDIO_TICK: Duration = Duration::from_millis(20);
 struct BridgeDesired {
     active: bool,
     transmit: bool,
+    receive: bool,
     /// Local lifecycle discriminator only; never sent as identity to the broker or SFU.
     session: Option<(u64, u64)>,
 }
@@ -37,6 +43,7 @@ impl BridgeDesired {
     const STOPPED: Self = Self {
         active: false,
         transmit: false,
+        receive: false,
         session: None,
     };
 }
@@ -51,12 +58,14 @@ pub(crate) struct VoiceBridgeRuntime {
 struct ActiveBridge {
     socket_dir: PathBuf,
     desired: tokio::sync::watch::Sender<BridgeDesired>,
+    authorized: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
 }
 
 impl Drop for ActiveBridge {
     fn drop(&mut self) {
         self.desired.send_replace(BridgeDesired::STOPPED);
+        self.authorized.store(false, Ordering::Release);
         // Do not join on Bevy’s frame-critical thread; the watch update wakes the worker.
     }
 }
@@ -68,18 +77,23 @@ impl VoiceBridgeRuntime {
     }
 }
 
-/// Starts the local voice pipe only while Voice Chat is enabled in a joined session.
+/// Probes the trusted room while joined, but opens no microphone until the user presses PTT.
+/// The mobile control is exposed only after the API authorizes the two-player Cinnabar room.
 pub(crate) fn drive_voice_bridge(
     network: Option<Res<NetworkHandle<PackApplication>>>,
-    policy: Option<Res<VoiceInputPolicy>>,
+    mut policy: Option<ResMut<VoiceInputPolicy>>,
     world: Res<crate::runtime::world::ClientWorld>,
     clock: Res<client_presentation::environment::WorldClock>,
     capture: Option<Res<VoiceCaptureController>>,
     playback: Option<Res<VoiceRemotePlayback>>,
     mut runtime: ResMut<VoiceBridgeRuntime>,
+    mut presentation: Option<ResMut<UiPresentationResource>>,
 ) {
-    let Some(policy) = policy else {
+    let Some(policy) = policy.as_deref_mut() else {
         runtime.stop();
+        if let Some(presentation) = presentation.as_deref_mut() {
+            presentation.set_voice_ptt_available(false);
+        }
         return;
     };
     let session_identity = world.stream.as_ref().map(|stream| {
@@ -88,24 +102,32 @@ pub(crate) fn drive_voice_bridge(
             stream.authority().actor_session_id(),
         )
     });
-    let feature_enabled = policy.enabled()
-        && policy.session_active()
-        && policy.mode() != MicrophoneMode::Unselected
-        && session_identity.is_some();
-    let Some(socket_dir) = network
+    let socket_dir = network
         .as_deref()
         .and_then(|network| network.core_socket_dir())
-        .map(PathBuf::from)
-        .filter(|_| feature_enabled)
-    else {
+        .map(PathBuf::from);
+    let (Some(session), Some(socket_dir)) = (session_identity, socket_dir) else {
+        policy.set_session_active(false);
+        policy.set_enabled(false);
+        policy.set_mode(MicrophoneMode::Unselected);
         runtime.stop();
+        if let Some(presentation) = presentation.as_deref_mut() {
+            presentation.set_voice_ptt_available(false);
+        }
         return;
     };
 
+    // This is a control-plane probe only. The policy stays disabled until a user
+    // presses the already-authorized PTT button, so unsupported Bedrock worlds
+    // never cause the microphone to open.
+    policy.set_session_active(true);
     let desired = BridgeDesired {
         active: true,
         transmit: policy.transmission_permitted(),
-        session: session_identity,
+        receive: policy.enabled()
+            && policy.session_active()
+            && policy.mode() != MicrophoneMode::Unselected,
+        session: Some(session),
     };
     let finished = runtime
         .active
@@ -114,13 +136,22 @@ pub(crate) fn drive_voice_bridge(
     let changed_binding = runtime.active.as_ref().is_some_and(|active| {
         active.socket_dir != socket_dir || active.desired.borrow().session != desired.session
     });
-    if finished || changed_binding {
+    if changed_binding || finished {
         if let Some(mut active) = runtime.active.take() {
-            // Close the previous room before requesting admission for the new
-            // local session. Never retain an old partida's receive path.
+            let was_authorized = active.authorized.load(Ordering::Acquire);
+            // A failed/closed bridge revokes both capture and PTT before any new room can start.
+            if finished || active.desired.borrow().session != desired.session {
+                policy.set_enabled(false);
+                policy.set_mode(MicrophoneMode::Unselected);
+                policy.set_push_to_talk_held(false);
+            }
             active.desired.send_replace(BridgeDesired::STOPPED);
             if finished && let Some(thread) = active.thread.take() {
                 let _ = thread.join();
+            }
+            drop(active);
+            if was_authorized {
+                bevy::log::info!("Cinnabar voice room authorization ended");
             }
         }
         runtime.retry_at = Some(Instant::now() + BRIDGE_RETRY_DELAY);
@@ -130,9 +161,24 @@ pub(crate) fn drive_voice_bridge(
         if *active.desired.borrow() != desired {
             active.desired.send_replace(desired);
         }
+        let authorized = active.authorized.load(Ordering::Acquire);
+        if authorized && cfg!(target_os = "android")
+            && policy.mode() == MicrophoneMode::Unselected
+        {
+            // Select PTT before showing the mobile button. This is not microphone consent:
+            // VoiceInputPolicy remains disabled until the player presses the button.
+            policy.set_mode(MicrophoneMode::PushToTalk);
+            policy.set_push_to_talk_held(false);
+        }
+        if let Some(presentation) = presentation.as_deref_mut() {
+            presentation.set_voice_ptt_available(authorized);
+        }
         return;
     }
 
+    if let Some(presentation) = presentation.as_deref_mut() {
+        presentation.set_voice_ptt_available(false);
+    }
     let now = Instant::now();
     if runtime.retry_at.is_some_and(|retry_at| now < retry_at) {
         return;
@@ -148,29 +194,29 @@ pub(crate) fn drive_voice_bridge(
     let remote = playback.clone();
     let (desired_tx, desired_rx) = tokio::sync::watch::channel(desired);
     let thread_socket_dir = socket_dir.clone();
+    let authorized = Arc::new(AtomicBool::new(false));
+    let worker_authorized = Arc::clone(&authorized);
     let worker = thread::Builder::new()
         .name("cinnabar-voice-ipc".to_owned())
         .spawn(move || {
-            let runtime = tokio::runtime::Builder::new_current_thread()
+            let result = match tokio::runtime::Builder::new_current_thread()
                 .enable_all()
-                .build();
-            match runtime {
-                Ok(runtime) => {
-                    if runtime
-                        .block_on(run_voice_bridge(
-                            thread_socket_dir,
-                            queue,
-                            remote,
-                            desired_rx,
-                        ))
-                        .is_err()
-                    {
-                        bevy::log::debug!(
-                            "voice IPC worker stopped; the next session tick may retry"
-                        );
-                    }
-                }
-                Err(_) => bevy::log::warn!("voice IPC runtime could not be created"),
+                .build()
+            {
+                Ok(runtime) => runtime.block_on(run_voice_bridge(
+                    thread_socket_dir,
+                    queue,
+                    remote,
+                    desired_rx,
+                    Arc::clone(&worker_authorized),
+                )),
+                Err(error) => Err(anyhow::Error::new(error)),
+            };
+            worker_authorized.store(false, Ordering::Release);
+            if result.is_err() {
+                bevy::log::debug!(
+                    "voice IPC worker stopped; the next session tick may retry"
+                );
             }
         });
     match worker {
@@ -178,6 +224,7 @@ pub(crate) fn drive_voice_bridge(
             runtime.active = Some(ActiveBridge {
                 socket_dir,
                 desired: desired_tx,
+                authorized,
                 thread: Some(thread),
             });
             runtime.retry_at = None;
@@ -194,6 +241,7 @@ async fn run_voice_bridge(
     transmit_queue: client_audio::audio::voice_stream::SharedPcmQueue,
     playback: VoiceRemotePlayback,
     mut desired: tokio::sync::watch::Receiver<BridgeDesired>,
+    authorized: Arc<AtomicBool>,
 ) -> anyhow::Result<()> {
     use bridge::{
         VOICE_FRAME_BYTES, VOICE_IPC_KIND_AUDIO, VOICE_IPC_KIND_CLOSE, VOICE_IPC_KIND_REMOTE_AUDIO,
@@ -241,12 +289,15 @@ async fn run_voice_bridge(
                         if payload.len() != VoiceRemotePlayback::REMOTE_FRAME_BYTES + 1 {
                             return Err(anyhow::anyhow!("invalid remote voice IPC frame"));
                         }
-                        let _ = playback.ingest_frame(&payload[1..]);
+                        if desired.borrow().receive {
+                            let _ = playback.ingest_frame(&payload[1..]);
+                        }
                     }
                     VOICE_IPC_KIND_STATUS => {
                         let status: IpcStatus = serde_json::from_slice(&payload[1..])?;
                         match status.status.as_str() {
                             "connected" => {
+                                authorized.store(true, Ordering::Release);
                                 connected = true;
                                 server_transmit_allowed = false;
                                 let state = *desired.borrow();
@@ -277,6 +328,7 @@ async fn run_voice_bridge(
                                 }
                             }
                             "disabled" => {
+                                authorized.store(false, Ordering::Release);
                                 return Err(anyhow::anyhow!(
                                     "voice admission or media service unavailable"
                                 ));
@@ -334,16 +386,19 @@ mod tests {
         let active = BridgeDesired {
             active: true,
             transmit: true,
+            receive: true,
             session: Some((12, 34)),
         };
         let transfer = BridgeDesired {
             active: true,
             transmit: false,
+            receive: false,
             session: Some((13, 35)),
         };
         let ptt_release = BridgeDesired {
             active: true,
             transmit: false,
+            receive: true,
             session: Some((12, 34)),
         };
 

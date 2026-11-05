@@ -58,6 +58,44 @@ fn successful_fallback_clears_the_sentinel_and_survives_relaunch() {
 }
 
 #[test]
+fn android_native_crash_marker_excludes_the_last_working_vulkan_backend_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut first = StartupGuard::open(dir.path()).unwrap();
+    first.begin(attempt(Backend::Vulkan, false)).unwrap();
+    first.presented().unwrap();
+    let marker = dir.path().join(NATIVE_RENDERER_CRASH_FILE);
+    fs::write(&marker, b"1793844275822").unwrap();
+
+    let next = StartupGuard::open(dir.path()).unwrap();
+    assert!(next.interrupted.is_none());
+    assert_eq!(next.recovery.failed_backends(), [Backend::Vulkan]);
+    assert!(!marker.exists());
+    assert_eq!(
+        launcher::graphics_backend::candidates(
+            launcher::graphics_backend::Platform::Android.backends(),
+            launcher::graphics_backend::Platform::Android.backends(),
+            None,
+            None,
+            next.recovery.failed_backends()
+        ),
+        [Backend::Gl]
+    );
+}
+
+#[test]
+fn explicit_vulkan_native_crash_is_remembered_for_video_fallback() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut first = StartupGuard::open(dir.path()).unwrap();
+    first.begin(attempt(Backend::Vulkan, true)).unwrap();
+    first.presented().unwrap();
+    fs::write(dir.path().join(NATIVE_RENDERER_CRASH_FILE), b"native").unwrap();
+
+    let next = StartupGuard::open(dir.path()).unwrap();
+    assert_eq!(next.recovery.crashed_choice(), Some(Backend::Vulkan));
+    assert!(next.recovery.failed_backends().is_empty());
+}
+
+#[test]
 fn concurrent_startup_cannot_consume_or_change_a_live_sentinel() {
     let dir = tempfile::tempdir().unwrap();
     let mut first = StartupGuard::open(dir.path()).unwrap();

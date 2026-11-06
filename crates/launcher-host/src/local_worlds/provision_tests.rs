@@ -226,7 +226,6 @@ fn background_detection_reports_checking_then_its_result() {
     );
 }
 
-
 /// A successful optional prewarm changes only readiness; it does not require a real server in
 /// this fixture and it is skipped by ordinary installation.
 #[test]
@@ -256,7 +255,10 @@ fn prepared_readiness_is_reused_by_later_world_opens() {
     assert!(provisioner.needs_preparation());
     assert_eq!(preparation_count.load(Ordering::SeqCst), 0);
 
-    assert_eq!(provisioner.ensure_prepared(&Cancel::never()).unwrap(), binary);
+    assert_eq!(
+        provisioner.ensure_prepared(&Cancel::never()).unwrap(),
+        binary
+    );
     assert!(!provisioner.needs_preparation());
     assert_eq!(preparation_count.load(Ordering::SeqCst), 1);
 

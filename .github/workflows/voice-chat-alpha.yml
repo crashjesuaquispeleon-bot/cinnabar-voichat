@@ -72,31 +72,16 @@ jobs:
         shell: pwsh
         run: |
           & packaging/windows/build-installer.ps1 -Root "$env:GITHUB_WORKSPACE"
-      - name: Smoke test the installer bundle layout
+      - name: Smoke test the installer bundle contents
         shell: pwsh
         run: |
           $setup = Get-ChildItem ".local/dist/windows-release/Cinnabar-*-x64-setup.exe" | Select-Object -First 1
+          $msi = Get-ChildItem ".local/dist/windows-release/Cinnabar-*-x64.msi" | Select-Object -First 1
           if (-not $setup) { throw "Windows setup EXE was not produced" }
-          $layout = Join-Path $env:RUNNER_TEMP "cinnabar-alpha-layout"
-          $log = Join-Path $env:RUNNER_TEMP "cinnabar-alpha-layout.log"
-          $process = Start-Process -FilePath $setup.FullName -ArgumentList @('/layout', ('"' + $layout + '"'), '/quiet', '/norestart', '/log', ('"' + $log + '"')) -WindowStyle Hidden -Wait -PassThru
-          if ($process.ExitCode -ne 0) { if (Test-Path $log) { Get-Content $log }; throw "Setup layout failed: $($process.ExitCode)" }
-          $layoutFiles = @(Get-ChildItem -LiteralPath $layout -Recurse -File)
-          $redist = @($layoutFiles | Where-Object {
-            if ($_.Extension -ine ".exe") { return $false }
-            $info = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($_.FullName)
-            $info.OriginalFilename -ieq "vc_redist.x64.exe" -and
-              $info.ProductName -match "(?i)Microsoft Visual C\+\+.*Redistributable"
-          })
-          $msi = @($layoutFiles | Where-Object { $_.Extension -ieq ".msi" })
-          if ($redist.Count -ne 1 -or $msi.Count -ne 1) {
-            $layoutFiles | Select-Object FullName, Length | Format-Table | Out-String | Write-Output
-            throw "Setup layout must contain exactly one Microsoft VC++ x64 redistributable and one MSI"
-          }
-          $signature = Get-AuthenticodeSignature -LiteralPath $redist[0].FullName
-          if ($signature.Status -ne "Valid" -or $signature.SignerCertificate.Subject -notmatch "Microsoft Corporation") {
-            throw "Bundled VC++ redistributable signature is invalid"
-          }
+          if (-not $msi) { throw "Windows MSI was not produced" }
+          $out = Join-Path $env:RUNNER_TEMP "cinnabar-alpha-bundle-check"
+          $outBA = Join-Path $env:RUNNER_TEMP "cinnabar-alpha-bundle-check-bootstrapper"
+          & packaging/windows/check-setup.ps1 -Setup $setup.FullName -Msi $msi.FullName -Out $out -OutBA $outBA
       - uses: actions/upload-artifact@v7
         with:
           name: cinnabar-voice-alpha-windows-x64

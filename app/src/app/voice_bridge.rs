@@ -84,6 +84,9 @@ fn receive_audio_enabled(policy: &VoiceInputPolicy) -> bool {
 
 /// Probes the trusted room while joined, but opens no microphone until the user presses PTT.
 /// The mobile control is exposed only after the API authorizes the two-player Cinnabar room.
+/// Bevy systems receive each ECS resource as a separate parameter, so this system intentionally
+/// exceeds Clippy's generic argument-count threshold.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn drive_voice_bridge(
     network: Option<Res<NetworkHandle<PackApplication>>>,
     mut policy: Option<ResMut<VoiceInputPolicy>>,

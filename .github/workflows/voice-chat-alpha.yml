@@ -82,10 +82,16 @@ jobs:
           $process = Start-Process -FilePath $setup.FullName -ArgumentList @('/layout', ('"' + $layout + '"'), '/quiet', '/norestart', '/log', ('"' + $log + '"')) -WindowStyle Hidden -Wait -PassThru
           if ($process.ExitCode -ne 0) { if (Test-Path $log) { Get-Content $log }; throw "Setup layout failed: $($process.ExitCode)" }
           $layoutFiles = @(Get-ChildItem -LiteralPath $layout -Recurse -File)
-          $redist = @($layoutFiles | Where-Object { $_.Name -ieq "vc_redist.x64.exe" })
+          $redist = @($layoutFiles | Where-Object {
+            if ($_.Extension -ine ".exe") { return $false }
+            $info = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($_.FullName)
+            $info.OriginalFilename -ieq "vc_redist.x64.exe" -and
+              $info.ProductName -match "(?i)Microsoft Visual C\+\+.*Redistributable"
+          })
           $msi = @($layoutFiles | Where-Object { $_.Extension -ieq ".msi" })
           if ($redist.Count -ne 1 -or $msi.Count -ne 1) {
-            throw "Setup layout must contain exactly one VC++ x64 redistributable and one MSI"
+            $layoutFiles | Select-Object FullName, Length | Format-Table | Out-String | Write-Output
+            throw "Setup layout must contain exactly one Microsoft VC++ x64 redistributable and one MSI"
           }
           $signature = Get-AuthenticodeSignature -LiteralPath $redist[0].FullName
           if ($signature.Status -ne "Valid" -or $signature.SignerCertificate.Subject -notmatch "Microsoft Corporation") {

@@ -475,7 +475,6 @@ impl VoiceRemoteAttachment {
 
 /// Remote playback is enabled only by the native voice bridge after authenticated room admission.
 /// The bridge also closes this gate on revocation, worker exit, and local world/session teardown.
-
 /// Attach one multi-speaker source to the existing output device. It never opens a
 /// separate OS output device; disable/session end cancels the shared mixer source.
 pub fn attach_remote_voice_to_named_audio(

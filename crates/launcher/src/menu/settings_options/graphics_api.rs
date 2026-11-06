@@ -3,12 +3,15 @@
 use super::{SettingDefinition, SettingId, SettingsOptions, definitions::SettingChoice};
 use crate::graphics_backend::{Backend, Platform};
 
+/// Video-setting choices keep stable indices and omit the renderer's Android GLES fallback.
+const SETTING_BACKENDS: &[Backend] = &[Backend::Vulkan, Backend::Dx12, Backend::Metal];
+
 /// Returns the backend represented by a current saved choice; zero is Auto.
 pub const fn backend(choice: usize) -> Option<Backend> {
-    if choice == 0 || choice > Backend::AVAILABLE.len() {
+    if choice == 0 || choice > SETTING_BACKENDS.len() {
         None
     } else {
-        Some(Backend::AVAILABLE[choice - 1])
+        Some(SETTING_BACKENDS[choice - 1])
     }
 }
 
@@ -17,17 +20,17 @@ pub fn visible(choice: usize, platform: Platform) -> bool {
     choice == 0 || backend(choice).is_some_and(|backend| platform.backends().contains(&backend))
 }
 
-/// Derives names and labels from the policy's backend registry.
-const fn choices() -> [SettingChoice; Backend::AVAILABLE.len() + 1] {
+/// Derives user-facing choices from the stable Video setting registry.
+const fn choices() -> [SettingChoice; SETTING_BACKENDS.len() + 1] {
     let mut choices = [SettingChoice {
         name: "auto",
         label: "Auto",
-    }; Backend::AVAILABLE.len() + 1];
+    }; SETTING_BACKENDS.len() + 1];
     let mut i = 0;
-    while i < Backend::AVAILABLE.len() {
+    while i < SETTING_BACKENDS.len() {
         choices[i + 1] = SettingChoice {
-            name: Backend::AVAILABLE[i].name(),
-            label: Backend::AVAILABLE[i].label(Platform::current()),
+            name: SETTING_BACKENDS[i].name(),
+            label: SETTING_BACKENDS[i].label(Platform::current()),
         };
         i += 1;
     }
@@ -111,7 +114,7 @@ mod tests {
     }
     #[test]
     fn offered_choices_match_native_candidates_and_omit_gl() {
-        assert_eq!(CHOICES.len(), Backend::AVAILABLE.len() + 1);
+        assert_eq!(CHOICES.len(), SETTING_BACKENDS.len() + 1);
         assert!(
             !CHOICES
                 .iter()
@@ -128,12 +131,14 @@ mod tests {
                 .filter(|&choice| visible(choice, platform))
                 .filter_map(backend)
                 .collect();
-            // Menu order follows the fixed saved indices, not the platform's startup order.
-            assert_eq!(offered.len(), platform.backends().len(), "{platform:?}");
-            assert!(
-                platform.backends().iter().all(|api| offered.contains(api)),
-                "{platform:?}"
-            );
+            let expected: Vec<_> = platform
+                .backends()
+                .iter()
+                .copied()
+                .filter(|api| *api != Backend::Gl)
+                .collect();
+            // Android GLES remains an automatic renderer fallback, not a user override.
+            assert_eq!(offered, expected, "{platform:?}");
         }
     }
 

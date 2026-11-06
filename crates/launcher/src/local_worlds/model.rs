@@ -2,10 +2,12 @@ use super::world::{
     Difficulty, Generator, NewWorld, Prefs, Setup, SetupState, UnavailableReason, World,
     WorldStatus, WorldUpdate,
 };
+use crate::graphics_backend::Platform;
 use bridge::{Backend, GameMode, WorldState};
 use std::path::PathBuf;
 
 use super::form::{CreateForm, EditForm, validate_name};
+use super::helpers::{default_create_form, edit_changes};
 use super::progress::{self, Progress};
 use super::prompt::{DOCKER_URL, Prompt, PromptButton, PromptFor, PromptKind};
 
@@ -432,7 +434,7 @@ impl WorldsMenu {
         self.pending = None;
         match pending {
             Pending::Create => {
-                self.create = CreateForm::default();
+                self.create = default_create_form(self.bds_can_run(), Platform::current());
                 self.option_text.clear();
                 self.tab = Tab::General;
                 self.form_error = None;
@@ -978,19 +980,6 @@ impl WorldsMenu {
                 vec![Effect::Close]
             }
         }
-    }
-}
-
-/// Includes only fields that differ from the saved world, using the validated name.
-fn edit_changes(edit: &EditForm, saved: &World, name: String) -> WorldUpdate {
-    WorldUpdate {
-        name: (name != saved.name).then_some(name),
-        game_mode: (edit.game_mode != saved.game_mode).then_some(edit.game_mode),
-        difficulty: (edit.difficulty != saved.difficulty).then_some(edit.difficulty),
-        options: {
-            let changes = edit.options.changes_from(&edit.original_options);
-            (!changes.is_empty()).then_some(changes)
-        },
     }
 }
 

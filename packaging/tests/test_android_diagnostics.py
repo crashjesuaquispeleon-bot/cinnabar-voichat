@@ -56,6 +56,35 @@ import java.util.Arrays;
 import java.util.zip.ZipInputStream;
 public final class DiagnosticsFixture {
     public static void main(String[] args) throws Exception {
+        String nativeLoadFailure = NativeLibraryLoader.load("cinnabar_missing_library_fixture");
+        if (nativeLoadFailure == null || !nativeLoadFailure.contains("cinnabar_missing_library_fixture"))
+            throw new AssertionError("native library load failure was not returned to the activity");
+
+        File appFiles = new File(args[0] + "-app");
+        File appData = new File(appFiles, "data");
+        if (!appData.mkdirs()) throw new AssertionError("could not create app data fixture");
+        File rendererChoice = new File(appData, "renderer-choice.json");
+        File rendererCrash = new File(appData, "renderer-native-crash.flag");
+        Files.write(rendererChoice.toPath(),
+                "{\\"working\\":{\\"backend\\":\\"vulkan\\",\\"adapter\\":null,\\"stage\\":\\"ready\\",\\"explicit\\":false}}"
+                        .getBytes(StandardCharsets.UTF_8));
+        if (!StartupDiagnostics.recordRendererCrashIfApplicable(appFiles,
+                ApplicationExitInfo.REASON_CRASH_NATIVE) || !rendererCrash.isFile())
+            throw new AssertionError("Vulkan native crash did not request one-launch GLES fallback");
+        rendererCrash.delete();
+        Files.write(rendererChoice.toPath(),
+                "{\\"working\\":{\\"backend\\":\\"gl\\",\\"adapter\\":null}}"
+                        .getBytes(StandardCharsets.UTF_8));
+        if (StartupDiagnostics.recordRendererCrashIfApplicable(appFiles,
+                ApplicationExitInfo.REASON_CRASH_NATIVE) || rendererCrash.exists())
+            throw new AssertionError("GLES renderer was incorrectly marked for fallback");
+        Files.write(rendererChoice.toPath(),
+                "{\\"working\\":{\\"backend\\":\\"vulkan\\",\\"adapter\\":null}}"
+                        .getBytes(StandardCharsets.UTF_8));
+        if (StartupDiagnostics.recordRendererCrashIfApplicable(appFiles,
+                ApplicationExitInfo.REASON_CRASH) || rendererCrash.exists())
+            throw new AssertionError("non-native crash requested a graphics fallback");
+
         for (int reason : new int[] {ApplicationExitInfo.REASON_CRASH,
                 ApplicationExitInfo.REASON_CRASH_NATIVE, ApplicationExitInfo.REASON_ANR,
                 ApplicationExitInfo.REASON_LOW_MEMORY}) {

@@ -363,6 +363,7 @@ fn core_child_args_are_offline_unless_authentication_was_validated() {
             layout.device_profile_file().into_os_string(),
             OsString::from("-auth-cache"),
             OsString::from("validated token.json"),
+            OsString::from("-cinnabar-api"),
         ]
     );
 }

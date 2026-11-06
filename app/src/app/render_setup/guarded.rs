@@ -111,8 +111,13 @@ pub(super) fn render_plugin(
                 excluded,
             );
             with_recovery(&mut guard, &allowed, explicit, |guard| {
-                let failed = guard.recovery.failed_backends();
-                let order = candidates(&allowed, &allowed, environment.as_deref(), video, failed);
+                let mut failed = guard.recovery.failed_backends().to_vec();
+                if let Some(crashed) = guard.recovery.crashed_choice()
+                    && !failed.contains(&crashed)
+                {
+                    failed.push(crashed);
+                }
+                let order = candidates(&allowed, &allowed, environment.as_deref(), video, &failed);
                 log(format_args!(
                     "Renderer trying {order:?} (allowed {allowed:?}; excluded after interrupted startups: {failed:?})"
                 ));

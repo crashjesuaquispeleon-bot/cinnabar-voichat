@@ -81,7 +81,10 @@ pub(super) fn with_recovery<T>(
         match attempt(guard) {
             Ok(selected) => return Ok(selected),
             Err(error) => {
-                if explicit || !guard.retry_exclusions(allowed)? {
+                if explicit
+                    || guard.recovery.crashed_choice().is_some()
+                    || !guard.retry_exclusions(allowed)?
+                {
                     return Err(error);
                 }
             }

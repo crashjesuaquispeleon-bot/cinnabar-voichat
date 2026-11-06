@@ -25,6 +25,8 @@ type VoiceAdmissionSource interface {
 // VoiceBridgeConfig pins the media endpoint and the trusted admission-token source.
 // The endpoint and ICE servers are operator configuration, never client request fields.
 type VoiceBridgeConfig struct {
+	Transport       string
+	P2PSignaler     P2PSignaler
 	Endpoint        string
 	ICEServers      []webrtc.ICEServer
 	AdmissionSource VoiceAdmissionSource
@@ -77,11 +79,17 @@ func parseVoiceIPCCommand(payload []byte) (voiceIPCCommand, error) {
 // ServeBridge accepts Rust IPC connections one at a time. Disconnecting the IPC
 // connection closes the WebRTC peer and revokes its current admission token.
 func ServeBridge(ctx context.Context, listener net.Listener, config VoiceBridgeConfig) error {
-	if listener == nil || !validVoiceEndpoint(config.Endpoint) || config.AdmissionSource == nil {
-		if listener != nil {
+	if listener == nil {
+		return errors.New("voice: bridge listener is required")
+	}
+	if config.Transport == "p2p" {
+		if config.P2PSignaler == nil {
 			_ = listener.Close()
+			return errors.New("voice: P2P bridge requires the authenticated Cinnabar signaling client")
 		}
-		return errors.New("voice: bridge requires a WSS endpoint and trusted admission source")
+	} else if !validVoiceEndpoint(config.Endpoint) || config.AdmissionSource == nil {
+		_ = listener.Close()
+		return errors.New("voice: SFU bridge requires a WSS endpoint and trusted admission source")
 	}
 	defer listener.Close()
 	logger := config.Logger
@@ -121,6 +129,9 @@ func ServeBridge(ctx context.Context, listener net.Listener, config VoiceBridgeC
 }
 
 func serveVoiceIPCConnection(ctx context.Context, raw net.Conn, config VoiceBridgeConfig) error {
+	if config.Transport == "p2p" {
+		return serveP2PVoiceIPCConnection(ctx, raw, config.ICEServers, config.P2PSignaler)
+	}
 	defer raw.Close()
 	ipc := streamnet.NewFramedConnWithMax(raw, bridgecontract.VoiceMaxFrameLen)
 

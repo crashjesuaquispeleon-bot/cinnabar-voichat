@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Only portable local worlds are backed up; auth tokens, logs and caches stay excluded. -->
+    <include domain="file" path="data/worlds/" />
+</full-backup-content>

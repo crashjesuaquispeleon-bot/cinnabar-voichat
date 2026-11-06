@@ -6,6 +6,8 @@ on:
   push:
     branches:
       - feature/voice-chat-foundation
+      - feature/voice-chat-p2p-alpha
+      - feature/voice-chat-p2p-foundation-synced
     paths:
       - ".github/workflows/voice-chat-alpha.yml"
       - "Cargo.toml"
@@ -56,6 +58,7 @@ jobs:
         run: |
           dotnet tool install --global wix --version 5.0.2
           & "$env:USERPROFILE\\.dotnet\\tools\\wix.exe" extension add -g WixToolset.BootstrapperApplications.wixext/5.0.2
+          & "$env:USERPROFILE\\.dotnet\\tools\\wix.exe" extension add -g WixToolset.Util.wixext/5.0.2
           choco install imagemagick --no-progress -y
           if (-not (Get-Command make -ErrorAction SilentlyContinue)) { choco install make --no-progress -y }
           $magick = Get-ChildItem "$env:ProgramFiles\\ImageMagick*" -Directory | Select-Object -First 1
@@ -69,15 +72,16 @@ jobs:
         shell: pwsh
         run: |
           & packaging/windows/build-installer.ps1 -Root "$env:GITHUB_WORKSPACE"
-      - name: Smoke test the installer bundle layout
+      - name: Smoke test the installer bundle contents
         shell: pwsh
         run: |
           $setup = Get-ChildItem ".local/dist/windows-release/Cinnabar-*-x64-setup.exe" | Select-Object -First 1
+          $msi = Get-ChildItem ".local/dist/windows-release/Cinnabar-*-x64.msi" | Select-Object -First 1
           if (-not $setup) { throw "Windows setup EXE was not produced" }
-          $layout = Join-Path $env:RUNNER_TEMP "cinnabar-alpha-layout"
-          $log = Join-Path $env:RUNNER_TEMP "cinnabar-alpha-layout.log"
-          $process = Start-Process -FilePath $setup.FullName -ArgumentList @('/layout', ('"' + $layout + '"'), '/quiet', '/norestart', '/log', ('"' + $log + '"')) -WindowStyle Hidden -Wait -PassThru
-          if ($process.ExitCode -ne 0) { if (Test-Path $log) { Get-Content $log }; throw "Setup layout failed: $($process.ExitCode)" }
+          if (-not $msi) { throw "Windows MSI was not produced" }
+          $out = Join-Path $env:RUNNER_TEMP "cinnabar-alpha-bundle-check"
+          $outBA = Join-Path $env:RUNNER_TEMP "cinnabar-alpha-bundle-check-bootstrapper"
+          & packaging/windows/check-setup.ps1 -Setup $setup.FullName -Msi $msi.FullName -Out $out -OutBA $outBA
       - uses: actions/upload-artifact@v7
         with:
           name: cinnabar-voice-alpha-windows-x64

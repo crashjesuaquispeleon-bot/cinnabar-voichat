@@ -16,9 +16,279 @@ pub(super) fn word(key: &str, language: Option<&str>, translate: Translate<'_>) 
 
 /// Returns built-in text only when the selected locale belongs to its language.
 pub(super) fn locale_text(key: &str, language: Option<&str>) -> Option<&'static str> {
-    language
-        .filter(|language| language.starts_with("fr"))
-        .and_then(|_| french_text(key))
+    let language = language?;
+    if language.starts_with("fr") {
+        return french_text(key);
+    }
+    match language {
+        "es_ES" => spanish_text(key, false),
+        "es_MX" => spanish_text(key, true),
+        _ => None,
+    }
+}
+
+/// Spanish additions for Cinnabar settings that are not part of Mojang's language catalog.
+/// Mojang's pinned Spanish catalogues supply the rest of the game UI.
+fn spanish_text(key: &str, latin_american: bool) -> Option<&'static str> {
+    Some(match key {
+        "options.on" | "On" | "gui.yes" | "True" | "true" => "Sí",
+        "options.off" | "Off" | "gui.no" | "False" | "false" => "No",
+        "Automatic" => "Automático",
+        "Low" => "Bajo",
+        "Medium" => "Medio",
+        "High" => "Alto",
+        "Reset" => "Restablecer",
+        "Open" => "Abrir",
+        "View" => "Ver",
+        "Clear data" => "Borrar datos",
+        "Sign In" => "Iniciar sesión",
+        "Sign Out" => "Cerrar sesión",
+        "Unassigned" => "Sin asignar",
+
+        "options.cinnabar.advanced" => "Avanzado",
+        "options.renderClouds" => "Mostrar nubes",
+        "options.renderClouds.description" => "Mostrar las nubes en el cielo.",
+        "options.showExactServerPing" => "Mostrar el ping exacto del servidor",
+        "options.showExactServerPing.description" => {
+            "Mostrar la latencia del servidor en milisegundos en lugar de Bajo, Medio o Alto."
+        }
+        "options.oreuiDarkMode" => "Modo oscuro",
+        "options.oreuiDarkMode.description" => {
+            "Usar fondos oscuros en los menús, ajustes y cuadros de diálogo."
+        }
+        "options.framerateLimit.description" => {
+            "Elige un límite de FPS o Sin límite. La sincronización vertical (VSync) o la frecuencia de actualización variable pueden reducirlo."
+        }
+        "options.framerateLimit.max" => "Sin límite",
+        "options.fullscreen" => "Pantalla completa",
+        "options.fullscreen.description" => "Activar o desactivar la pantalla completa",
+        "options.guiScale.optionName.name" => "Escala de la interfaz",
+        "options.guiScale.optionName.description" => {
+            "Ajusta el tamaño del HUD y de los demás elementos de la interfaz para facilitar su uso."
+        }
+        "options.guiScale.disabled" => {
+            "No se puede cambiar la escala de la interfaz en esta pantalla."
+        }
+        "options.guiAccessibilityScaling.name" => "Interfaz extragrande",
+        "options.guiAccessibilityScaling.description" => {
+            "Aumenta el tamaño de la interfaz para verla y leerla con mayor facilidad."
+        }
+
+        "options.cinnabar.worldsFolder" => "Carpeta de mundos",
+        "options.cinnabar.worldsFolder.description" => "Dónde se guardan tus mundos",
+        "options.cinnabar.resourcePacksFolder" => "Carpeta de paquetes de recursos",
+        "options.cinnabar.resourcePacksFolder.description" => {
+            "Dónde se guardan los paquetes de recursos que importas."
+        }
+        "options.cinnabar.shaderPacksFolder" => "Carpeta de paquetes de shaders",
+        "options.cinnabar.shaderPacksFolder.description" => {
+            "Añade aquí tus shaders de Java o arrástralos hasta esta ventana."
+        }
+        "options.cinnabar.openFolder.buttonLabel" => "Abrir carpeta",
+        "options.cinnabar.shaderOptions" => "Ajustes del paquete de shaders",
+        "options.cinnabar.shaderOptions.description" => {
+            "Opciones del paquete seleccionado. Al aplicarlas, se vuelve a cargar el paquete."
+        }
+        "options.cinnabar.shaderOptions.buttonLabel" => "Opciones de shaders…",
+        "options.dev_clearAllCache" => "Borrar toda la caché",
+        "options.dev_clearDownloadeCache.name" => "Borrar caché de descargas",
+        "options.dev_deleteLocalScreenshots" => "Eliminar capturas de pantalla locales",
+
+        "options.f5SelfVisuals" | "options.f5SelfVisuals.name" => {
+            "Mostrar tu personaje en tercera persona"
+        }
+        "options.f5SelfVisuals.description" => {
+            "Mostrar tu nombre, puntuación, insignias y estado sobre tu personaje en tercera persona."
+        }
+        "options.showOtherPlayerCosmetics" => "Mostrar los cosméticos de otros jugadores",
+        "options.showOtherPlayerCosmetics.description" => {
+            "Mostrar los cosméticos, acompañantes y efectos equipados por otros jugadores. Tus propios cosméticos seguirán visibles."
+        }
+        "options.estheticTab" | "options.estheticTab.name" => "Pestaña estética (estilo Lunar)",
+        "options.estheticTab.description" => {
+            "Muestra una lista de jugadores con el encabezado del servidor, un fondo translúcido e indicadores de ping."
+        }
+
+        "menu.settings" | "hbui.Settings.title" => {
+            if latin_american {
+                "Configuración"
+            } else {
+                "Ajustes"
+            }
+        }
+        "menu.video.tab.title" | "options.video" => "Vídeo",
+        "menu.video.tab.description" => "Ajusta los gráficos y la calidad visual.",
+        "menu.video.group.general" => "General",
+        "menu.video.group.general.description" => "Ajustes de vídeo comunes.",
+        "menu.video.group.performance" => "Gráficos, rendimiento y diseño",
+        "menu.video.group.performance.description" => {
+            "Controla cómo se ve y cómo funciona Minecraft."
+        }
+        "menu.video.group.customization" => "Personalización de la vista",
+        "menu.video.group.customization.description" => {
+            "Construye, transmite o toma capturas sin distracciones."
+        }
+        "menu.video.group.accessibility" => "Accesibilidad: vídeo",
+        "menu.video.group.accessibility.description" => {
+            "Controles para que Minecraft sea más cómodo de jugar."
+        }
+        "menu.video.mode" => "Modo",
+        "options.graphicsModeOptions.fancy" => "Gráficos detallados",
+        "options.graphicsModeOptions.simple" => "Gráficos simples",
+
+        "menu.accessibility.tab.title" | "options.accessibility" => "Accesibilidad",
+        "menu.accessibility.tab.description" => "Minecraft es para todos, también para ti.",
+        "menu.accessibility.tab.tts.title" => "Texto a voz",
+        "menu.accessibility.tab.tts.description" => {
+            "Ajusta la lectura en voz alta del texto que aparece en pantalla."
+        }
+        "menu.accessibility.tab.gameplay.title" => "Jugabilidad",
+        "menu.accessibility.tab.gameplay.description" => {
+            "Cambia las opciones de accesibilidad de los gráficos y los movimientos de cámara."
+        }
+        "menu.accessibility.tab.ui.title" => "Interfaz de usuario",
+        "menu.accessibility.tab.ui.description" => {
+            "Adapta la interfaz del juego a tu forma de jugar."
+        }
+
+        "menu.keyboardAndMouse.tab.title" | "options.keyboardAndMouse" => {
+            if latin_american {
+                "Teclado y mouse"
+            } else {
+                "Teclado y ratón"
+            }
+        }
+        "menu.keyboardAndMouse.tab.description" => {
+            "Ajusta las opciones de entrada y la asignación de teclas."
+        }
+        "menu.keyboardAndMouse.tab.mappings.title" => {
+            if latin_american {
+                "Asignación de teclado y mouse"
+            } else {
+                "Asignación de teclado y ratón"
+            }
+        }
+        "menu.keyboardAndMouse.tab.mappings.description" => {
+            "Cambia la asignación de las teclas y los botones del mouse para jugar a tu manera."
+        }
+        "menu.keyboardAndMouse.tab.macros.title" => "Macros",
+        "menu.keyboardAndMouse.tab.macros.description" => {
+            "Ejecuta un comando con el control asignado y el modificador de macros seleccionado. Elige Ninguno para usar solo el control."
+        }
+        "options.commandMacro.placeholder" => "Comando que se ejecutará",
+
+        "menu.controller.tab.title" | "options.controller" => {
+            if latin_american {
+                "Control"
+            } else {
+                "Mando"
+            }
+        }
+        "menu.controller.tab.description" => {
+            "Opciones de entrada, sensibilidad y asignación de botones del control."
+        }
+        "menu.controller.tab.mappings.title" => "Asignación de botones",
+        "menu.controller.tab.mappings.description" => {
+            "Cambia la asignación de los botones del control para jugar a tu manera."
+        }
+
+        "menu.general.tab.title" | "options.general" => "General",
+        "menu.general.tab.description" => {
+            "Opciones generales, desde la red hasta los créditos del juego."
+        }
+        "menu.general.tab.pause.title" => "Pausa",
+        "menu.general.tab.pause.description" => "Tómate un descanso mientras juegas en solitario.",
+        "menu.general.tab.network.title" => "Configuración de red",
+        "menu.general.tab.network.description" => {
+            "Ajusta tu experiencia en línea, tanto en el aspecto técnico como en el social."
+        }
+        "menu.general.tab.miscellaneous.title" => "Otros",
+        "menu.general.tab.miscellaneous.description" => "Más opciones y ajustes.",
+        "menu.general.tab.tutorial.title" => "Tutorial",
+        "menu.general.tab.tutorial.description" => "Ayuda para aprender a jugar.",
+
+        "menu.audio.tab.title" | "options.audio" => "Audio",
+        "menu.audio.tab.description" => "Ajusta el volumen de la música y los efectos de sonido.",
+        "menu.account.tab.title" | "options.account" => "Cuenta",
+        "menu.account.tab.description" => "Consulta la información de tu cuenta.",
+        "menu.account.gamertag.title" => "Gamertag",
+        "menu.account.changeGamertag.title" => "Cambiar gamertag",
+        "menu.account.manageAccount.title" => "Administrar cuenta",
+        "menu.account.signOutOfMicrosoft.title" => "Cerrar sesión de tu cuenta Microsoft",
+        "menu.account.signIn.title" => "Iniciar sesión gratis",
+        "menu.account.changeGamertag.buttonLabel" | "menu.account.manageAccount.buttonLabel" => {
+            "Abrir"
+        }
+        "menu.account.signOutOfMicrosoft.buttonLabel" => "Cerrar sesión",
+        "menu.account.signIn.buttonLabel" => "Iniciar sesión",
+        "menu.account.clearSignInData.buttonLabel" => "Borrar datos",
+        "menu.language.tab.title" | "options.language" => "Idioma",
+        "menu.language.tab.description" => "Selecciona el idioma que prefieres para Minecraft.",
+        "menu.storage.tab.title" | "options.storage" => "Almacenamiento",
+        "menu.storage.tab.description" => {
+            "Administra mundos, plantillas, paquetes de recursos, paquetes de comportamiento y datos en caché."
+        }
+        "hbui.Settings.storage.worlds.title" => "Mundos",
+        "hbui.Settings.storage.worldTemplates.title" => "Plantillas de mundos",
+        "hbui.Settings.storage.resourcePacks.title" => "Paquetes de recursos",
+        "hbui.Settings.storage.behaviorPacks.title" => "Paquetes de comportamiento",
+        "storageManager.contentType.skinPacks" => "Paquetes de aspectos",
+        "hbui.Settings.storage.cachedData.title" => "Datos en caché",
+        "hbui.Settings.storage.emptyList.title" => "No se encontró %1$s",
+        "hbui.Settings.storage.listHeader.delete" => "Eliminar",
+        "options.globalResources" | "menu.globalpacks" | "options.resourcepacks" => {
+            "Recursos globales"
+        }
+        "resourcePack.selected.title.packs" => "Activos",
+        "resourcePack.available.title.packs" => "Mis paquetes",
+        "resourcePack.message.noneFound.packs" => {
+            "No hay paquetes disponibles en este dispositivo."
+        }
+        "resourcePack.selected.remove" => "Desactivar",
+        "resourcePack.available.add" => "Activar",
+
+        "Chat Position" => "Posición del chat",
+        "Chat Position.description" => {
+            "Coloca el chat en la parte inferior o superior de la pantalla."
+        }
+        "menu.touch.tab.title" => "Controles táctiles",
+        "menu.touch.tab.description" => {
+            "Opciones de entrada, sensibilidad y asignación de controles para pantallas táctiles."
+        }
+        "hudScreen.controlCustomization.tooltip.notouch" => {
+            "Usa un dispositivo con pantalla táctil para personalizar los controles."
+        }
+        "options.keyboardAndMouse.resetMappings" => "Restablecer asignación predeterminada",
+        "options.keyboardAndMouse.resetMappings.description" => {
+            "Restaurar la asignación original de todas las teclas y botones del mouse."
+        }
+        "options.controller.resetMappings" => "Restablecer asignación del control",
+        "options.controller.resetMappings.description" => {
+            "Restaurar la asignación original de todos los botones del control."
+        }
+        "options.accessibility.resetSettings"
+        | "options.video.resetSettings"
+        | "options.sound.resetSettings" => "Restablecer valores predeterminados",
+        "options.accessibility.resetSettings.description" => {
+            "Restaurar los ajustes y controles deslizantes de accesibilidad a sus valores originales."
+        }
+        "options.video.resetSettings.description" => {
+            "Restaurar los ajustes de vídeo a sus valores originales."
+        }
+        "options.sound.resetSettings.description" => {
+            "Restaurar todos los ajustes de sonido a sus valores originales."
+        }
+        "options.keyboardAndMouse.resetMappings.buttonLabel"
+        | "options.controller.resetMappings.buttonLabel"
+        | "options.accessibility.resetSettings.buttonLabel"
+        | "options.video.resetSettings.buttonLabel"
+        | "options.sound.resetSettings.buttonLabel"
+        | "options.key.reset.buttonLabel" => "Restablecer",
+        "controllerLayoutScreen.unassigned" => "Sin asignar",
+        "playscreen.fileSize.GB" => "GB",
+        "playscreen.fileSize.MB" => "MB",
+        _ => return None,
+    })
 }
 
 /// Returns built-in French settings text for supported localization keys.

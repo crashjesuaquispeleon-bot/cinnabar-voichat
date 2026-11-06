@@ -135,6 +135,8 @@ struct Inner {
     subscribers: Mutex<Vec<Sender<()>>>,
     /// Background starts, stops and exit watches still running.
     background: Mutex<usize>,
+    /// Prevents concurrent Android translated-server cache preparation.
+    android_preparation_running: std::sync::atomic::AtomicBool,
     background_done: Condvar,
     /// Asks the running server to stop its own way when the client exits without destructors.
     _exit: ExitHookGuard<'static>,
@@ -222,6 +224,7 @@ impl Manager {
                 host_waits: Default::default(),
                 subscribers: Mutex::default(),
                 background: Mutex::new(0),
+                android_preparation_running: Default::default(),
                 background_done: Condvar::new(),
             }),
         }
@@ -262,8 +265,35 @@ impl Manager {
     pub fn create(&self, world: &NewWorld) -> Result<World, WorldError> {
         let mut world = world.clone();
         world.name = validate_name(&world.name)?;
-        let backend = self.creatable_backend(world.backend)?;
+        let backend = match self.creatable_backend(world.backend) {
+            Ok(backend) => backend,
+            Err(error) => {
+                if let Some(setup) = &self.inner.setup {
+                    let (status, unavailable) = setup.status();
+                    tracing::error!(
+                        "local world creation rejected: requested_backend={:?}, runtime={}, setup={:?}, reason={:?}, unavailable={:?}, error={}",
+                        world.backend,
+                        status.runtime,
+                        status.state,
+                        status.reason,
+                        unavailable,
+                        error
+                    );
+                } else {
+                    tracing::error!(
+                        "local world creation rejected: requested_backend={:?}, no setup manager, error={}",
+                        world.backend,
+                        error
+                    );
+                }
+                return Err(error);
+            }
+        };
         if !world.generator.supports_backend(backend) {
+            tracing::warn!(
+                "local world creation rejected: backend={backend:?} does not support generator={:?}",
+                world.generator
+            );
             return Err(WorldError::Invalid(NATURAL_TERRAIN_REQUIRES_BDS.to_owned()));
         }
         world.backend = Some(backend);
@@ -399,7 +429,9 @@ impl Manager {
             .setup
             .as_ref()
             .ok_or(WorldError::BackendUnavailable)?
-            .accept_eula()
+            .accept_eula()?;
+        self.prepare_translated_server();
+        Ok(())
     }
 
     /// Applies `update`, re-probing Docker first when asked, and returns the saved preferences. A
@@ -416,10 +448,52 @@ impl Manager {
         }
     }
 
-    /// Readies a Dragonfly server ahead of an open, while the worlds are on screen.
+    /// Readies a Dragonfly server and warms Android's translated BDS startup cache off-frame.
     pub fn prepare(&self) {
         if let Some(runner) = &self.inner.runners.dragonfly {
             runner.prepare();
+        }
+        self.prepare_translated_server();
+    }
+
+    /// Best-effort Android prewarm. It runs only after EULA acceptance and never blocks world
+    /// creation or opening; a failed optional cache leaves the ordinary BDS path available.
+    fn prepare_translated_server(&self) {
+        let Some(setup) = self.inner.setup.as_ref() else {
+            return;
+        };
+        if setup.runtime_info().kind != RuntimeKind::Translated
+            || !setup.eula_accepted()
+            || !setup.needs_preparation()
+        {
+            return;
+        }
+        use std::sync::atomic::Ordering;
+        if self
+            .inner
+            .android_preparation_running
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
+            return;
+        }
+        let setup = Arc::clone(setup);
+        let started = self.background(move |manager| {
+            let result = setup.ensure_prepared(&Cancel::never());
+            manager
+                .inner
+                .android_preparation_running
+                .store(false, Ordering::Release);
+            if let Err(error) = result {
+                tracing::warn!(
+                    "Android local-world startup prewarm failed; normal world starts remain available: {error}"
+                );
+            }
+        });
+        if !started {
+            self.inner
+                .android_preparation_running
+                .store(false, Ordering::Release);
         }
     }
 

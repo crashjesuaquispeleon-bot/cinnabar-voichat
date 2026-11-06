@@ -127,6 +127,7 @@ type session struct {
 	nextID          uint32
 	pending         map[uint32]chan lookupReply // guarded by Client.mu
 	voicePending    map[string]chan voiceReply  // guarded by Client.mu
+	voiceSignals    chan inbound
 	closed          chan struct{}
 	parameters      parameters
 }
@@ -342,6 +343,60 @@ func (c *Client) IssueVoiceAdmissionToken(ctx context.Context) (string, error) {
 	return reply.Token, nil
 }
 
+
+ // VoicePeerSession returns the broker-derived session ID and deterministic offerer role.
+func (c *Client) VoicePeerSession(ctx context.Context) (sessionID string, offerer bool, err error) {
+	requestID := uuid.NewString()
+	reply, err := c.requestVoice(ctx, requestID, voicePeerSessionRequestMessage{
+		Type: typeVoicePeerSessionRequest, RequestID: requestID,
+	})
+	if err != nil { return "", false, err }
+	if reply.Type != typeVoicePeerSession || !ValidUUID(reply.SessionID) {
+		return "", false, ErrVoiceUnavailable
+	}
+	return reply.SessionID, reply.Offerer, nil
+}
+
+// VoiceSignal is a broker-relayed SDP or ICE message from the other authorized room member.
+type VoiceSignal struct {
+	SessionID string
+	SignalType string
+	Payload string
+}
+
+// SendVoiceSignal relays one bounded negotiation message through the authenticated API socket.
+func (c *Client) SendVoiceSignal(ctx context.Context, sessionID, signalType, payload string) error {
+	if !ValidUUID(sessionID) || len(payload) == 0 || len(payload) > 8192 ||
+		(signalType != "offer" && signalType != "answer" && signalType != "candidate") {
+		return ErrVoiceUnavailable
+	}
+	requestID := uuid.NewString()
+	reply, err := c.requestVoice(ctx, requestID, voiceSignalMessage{
+		Type: typeVoiceSignal, RequestID: requestID, SessionID: sessionID,
+		SignalType: signalType, Payload: payload,
+	})
+	if err != nil { return err }
+	if reply.Type != typeVoiceSignalSent { return ErrVoiceUnavailable }
+	return nil
+}
+
+// ReceiveVoiceSignal waits for the other room member's broker-authorized signal.
+func (c *Client) ReceiveVoiceSignal(ctx context.Context) (string, string, string, error) {
+	if ctx == nil { return "", "", "", ErrVoiceUnavailable }
+	c.mu.Lock()
+	s := c.live
+	c.mu.Unlock()
+	if s == nil { return "", "", "", ErrUnavailable }
+	select {
+	case msg := <-s.voiceSignals:
+		return msg.SessionID, msg.SignalType, msg.Payload, nil
+	case <-s.closed:
+		return "", "", "", ErrUnavailable
+	case <-ctx.Done():
+		return "", "", "", ctx.Err()
+	}
+}
+
 func (c *Client) requestVoice(ctx context.Context, requestID string, message any) (inbound, error) {
 	if ctx == nil {
 		return inbound{}, ErrVoiceUnavailable
@@ -521,6 +576,7 @@ func (c *Client) session(ctx context.Context, config Config) (bool, string, erro
 		emoteDirty: make(chan struct{}, 1), emotes: make(map[string]receivedEmote),
 		parameters: c.parameters, visible: config.Visible,
 		pending: make(map[uint32]chan lookupReply), voicePending: make(map[string]chan voiceReply),
+		voiceSignals: make(chan inbound, 16),
 		closed: make(chan struct{}),
 	}
 	c.mu.Lock()
@@ -656,8 +712,14 @@ func (c *Client) read(ctx context.Context, s *session) error {
 		case typeLookupResult:
 			c.logger.Debug("Cinnabar API lookup result received", "found", len(msg.Cinnabar), "found_uuids", len(msg.CinnabarUUIDs))
 			c.answer(s, msg.ID, lookupReply{result: LookupResult{Cinnabar: msg.Cinnabar, CinnabarUUIDs: msg.CinnabarUUIDs}})
-		case typeVoiceRoom, typeVoiceMembersUpdated, typeVoiceClosed, typeVoiceAdmission:
+		case typeVoiceRoom, typeVoiceMembersUpdated, typeVoiceClosed, typeVoiceAdmission, typeVoicePeerSession, typeVoiceSignalSent:
 			c.answerVoice(s, msg.RequestID, voiceReply{message: msg})
+		case typeVoicePeerSignal:
+			select {
+			case s.voiceSignals <- msg:
+			default:
+				return errors.New("cinnabarapi: P2P signaling queue overflow")
+			}
 		case typeVoiceError:
 			c.answerVoice(s, msg.RequestID, voiceReply{err: fmt.Errorf("%w: %s", ErrVoiceUnavailable, msg.Code)})
 		case typeError:

@@ -8,7 +8,9 @@ link_apk_resources() {
     local resources="$output/launcher-res"
     local icon_size=192
     rm -rf "$resources"
-    mkdir -p "$resources/mipmap-xxxhdpi" "$resources/drawable-nodpi" "$resources/drawable" "$resources/values" "$resources/values-v31"
+    mkdir -p "$resources/mipmap-xxxhdpi" "$resources/drawable-nodpi" "$resources/drawable" "$resources/values" "$resources/values-v31" "$resources/xml"
+    install -m 0644 "$repo_root/packaging/android/res/xml/backup_rules.xml" "$resources/xml/backup_rules.xml"
+    install -m 0644 "$repo_root/packaging/android/res/xml/data_extraction_rules.xml" "$resources/xml/data_extraction_rules.xml"
     install -m 0644 "$repo_root/assets/branding/title.png" "$assets/startup-title.png"
     install -m 0644 "$repo_root/assets/startup-screen.json" "$assets/startup-screen.json"
     python3 "$repo_root/packaging/android/startup-resources.py" "$repo_root/assets/startup-screen.json" "$resources"

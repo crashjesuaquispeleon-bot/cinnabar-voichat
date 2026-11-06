@@ -46,6 +46,8 @@ const UTILITY_ACTIONS: &[(&str, u16)] = &[
 #[derive(Default)]
 pub(in super::super) struct TouchControls {
     enabled: bool,
+    /// Voice PTT is only shown after the authenticated two-player room is ready.
+    voice_ptt_available: bool,
     utilities_open: bool,
     debug_toggle_pending: bool,
     editor: Option<mod_ui::HudEditor>,
@@ -103,6 +105,16 @@ impl UiPresentationRuntime {
 
     pub fn touch_controls_enabled(&self) -> bool {
         self.screens.touch.enabled
+    }
+
+    /// Hides the microphone button until the API has admitted a live P2P room.
+    pub fn set_voice_ptt_available(&mut self, available: bool) {
+        self.screens.touch.voice_ptt_available = available;
+    }
+
+    /// Whether the authenticated voice PTT control is currently presented.
+    pub fn voice_ptt_available(&self) -> bool {
+        self.screens.touch.voice_ptt_available
     }
 
     pub fn set_touch_contacts(&mut self, contacts: Vec<TouchContact>) {
@@ -217,6 +229,10 @@ impl UiPresentationRuntime {
         );
         data.set_global("#touch_never_active", Scalar::Bool(false));
         data.set_global("#touch_voice_ptt_label", Scalar::Text("PTT".to_owned()));
+        data.set_global(
+            "#touch_voice_ptt_visible",
+            Scalar::Bool(state.voice_ptt_available && state.editor.is_none()),
+        );
         for &(name, id) in CONTROLS {
             let held = state
                 .contacts

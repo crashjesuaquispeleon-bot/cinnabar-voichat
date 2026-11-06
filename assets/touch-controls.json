@@ -215,6 +215,12 @@
       },
       {
         "voice_ptt@cinnabar_touch.mod_button": {
+          "bindings": [
+            {
+              "binding_name": "#touch_voice_ptt_visible",
+              "binding_name_override": "#visible"
+            }
+          ],
           "anchor_from": "center",
           "anchor_to": "center",
           "offset": [

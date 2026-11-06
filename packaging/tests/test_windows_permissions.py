@@ -35,6 +35,50 @@ class WindowsPermissionTests(unittest.TestCase):
             for element in xml.iter():
                 self.assertFalse(any(key.startswith("LaunchTarget") for key in element.attrib))
 
+    def test_setup_installs_a_current_vc_runtime_before_the_application_msi(self):
+        """The Burn chain supplies the supported x64 runtime without downgrading newer installs."""
+        ns = {
+            "w": "http://wixtoolset.org/schemas/v4/wxs",
+            "util": "http://wixtoolset.org/schemas/v4/wxs/util",
+        }
+        bundle = ET.parse(WINDOWS / "setup.wxs").getroot()
+        searches = {
+            node.attrib["Variable"]: node
+            for node in bundle.findall(".//util:RegistrySearch", ns)
+        }
+        expected = {
+            "VCRedistX64Installed": "Installed",
+            "VCRedistX64Major": "Major",
+            "VCRedistX64Minor": "Minor",
+            "VCRedistX64Build": "Bld",
+            "VCRedistX64Revision": "Rbld",
+        }
+        for variable, value in expected.items():
+            with self.subTest(variable=variable):
+                search = searches[variable]
+                self.assertEqual(search.attrib["Root"], "HKLM")
+                self.assertEqual(search.attrib["Key"],
+                                 r"SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64")
+                self.assertEqual(search.attrib["Value"], value)
+                self.assertEqual(search.attrib["Bitness"], "always64")
+
+        chain = bundle.find(".//w:Chain", ns)
+        self.assertIsNotNone(chain)
+        packages = list(chain)
+        self.assertEqual([node.tag.rsplit("}", 1)[-1] for node in packages],
+                         ["ExePackage", "MsiPackage"])
+        redist = packages[0]
+        self.assertEqual(redist.attrib["Id"], "VCRedistX64")
+        self.assertEqual(redist.attrib["SourceFile"], "$(VcRedist)")
+        self.assertEqual(redist.attrib["PerMachine"], "yes")
+        self.assertEqual(redist.attrib["Permanent"], "yes")
+        self.assertEqual(redist.attrib["Vital"], "yes")
+        self.assertEqual(redist.attrib["InstallArguments"], "/install /quiet /norestart")
+        self.assertIn("VCRedistX64Installed = 1", redist.attrib["DetectCondition"])
+        self.assertIn("VCRedistX64Major", redist.attrib["DetectCondition"])
+        for variable in ("VcRedistMajor", "VcRedistMinor", "VcRedistBuild", "VcRedistRevision"):
+            self.assertIn(f"$({variable})", redist.attrib["DetectCondition"])
+
     @unittest.skipUnless(shutil.which("pwsh"), "missing fixture: PowerShell pwsh")
     def test_manifest_checker_rejects_missing_or_unsafe_embedded_resources(self):
         """An SDK extractor fixture exercises the real packaging check, including failure paths."""

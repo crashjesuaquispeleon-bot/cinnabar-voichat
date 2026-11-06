@@ -487,7 +487,7 @@ settings! {
         [(SettingPanel::Audio, 9)], [SettingsGroup::Audio], Some(AudioCategory::Weather), None;
     VoiceChatEnabled => "voice_chat_enabled", toggle("Enable Voice Chat", false),
         [(SettingPanel::Audio, 10)], [SettingsGroup::Audio], None, None;
-    VoiceActivationMode => "voice_activation_mode", dropdown("Voice Activation Mode", VOICE_ACTIVATION_CHOICES, 0),
+    VoiceActivationMode => "voice_activation_mode", dropdown("Voice Activation Mode", VOICE_ACTIVATION_CHOICES, 1),
         [(SettingPanel::Audio, 11)], [SettingsGroup::Audio], None, None;
     VoiceChatMuted => "voice_chat_muted", toggle("Mute My Microphone", false),
         [(SettingPanel::Audio, 12)], [SettingsGroup::Audio], None, None;

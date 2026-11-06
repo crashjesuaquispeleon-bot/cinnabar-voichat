@@ -20,6 +20,21 @@ $version = $versionMatch.Groups[1].Value
 
 $outPath = [IO.Path]::GetFullPath($Out)
 New-Item -ItemType Directory -Force $outPath | Out-Null
+
+# Bundle Microsoft's current x64 VC++ v14 runtime. Verify its Authenticode signature and
+# use its exact version for Burn detection, so newer runtimes already on the PC are not downgraded.
+$vcRedist = Join-Path $outPath "vc_redist.x64.exe"
+Invoke-WebRequest -Uri "https://aka.ms/vc14/vc_redist.x64.exe" -OutFile $vcRedist
+$vcSignature = Get-AuthenticodeSignature -LiteralPath $vcRedist
+if ($vcSignature.Status -ne "Valid" -or
+    $vcSignature.SignerCertificate.Subject -notmatch "Microsoft Corporation") {
+    throw "Downloaded VC++ redistributable does not have a valid Microsoft Authenticode signature"
+}
+$vcVersionText = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($vcRedist).ProductVersion
+$vcVersionMatch = [regex]::Match($vcVersionText, '(\d+)\.(\d+)\.(\d+)\.(\d+)')
+if (-not $vcVersionMatch.Success) { throw "Cannot read VC++ redistributable product version: $vcVersionText" }
+$vcVersion = [version]$vcVersionMatch.Groups[0].Value
+if ($vcVersion.Major -ne 14) { throw "Unexpected VC++ redistributable major version: $vcVersion" }
 $payload = Join-Path $outPath "payload"
 # Only remove this builder's payload directory after resolving it within the output root.
 if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($payload)) -ne $outPath) { throw "unsafe payload path" }
@@ -56,7 +71,24 @@ wix build -arch x64 -d Version=$version -d Payload=$payload -d Icon=$icon -o $ms
 if ($LASTEXITCODE -ne 0) { throw "wix build failed" }
 & (Join-Path $PSScriptRoot "sign.ps1") -Path $msi
 $setup = Join-Path $outPath "Cinnabar-$version-x64-setup.exe"
-wix build -arch x64 -ext WixToolset.BootstrapperApplications.wixext -d Version=$version -d Msi=$msi -d Icon=$icon -d Logo=$logo -o $setup (Join-Path $PSScriptRoot "setup.wxs")
+$wixArgs = @(
+    "build",
+    "-arch", "x64",
+    "-ext", "WixToolset.BootstrapperApplications.wixext",
+    "-ext", "WixToolset.Util.wixext",
+    "-d", "Version=$version",
+    "-d", "Msi=$msi",
+    "-d", "VcRedist=$vcRedist",
+    "-d", "VcRedistMajor=$($vcVersion.Major)",
+    "-d", "VcRedistMinor=$($vcVersion.Minor)",
+    "-d", "VcRedistBuild=$($vcVersion.Build)",
+    "-d", "VcRedistRevision=$($vcVersion.Revision)",
+    "-d", "Icon=$icon",
+    "-d", "Logo=$logo",
+    "-o", $setup,
+    (Join-Path $PSScriptRoot "setup.wxs")
+)
+& wix @wixArgs
 if ($LASTEXITCODE -ne 0) { throw "setup bundle build failed" }
 & (Join-Path $PSScriptRoot "execution-level.ps1") -Executable $setup
 $engine = Join-Path $outPath "setup-engine.exe"
@@ -72,5 +104,10 @@ if ($env:WINDOWS_CERT_PFX_BASE64) {
     Move-Item -LiteralPath $signed -Destination $setup -Force
 }
 & (Join-Path $PSScriptRoot "sign.ps1") -Path $setup
+$bundleCheck = Join-Path $outPath "bundle-check"
+$bundleCheckBA = Join-Path $outPath "bundle-check-bootstrapper"
+& (Join-Path $PSScriptRoot "check-setup.ps1") -Setup $setup -Msi $msi -Out $bundleCheck -OutBA $bundleCheckBA
+if ($LASTEXITCODE -ne 0) { throw "setup bundle verification failed" }
+Remove-Item -LiteralPath $bundleCheck, $bundleCheckBA -Recurse -Force
 Write-Output $msi
 Write-Output $setup

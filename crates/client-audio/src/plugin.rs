@@ -21,10 +21,8 @@ impl bevy::prelude::Plugin for ClientAudioPlugin {
                     crate::audio::voice_controller::sync_voice_capture_with_policy,
                     crate::audio::voice_loopback::attach_voice_loopback_to_named_audio
                         .after(crate::audio::voice_controller::sync_voice_capture_with_policy),
-                    crate::audio::voice_remote::sync_remote_voice_playback
-                        .after(crate::audio::voice_controller::sync_voice_capture_with_policy),
                     crate::audio::voice_remote::attach_remote_voice_to_named_audio
-                        .after(crate::audio::voice_remote::sync_remote_voice_playback),
+                        .after(crate::audio::voice_controller::sync_voice_capture_with_policy),
                 ),
             )
             .add_message::<UiSoundCue>()

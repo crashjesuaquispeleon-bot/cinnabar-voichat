@@ -1,14 +1,36 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
-     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">
+     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <!-- The embedded MSI remains the single owner of files, shortcuts and upgrades. -->
   <Bundle Name="Cinnabar Setup" Manufacturer="Cinnabar" Version="$(Version)"
           UpgradeCode="3D75803D-B970-4281-A17B-7BCC8CF39F7C" IconSourceFile="$(Icon)">
+    <!-- Install the current x64 VC++ runtime before the app MSI when the system lacks it. -->
+    <util:RegistrySearch Id="VCRedistX64InstalledSearch" Variable="VCRedistX64Installed"
+                         Root="HKLM" Key="SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64"
+                         Value="Installed" Result="value" Bitness="always64" />
+    <util:RegistrySearch Id="VCRedistX64MajorSearch" Variable="VCRedistX64Major"
+                         Root="HKLM" Key="SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64"
+                         Value="Major" Result="value" Bitness="always64" />
+    <util:RegistrySearch Id="VCRedistX64MinorSearch" Variable="VCRedistX64Minor"
+                         Root="HKLM" Key="SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64"
+                         Value="Minor" Result="value" Bitness="always64" />
+    <util:RegistrySearch Id="VCRedistX64BuildSearch" Variable="VCRedistX64Build"
+                         Root="HKLM" Key="SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64"
+                         Value="Bld" Result="value" Bitness="always64" />
+    <util:RegistrySearch Id="VCRedistX64RevisionSearch" Variable="VCRedistX64Revision"
+                         Root="HKLM" Key="SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64"
+                         Value="Rbld" Result="value" Bitness="always64" />
     <BootstrapperApplication>
       <bal:WixStandardBootstrapperApplication Theme="hyperlinkLicense" LicenseUrl=""
                                                LogoFile="$(Logo)" />
     </BootstrapperApplication>
     <Chain>
+      <ExePackage Id="VCRedistX64" SourceFile="$(VcRedist)"
+                  InstallArguments="/install /quiet /norestart"
+                  RepairArguments="/repair /quiet /norestart"
+                  DetectCondition="VCRedistX64Installed = 1 AND ((VCRedistX64Major &gt; $(VcRedistMajor)) OR (VCRedistX64Major = $(VcRedistMajor) AND VCRedistX64Minor &gt; $(VcRedistMinor)) OR (VCRedistX64Major = $(VcRedistMajor) AND VCRedistX64Minor = $(VcRedistMinor) AND VCRedistX64Build &gt; $(VcRedistBuild)) OR (VCRedistX64Major = $(VcRedistMajor) AND VCRedistX64Minor = $(VcRedistMinor) AND VCRedistX64Build = $(VcRedistBuild) AND VCRedistX64Revision &gt;= $(VcRedistRevision)))"
+                  PerMachine="yes" Permanent="yes" Vital="yes" />
       <MsiPackage SourceFile="$(Msi)" Compressed="yes" Visible="no" />
     </Chain>
   </Bundle>

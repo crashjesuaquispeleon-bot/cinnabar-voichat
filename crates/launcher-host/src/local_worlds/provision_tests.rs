@@ -226,6 +226,45 @@ fn background_detection_reports_checking_then_its_result() {
     );
 }
 
+
+/// A successful optional prewarm changes only readiness; it does not require a real server in
+/// this fixture and it is skipped by ordinary installation.
+#[test]
+fn prepared_readiness_is_reused_by_later_world_opens() {
+    let dir = scratch();
+    let mojang = FakeMojang::start(VERSION, build_zip(&[("bedrock_server", b"server")]));
+    let provisioner = mojang.provisioner(dir.path());
+    provisioner.set_runtime(RuntimeInfo::translated());
+    provisioner.accept_eula().unwrap();
+
+    let ready = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let preparation_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let prepared_by_worker = Arc::clone(&ready);
+    let checked_by_provisioner = Arc::clone(&ready);
+    let counted = Arc::clone(&preparation_count);
+    provisioner.set_preparer(
+        Arc::new(move |_, _, _| {
+            counted.fetch_add(1, Ordering::SeqCst);
+            prepared_by_worker.store(true, Ordering::SeqCst);
+            Ok(())
+        }),
+        Arc::new(move |_| checked_by_provisioner.load(Ordering::SeqCst)),
+    );
+
+    assert!(provisioner.needs_preparation());
+    let binary = provisioner.ensure(&Cancel::never()).unwrap();
+    assert!(provisioner.needs_preparation());
+    assert_eq!(preparation_count.load(Ordering::SeqCst), 0);
+
+    assert_eq!(provisioner.ensure_prepared(&Cancel::never()).unwrap(), binary);
+    assert!(!provisioner.needs_preparation());
+    assert_eq!(preparation_count.load(Ordering::SeqCst), 1);
+
+    // A later ensure() is still the normal, non-preparing path.
+    assert_eq!(provisioner.ensure(&Cancel::never()).unwrap(), binary);
+    assert_eq!(preparation_count.load(Ordering::SeqCst), 1);
+}
+
 /// Preparation belongs to setup, not the world's own launch. Even a configured preparation
 /// failure must not turn an installed server into a missing or unstartable one.
 #[test]
@@ -244,10 +283,13 @@ fn optional_preparation_failure_does_not_block_normal_world_installation() {
         }),
         Arc::new(|_| false),
     );
+    assert!(provisioner.needs_preparation());
     let binary = provisioner.ensure(&Cancel::never()).unwrap();
+    assert!(provisioner.needs_preparation());
     assert_eq!(attempts.load(Ordering::SeqCst), 0);
     assert_eq!(provisioner.status().0.state, SetupState::Ready);
     assert!(provisioner.ensure_prepared(&Cancel::never()).is_err());
+    assert!(provisioner.needs_preparation());
     assert_eq!(attempts.load(Ordering::SeqCst), 1);
     assert_eq!(provisioner.status().0.state, SetupState::Failed);
     assert_eq!(provisioner.ensure(&Cancel::never()).unwrap(), binary);

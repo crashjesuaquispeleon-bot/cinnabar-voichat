@@ -220,6 +220,13 @@ impl Provisioner {
         check.is_none_or(|check| check(binary))
     }
 
+    /// Whether optional runtime preparation is still needed. A platform without a preparer
+    /// reports ready; a missing install or an unsealed translated cache needs background setup.
+    pub(crate) fn needs_preparation(&self) -> bool {
+        self.installed()
+            .is_none_or(|(binary, _)| !self.prepared(&binary))
+    }
+
     pub(crate) fn on_detected(&self, hook: DetectedHook) {
         lock(&self.hooks).on_detected = Some(hook);
     }
